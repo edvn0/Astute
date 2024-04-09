@@ -1,0 +1,81 @@
+# Prerequisites
+*.d
+
+vscode-build
+build
+out
+cmake-build*
+
+*pipe-bin
+
+.vs
+
+.DS_Store
+
+Thumbs.db
+*.tga
+
+.idea
+cmake-*
+
+# Our icons
+!App/Assets/Icons/*.png
+
+App/Assets/Textures
+App/Assets/Logs/*.log
+App/Assets/Logs/*.txt
+
+__pycache__
+App/Assets/Scripts/*.pyc
+App/Assets/Scripts/*.exp
+App/Assets/Scripts/*.pyd
+App/Assets/Scripts/*.pdb
+App/Assets/Scripts/*.so
+
+*.prof
+
+VS
+*.cache
+.cache
+
+*.spv
+
+XCode
+Xcode
+xcode
+compile_commands.json
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Folders
+build*
+
+App/*.ini

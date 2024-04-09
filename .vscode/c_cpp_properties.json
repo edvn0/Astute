@@ -1,0 +1,32 @@
+{
+  "configurations": [
+    {
+      "name": "Win32",
+      "compileCommands": "${workspaceRoot}/build/compile_commands.json",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "C:\\VulkanSDK\\1.3.261.1"
+      ],
+      "defines": [
+        "_DEBUG",
+        "UNICODE",
+        "_UNICODE"
+      ],
+      "windowsSdkVersion": "10.0.22621.0",
+      "cStandard": "c17",
+      "cppStandard": "c++20"
+    },
+    {
+      "name": "Linux",
+      "compileCommands": "${workspaceRoot}/build/compile_commands.json",
+      "includePath": [
+        "${workspaceFolder}/**"
+      ],
+      "compilerPath": "/home/edwinc/Builds/bin/clang++",
+      "cStandard": "c17",
+      "cppStandard": "c++20",
+      "intelliSenseMode": "linux-clang-x64"
+    }
+  ],
+  "version": 4
+}
