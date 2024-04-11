@@ -184,11 +184,92 @@ Device::create_device(VkSurfaceKHR surface) -> void
                    queue_support.at(QueueType::Transfer).family_index,
                    0,
                    &queue_support.at(QueueType::Transfer).queue);
+
+  VkCommandPoolCreateInfo command_pool_create_info = {};
+  command_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+  command_pool_create_info.queueFamilyIndex =
+    queue_support.at(QueueType::Graphics).family_index;
+  command_pool_create_info.flags =
+    VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+  vkCreateCommandPool(
+    device(), &command_pool_create_info, nullptr, &graphics_command_pool);
+
+  command_pool_create_info.queueFamilyIndex =
+    queue_support.at(QueueType::Compute).family_index;
+  vkCreateCommandPool(
+    device(), &command_pool_create_info, nullptr, &compute_command_pool);
+}
+
+auto
+Device::execute_immediate(QueueType type,
+                          std::function<void(VkCommandBuffer)>&& command)
+  -> void
+{
+  // Create command buffer from pool
+  VkCommandBuffer cmdBuffer;
+
+  VkCommandBufferAllocateInfo allocation_info = {};
+  allocation_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  allocation_info.commandPool =
+    type == QueueType::Compute ? compute_command_pool : graphics_command_pool;
+  allocation_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocation_info.commandBufferCount = 1;
+
+  vkAllocateCommandBuffers(device(), &allocation_info, &cmdBuffer);
+
+  // If requested, also start the new command buffer
+  VkCommandBufferBeginInfo cmdBufferBeginInfo{};
+  cmdBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  vkBeginCommandBuffer(cmdBuffer, &cmdBufferBeginInfo);
+
+  // Execute function
+  command(cmdBuffer);
+  // End command buffer
+  vkEndCommandBuffer(cmdBuffer);
+  // Submit command buffer
+  VkSubmitInfo submitInfo = {};
+  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submitInfo.commandBufferCount = 1;
+  submitInfo.pCommandBuffers = &cmdBuffer;
+
+  VkFenceCreateInfo fence_create_info = {};
+  fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+  fence_create_info.flags = 0;
+  VkFence fence;
+
+  vkCreateFence(device(), &fence_create_info, nullptr, &fence);
+
+  // Submit to queue
+  auto queue = get_queue(type);
+  vkQueueSubmit(queue, 1, &submitInfo, fence);
+  static constexpr auto default_fence_timeout = 100000000000;
+  vkWaitForFences(device(), 1, &fence, VK_TRUE, default_fence_timeout);
+
+  vkDestroyFence(device(), fence, nullptr);
+  vkFreeCommandBuffers(device(), allocation_info.commandPool, 1, &cmdBuffer);
+}
+
+auto
+Device::create_secondary_command_buffer() -> VkCommandBuffer
+{
+  VkCommandBufferAllocateInfo alloc_info = {};
+  alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  alloc_info.commandPool = graphics_command_pool;
+  alloc_info.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+  alloc_info.commandBufferCount = 1;
+
+  VkCommandBuffer command_buffer;
+  vkAllocateCommandBuffers(device(), &alloc_info, &command_buffer);
+
+  return command_buffer;
 }
 
 auto
 Device::deinitialise() -> void
 {
+  vkDestroyCommandPool(vk_device, graphics_command_pool, nullptr);
+  vkDestroyCommandPool(vk_device, compute_command_pool, nullptr);
+
   vkDestroyDevice(vk_device, nullptr);
 }
 

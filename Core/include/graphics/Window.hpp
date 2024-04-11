@@ -43,6 +43,9 @@ public:
   auto toggle_fullscreen() -> void;
   auto close() -> void;
 
+  auto get_native() const -> const GLFWwindow* { return window; }
+  auto get_swapchain() const -> const Swapchain& { return *swapchain; }
+
 private:
   Core::Scope<Swapchain> swapchain;
 

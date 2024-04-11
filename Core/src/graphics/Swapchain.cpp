@@ -43,16 +43,14 @@ auto
 Swapchain::initialise(const Window* window, VkSurfaceKHR surf) -> void
 {
   surface = surf;
-  const auto& device = Device::the().device();
   const auto& physical_device = Device::the().physical();
-  const auto& instance = Instance::the().instance();
 
   auto graphics_queue = Device::the().get_family(QueueType::Graphics);
   queue_node_index = graphics_queue;
 
   Core::u32 format_count{};
   vkGetPhysicalDeviceSurfaceFormatsKHR(
-    physical_device, surface, &format_count, NULL);
+    physical_device, surface, &format_count, nullptr);
 
   std::vector<VkSurfaceFormatKHR> surface_formats(format_count);
   vkGetPhysicalDeviceSurfaceFormatsKHR(
@@ -103,6 +101,7 @@ Swapchain::create(const Core::Extent& input_size, bool vsync) -> void
 
   auto present_mode = determine_present_mode(physical_device, surface, vsync);
   auto wanted_swapchain_images = calculate_swapchain_image_count(surf_caps);
+  image_count = wanted_swapchain_images;
   auto pre_transform = select_surface_transformation(surf_caps);
   auto composite_alpha = select_composite_alpha(surf_caps);
 
@@ -213,21 +212,21 @@ Swapchain::present() -> void
   VkPipelineStageFlags wait_stage_mask =
     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
-  VkSubmitInfo submitInfo = {};
-  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submitInfo.pWaitDstStageMask = &wait_stage_mask;
-  submitInfo.pWaitSemaphores = &semaphores.present_complete;
-  submitInfo.waitSemaphoreCount = 1;
-  submitInfo.pSignalSemaphores = &semaphores.render_complete;
-  submitInfo.signalSemaphoreCount = 1;
-  submitInfo.pCommandBuffers =
+  VkSubmitInfo present_submit_info = {};
+  present_submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  present_submit_info.pWaitDstStageMask = &wait_stage_mask;
+  present_submit_info.pWaitSemaphores = &semaphores.present_complete;
+  present_submit_info.waitSemaphoreCount = 1;
+  present_submit_info.pSignalSemaphores = &semaphores.render_complete;
+  present_submit_info.signalSemaphoreCount = 1;
+  present_submit_info.pCommandBuffers =
     &command_buffers[current_buffer_index].command_buffer;
-  submitInfo.commandBufferCount = 1;
+  present_submit_info.commandBufferCount = 1;
 
   vkResetFences(device, 1, &wait_fences[current_buffer_index]);
   vkQueueSubmit(Device::the().get_queue(QueueType::Graphics),
                 1,
-                &submitInfo,
+                &present_submit_info,
                 wait_fences[current_buffer_index]);
 
   VkResult result;
@@ -254,10 +253,12 @@ Swapchain::present() -> void
     }
   }
 
-  static constexpr auto frames_in_flight = 3ULL;
-  current_buffer_index = (current_buffer_index + 1) % frames_in_flight;
-  vkWaitForFences(
-    device, 1, &wait_fences[current_buffer_index], VK_TRUE, UINT64_MAX);
+  current_buffer_index = (current_buffer_index + 1) % image_count;
+  vkWaitForFences(device,
+                  1,
+                  &wait_fences[current_buffer_index],
+                  VK_TRUE,
+                  DEFAULT_FENCE_TIMEOUT);
 }
 
 auto

@@ -35,7 +35,21 @@ public:
   }
 
   auto get_queue(QueueType t) { return queue_support.at(t).queue; }
+  auto get_queue(QueueType t) const { return queue_support.at(t).queue; }
   auto get_family(QueueType t) { return queue_support.at(t).family_index; }
+  auto get_family(QueueType t) const
+  {
+    return queue_support.at(t).family_index;
+  }
+
+  auto execute_immediate(QueueType, std::function<void(VkCommandBuffer)>&&)
+    -> void;
+  auto execute_immediate(std::function<void(VkCommandBuffer)>&& command) -> void
+  {
+    execute_immediate(QueueType::Graphics, std::move(command));
+  }
+
+  auto create_secondary_command_buffer() -> VkCommandBuffer;
 
 private:
   auto deinitialise() -> void;
@@ -52,6 +66,8 @@ private:
 
   VkDevice vk_device;
   VkPhysicalDevice vk_physical_device;
+  VkCommandPool graphics_command_pool;
+  VkCommandPool compute_command_pool;
 
   std::unordered_map<QueueType, QueueInformation> queue_support;
 };

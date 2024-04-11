@@ -34,6 +34,11 @@ public:
   virtual auto interface() -> void {}
   virtual auto on_resize(const Extent&) -> void {}
 
+  static auto the() -> Application&;
+
+  auto current_frame_index() const -> u32;
+  auto get_swapchain() const -> const Graphics::Swapchain&;
+
 protected:
   auto get_statistics() const -> const Statistics& { return statistics; }
   auto get_statistics() -> Statistics& { return statistics; }
@@ -47,7 +52,16 @@ private:
   Statistics statistics{};
 
   Scope<Graphics::Window> window;
+  Scope<Graphics::InterfaceSystem> interface_system;
   auto forward_incoming_events(Event&) -> void;
+
+  // Make singleton
+  Application(const Application&) = delete;
+  Application(Application&&) = delete;
+  auto operator=(const Application&) -> Application& = delete;
+  auto operator=(Application&&) -> Application& = delete;
+
+  static inline Application* instance{ nullptr };
 };
 
 } // namespace Engine::Core

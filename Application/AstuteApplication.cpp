@@ -2,6 +2,8 @@
 
 #include "graphics/Window.hpp"
 
+#include <imgui.h>
+
 AstuteApplication::~AstuteApplication() = default;
 
 AstuteApplication::AstuteApplication(Application::Configuration config)
@@ -11,7 +13,12 @@ auto AstuteApplication::update(f64) -> void{};
 auto AstuteApplication::interpolate(f64) -> void{};
 
 auto
-AstuteApplication::interface() -> void{};
+AstuteApplication::interface() -> void
+{
+  ImGui::Begin("Test");
+  ImGui::Text("%s", "Hello, world!");
+  ImGui::End();
+};
 auto
 AstuteApplication::handle_events(Event& event) -> void
 {

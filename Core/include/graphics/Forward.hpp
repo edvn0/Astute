@@ -2,9 +2,11 @@
 
 namespace Engine::Graphics {
 
-class Window;
-class Instance;
+class CommandBuffer;
 class Device;
+class Instance;
+class InterfaceSystem;
 class Swapchain;
+class Window;
 
 }

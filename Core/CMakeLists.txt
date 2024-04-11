@@ -15,6 +15,12 @@ add_library(Core STATIC
     src/graphics/Device.cpp
     include/graphics/Swapchain.hpp
     src/graphics/Swapchain.cpp
+    include/graphics/CommandBuffer.hpp
+    src/graphics/CommandBuffer.cpp
+    include/graphics/InterfaceSystem.hpp
+    src/graphics/InterfaceSystem.cpp
+    include/core/PlatformConfig.hpp
+    src/core/PlatformConfig.cpp
     include/graphics/Allocator.hpp
     src/graphics/Allocator.cpp
     include/core/Clock.hpp
@@ -22,7 +28,7 @@ add_library(Core STATIC
     include/core/Types.hpp
     include/graphics/Window.hpp
     src/graphics/Window.cpp)
-target_include_directories(Core PUBLIC include PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(Core PUBLIC glfw Vulkan::Vulkan PRIVATE GPUOpen::VulkanMemoryAllocator)
+target_include_directories(Core PUBLIC include ${CMAKE_SOURCE_DIR}/Library/imgui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(Core PUBLIC glfw Vulkan::Vulkan PRIVATE GPUOpen::VulkanMemoryAllocator imgui)
 
 target_precompile_headers(Core PRIVATE include/pch/CorePCH.hpp)

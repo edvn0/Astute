@@ -7,6 +7,8 @@
 #include "graphics/Allocator.hpp"
 #include "graphics/Device.hpp"
 #include "graphics/Instance.hpp"
+#include "graphics/InterfaceSystem.hpp"
+#include "graphics/Swapchain.hpp"
 #include "graphics/Window.hpp"
 
 namespace Engine::Core {
@@ -40,11 +42,16 @@ Application::Application(Configuration conf)
     [this](Event& event) { forward_incoming_events(event); });
 
   Graphics::Allocator::construct();
+
+  interface_system = make_scope<Graphics::InterfaceSystem>(*window);
+
+  instance = this;
 }
 
 Application::~Application()
 {
   Graphics::Allocator::destroy();
+  interface_system.reset();
   window.reset();
   Graphics::Device::destroy();
   Graphics::Instance::destroy();
@@ -73,6 +80,10 @@ Application::run() -> i32
     }
     interpolate(accumulator / delta_time);
 
+    interface_system->begin_frame();
+    interface();
+    interface_system->end_frame();
+
     window->present();
 
     ++frame_count;
@@ -92,6 +103,25 @@ Application::run() -> i32
   info("Exiting Astute Engine.");
 
   return 0;
+}
+
+auto
+Application::the() -> Application&
+{
+  assert(instance != nullptr && "Application instance is null.");
+  return *instance;
+}
+
+auto
+Application::current_frame_index() const -> u32
+{
+  return window->get_swapchain().get_current_buffer_index();
+}
+
+auto
+Application::get_swapchain() const -> const Graphics::Swapchain&
+{
+  return window->get_swapchain();
 }
 
 } // namespace Core
