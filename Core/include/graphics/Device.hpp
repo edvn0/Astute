@@ -40,7 +40,7 @@ public:
 private:
   auto deinitialise() -> void;
 
-  Device(VkSurfaceKHR);
+  explicit Device(VkSurfaceKHR);
   Device(const Device&) = delete;
   Device& operator=(const Device&) = delete;
 

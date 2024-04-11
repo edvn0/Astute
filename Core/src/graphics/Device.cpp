@@ -49,24 +49,25 @@ Device::is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface)
   // TODO: Add more suitability checks here (features, extensions, etc.)
 
   if (is_suitable) {
-    queue_support[QueueType::Graphics] = {
+    using enum QueueType;
+    queue_support[Graphics] = {
       VK_NULL_HANDLE,
       static_cast<Core::u32>(graphics_family_index),
     };
     if (compute_family_index >= 0) {
-      queue_support[QueueType::Compute] = {
+      queue_support[Compute] = {
         VK_NULL_HANDLE,
         static_cast<Core::u32>(compute_family_index),
       };
     }
     if (transfer_family_index >= 0) {
-      queue_support[QueueType::Transfer] = {
+      queue_support[Transfer] = {
         VK_NULL_HANDLE,
         static_cast<Core::u32>(transfer_family_index),
       };
     }
     if (present_family_index >= 0) {
-      queue_support[QueueType::Present] = {
+      queue_support[Present] = {
         VK_NULL_HANDLE,
         static_cast<Core::u32>(present_family_index),
       };
@@ -75,33 +76,6 @@ Device::is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface)
 
   return is_suitable;
 }
-
-class NoDeviceFoundException : public std::runtime_error
-{
-public:
-  NoDeviceFoundException(const std::string_view data)
-    : std::runtime_error(data.data())
-  {
-  }
-};
-
-class CouldNotSelectPhysicalException : public std::runtime_error
-{
-public:
-  CouldNotSelectPhysicalException(const std::string_view data)
-    : std::runtime_error(data.data())
-  {
-  }
-};
-
-class CouldNotCreateDeviceException : public std::runtime_error
-{
-public:
-  CouldNotCreateDeviceException(const std::string_view data)
-    : std::runtime_error(data.data())
-  {
-  }
-};
 
 Device::Device(VkSurfaceKHR surf)
 {
@@ -143,7 +117,7 @@ Device::create_device(VkSurfaceKHR surface) -> void
   vkEnumeratePhysicalDevices(instance, &device_count, nullptr);
 
   if (device_count == 0) {
-    throw NoDeviceFoundException{
+    throw Core::NoDeviceFoundException{
       "No devices found",
     };
   }
@@ -159,7 +133,7 @@ Device::create_device(VkSurfaceKHR surface) -> void
   }
 
   if (!vk_physical_device) {
-    throw CouldNotSelectPhysicalException{
+    throw Core::CouldNotSelectPhysicalException{
       "Failed to find a suitable GPU",
     };
   }
@@ -189,7 +163,7 @@ Device::create_device(VkSurfaceKHR surface) -> void
 
   if (vkCreateDevice(vk_physical_device, &create_info, nullptr, &vk_device) !=
       VK_SUCCESS) {
-    throw CouldNotCreateDeviceException{
+    throw Core::CouldNotCreateDeviceException{
       "Could not create VkDevice",
     };
   }

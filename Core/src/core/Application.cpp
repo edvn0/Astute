@@ -4,11 +4,27 @@
 #include "core/Clock.hpp"
 #include "core/Logger.hpp"
 
+#include "graphics/Allocator.hpp"
 #include "graphics/Device.hpp"
 #include "graphics/Instance.hpp"
 #include "graphics/Window.hpp"
 
 namespace Engine::Core {
+
+auto
+Application::forward_incoming_events(Event& event) -> void
+{
+  EventDispatcher dispatcher(event);
+  dispatcher.dispatch<WindowResizeEvent>([this](WindowResizeEvent& event) {
+    const BasicExtent extent{ event.get_width(), event.get_height() };
+    on_resize(extent.as<u32>());
+    return true;
+  });
+
+  if (event.handled)
+    return;
+  handle_events(event);
+}
 
 Application::Application(Configuration conf)
   : config(conf)
@@ -20,16 +36,18 @@ Application::Application(Configuration conf)
     .start_fullscreen = config.fullscreen,
     .is_fullscreen = config.fullscreen,
   });
+  window->set_event_handler(
+    [this](Event& event) { forward_incoming_events(event); });
 
-  (void)Graphics::Instance::initialise();
-  (void)Graphics::Device::initialise(window->get_surface());
+  Graphics::Allocator::construct();
 }
 
 Application::~Application()
 {
-  window = nullptr;
-  Graphics::Device::the().destroy();
-  Graphics::Instance::the().destroy();
+  Graphics::Allocator::destroy();
+  window.reset();
+  Graphics::Device::destroy();
+  Graphics::Instance::destroy();
 }
 
 auto

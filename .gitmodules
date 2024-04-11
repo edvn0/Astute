@@ -4,3 +4,7 @@
 [submodule "Library/VulkanMemoryAllocator"]
 	path = Library/VulkanMemoryAllocator
 	url = git@github.com:GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+[submodule "Library/imgui"]
+	path = Library/imgui
+	url = git@github.com:edvn0/imgui.git
+	branch = docking
