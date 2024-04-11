@@ -10,19 +10,18 @@
       "name": "Debug",
       "program": "${workspaceRoot}/build/Application/App",
       "cwd": "${workspaceRoot}/Application",
+      "preLaunchTask": "build",
       "args": [
-        "--wd",
-        "${workspaceRoot}/Application"
+        "-b",
+        "1920",
+        "-d",
+        "1080"
       ],
       "environment": [
         {
           "name": "LOG_LEVEL",
           "value": "Debug"
         },
-        {
-          "name": "ENABLE_VALIDATION_LAYERS",
-          "value": "ON"
-        }
       ],
     }
   ]

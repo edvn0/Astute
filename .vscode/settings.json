@@ -1,5 +1,6 @@
 {
-  "sonarlint.pathToCompileCommands": "${workspaceFolder}\\build-clang\\compile_commands.json",
+  "sonarlint.pathToCompileCommands":
+    "${workspaceFolder}\\build-clang\\compile_commands.json",
   "C_Cpp.default.compileCommands": "${workspaceFolder}\\compile_commands.json",
   "C_Cpp.codeAnalysis.clangTidy.useBuildPath": true,
   "cSpell.words": [
@@ -127,6 +128,7 @@
     "valarray": "cpp",
     "expected": "cpp",
     "*.glsl": "glsl",
-    "cassert": "cpp"
+    "cassert": "cpp",
+    "*.rh": "cpp"
   }
 }
