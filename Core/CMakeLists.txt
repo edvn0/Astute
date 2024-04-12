@@ -19,6 +19,8 @@ add_library(Core STATIC
     src/graphics/CommandBuffer.cpp
     include/graphics/InterfaceSystem.hpp
     src/graphics/InterfaceSystem.cpp
+    include/graphics/Renderer.hpp
+    src/graphics/Renderer.cpp
     include/core/Platform.hpp
     src/core/Platform.cpp
     include/graphics/Allocator.hpp

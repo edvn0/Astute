@@ -4,6 +4,6 @@
 #include "core/Event.hpp"
 #include "core/Logger.hpp"
 
-#include "graphics/Window.hpp"
+#include "graphics/Renderer.hpp"
 
 #include "ui/UI.hpp"

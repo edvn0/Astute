@@ -2,6 +2,8 @@
 
 #include <imgui.h>
 
+#include "graphics/Window.hpp"
+
 AstuteApplication::~AstuteApplication() = default;
 
 AstuteApplication::AstuteApplication(Application::Configuration config)
@@ -25,15 +27,17 @@ ShowDockingDisabledMessage()
 auto
 AstuteApplication::interface() -> void
 {
+  using namespace Engine::UI;
   ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
 
-  Engine::UI::scope("Viewport", [&](auto w, auto h) {
-    Engine::UI::coloured_text({ 1.0F, 1.0F, 0.1F, 1.0F }, "{}", "Test");
+  scope("Viewport", [&](auto w, auto h) {
+    coloured_text({ 1.0F, 1.0F, 0.1F, 1.0F }, "{}", "Test");
     const auto& statistics = get_statistics();
-    Engine::UI::coloured_text({ 1.0F, 0.1F, 1.0F, 1.0F },
-                              "FPS: {}ms, Frametime: {:5f}Hz",
-                              statistics.frames_per_seconds,
-                              statistics.frame_time);
+    coloured_text({ 1.0F, 0.1F, 1.0F, 1.0F },
+                  "FPS: {}ms, Frametime: {:5f}Hz",
+                  statistics.frames_per_seconds,
+                  statistics.frame_time);
+    // image(renderer.get_output_image(), w, h);
   });
 }
 

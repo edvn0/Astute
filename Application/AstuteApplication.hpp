@@ -16,4 +16,7 @@ public:
   auto interface() -> void override;
   auto handle_events(Event& event) -> void override;
   auto on_resize(const Extent&) -> void override;
+
+private:
+  Renderer renderer;
 };
