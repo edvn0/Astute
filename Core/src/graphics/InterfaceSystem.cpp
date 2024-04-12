@@ -217,7 +217,7 @@ InterfaceSystem::end_frame() -> void
 
   vkEndCommandBuffer(draw_command_buffer);
 
-  if (const ImGuiIO& imgui_io = ImGui::GetIO();
+  if (const auto& imgui_io = ImGui::GetIO();
       imgui_io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
     ImGui::UpdatePlatformWindows();
     ImGui::RenderPlatformWindowsDefault();

@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <type_traits>
 
 #include "core/Exceptions.hpp"
@@ -101,5 +102,8 @@ template<class T, Detail::Deleter D, typename... Args>
 {
   return Scope<T, D>{ new T{ std::forward<Args>(args)... } };
 }
+
+template<class T>
+using Maybe = std::optional<T>;
 
 } // namespace Core

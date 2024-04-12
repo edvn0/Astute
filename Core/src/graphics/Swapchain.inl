@@ -103,7 +103,7 @@ create_swapchain(const VkDevice& device,
   vkCreateSwapchainKHR(device, &swapchain_create_info, nullptr, &swapchain);
   if (old_swapchain) {
     vkDestroySwapchainKHR(device, old_swapchain, nullptr);
-    old_swapchain = VK_NULL_HANDLE;
+    old_swapchain = nullptr;
   }
 }
 
@@ -158,9 +158,7 @@ create_command_pools_and_buffers(const VkDevice& device,
   VkCommandPoolCreateInfo cmd_pool_info{};
   cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
   cmd_pool_info.queueFamilyIndex = queue_family_index;
-  cmd_pool_info.flags =
-    VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // Allows command buffers
-                                                     // to be individually reset
+  cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
   command_buffers.resize(image_count);
   for (auto& command_buffer : command_buffers) {
@@ -179,20 +177,27 @@ create_command_pools_and_buffers(const VkDevice& device,
 }
 
 auto
-setup_semaphores(const VkDevice& device, auto& semaphores) -> void
+setup_semaphores(const VkDevice& device,
+                 auto& semaphores_vector,
+                 const auto image_count) -> void
 {
-  if (!semaphores.render_complete || !semaphores.present_complete) {
-    VkSemaphoreCreateInfo semaphore_create_info{};
-    semaphore_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+  semaphores_vector.resize(image_count);
+  for (auto& semaphores : semaphores_vector) {
+    if (!semaphores.render_complete || !semaphores.present_complete) {
+      VkSemaphoreCreateInfo semaphore_create_info{};
+      semaphore_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-    if (!semaphores.render_complete) {
-      vkCreateSemaphore(
-        device, &semaphore_create_info, nullptr, &semaphores.render_complete);
-    }
+      if (!semaphores.render_complete) {
+        vkCreateSemaphore(
+          device, &semaphore_create_info, nullptr, &semaphores.render_complete);
+      }
 
-    if (!semaphores.present_complete) {
-      vkCreateSemaphore(
-        device, &semaphore_create_info, nullptr, &semaphores.present_complete);
+      if (!semaphores.present_complete) {
+        vkCreateSemaphore(device,
+                          &semaphore_create_info,
+                          nullptr,
+                          &semaphores.present_complete);
+      }
     }
   }
 }
@@ -217,6 +222,7 @@ prepare_submit_info(VkSubmitInfo& submit_info,
                     const auto& semaphores,
                     const VkPipelineStageFlags& pipeline_stage_flags) -> void
 {
+  submit_info = {};
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submit_info.pWaitDstStageMask = &pipeline_stage_flags;
   submit_info.waitSemaphoreCount = 1;
@@ -276,6 +282,9 @@ create_framebuffers(const VkDevice& device,
                     auto& images,
                     const Core::Extent& size) -> void
 {
+  for (auto& framebuffer : framebuffers)
+    vkDestroyFramebuffer(device, framebuffer, nullptr);
+
   framebuffers.resize(images.size());
 
   for (Core::usize i = 0; i < images.size(); i++) {

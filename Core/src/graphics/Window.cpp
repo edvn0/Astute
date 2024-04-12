@@ -54,7 +54,7 @@ Window::Window(Configuration config)
 
   Device::initialise(surface);
 
-  swapchain = Core::make_scope<Swapchain>();
+  swapchain = Core::make_scope<Swapchain>(this);
   swapchain->initialise(this, get_surface());
   swapchain->create(configuration.size, configuration.is_vsync);
 
@@ -212,9 +212,9 @@ Window::present() -> void
 }
 
 auto
-Window::begin_frame() -> void
+Window::begin_frame() -> bool
 {
-  swapchain->begin_frame();
+  return swapchain->begin_frame();
 }
 
 auto

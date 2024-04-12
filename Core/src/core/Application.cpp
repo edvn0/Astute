@@ -19,7 +19,7 @@ Application::forward_incoming_events(Event& event) -> void
   EventDispatcher dispatcher(event);
   dispatcher.dispatch<WindowResizeEvent>([this](WindowResizeEvent& event) {
     const BasicExtent extent{ event.get_width(), event.get_height() };
-    on_resize(extent.as<u32>());
+    // on_resize(extent.as<u32>());
     return true;
   });
 
@@ -68,7 +68,11 @@ Application::run() -> i32
 
   while (!window->should_close()) {
     window->update();
-    window->begin_frame();
+    if (!window->begin_frame()) {
+      info("Could not begin this frame.");
+      continue;
+    }
+
     auto current_frame_time = Clock::now();
     double frame_duration = current_frame_time - last_frame_time;
     last_frame_time = current_frame_time;
@@ -106,6 +110,15 @@ Application::run() -> i32
 }
 
 auto
+Application::on_resize(const Extent& new_size) -> void
+{
+  info("Resizing from Application::on_resize to {} x {}",
+       new_size.width,
+       new_size.height);
+  get_swapchain().on_resize(new_size);
+}
+
+auto
 Application::the() -> Application&
 {
   assert(instance != nullptr && "Application instance is null.");
@@ -120,6 +133,12 @@ Application::current_frame_index() const -> u32
 
 auto
 Application::get_swapchain() const -> const Graphics::Swapchain&
+{
+  return window->get_swapchain();
+}
+
+auto
+Application::get_swapchain() -> Graphics::Swapchain&
 {
   return window->get_swapchain();
 }

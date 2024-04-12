@@ -28,16 +28,17 @@ public:
 
   auto run() -> i32;
 
-  virtual auto update(f64) -> void {}
-  virtual auto interpolate(f64) -> void {}
-  virtual auto handle_events(Event&) -> void {}
-  virtual auto interface() -> void {}
-  virtual auto on_resize(const Extent&) -> void {}
+  virtual auto update(f64) -> void = 0;
+  virtual auto interpolate(f64) -> void = 0;
+  virtual auto handle_events(Event&) -> void = 0;
+  virtual auto interface() -> void = 0;
+  virtual auto on_resize(const Extent&) -> void;
 
   static auto the() -> Application&;
 
   auto current_frame_index() const -> u32;
   auto get_swapchain() const -> const Graphics::Swapchain&;
+  auto get_swapchain() -> Graphics::Swapchain&;
 
 protected:
   auto get_statistics() const -> const Statistics& { return statistics; }

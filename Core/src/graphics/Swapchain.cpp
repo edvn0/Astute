@@ -7,9 +7,20 @@
 
 #include <GLFW/glfw3.h>
 
+#include "core/Verify.hpp"
+
 #include "Swapchain.inl"
 
 namespace Engine::Graphics {
+
+auto
+recompute_size(const GLFWwindow* window)
+{
+  Core::BasicExtent<Core::i32> size;
+  glfwGetFramebufferSize(
+    const_cast<GLFWwindow*>(window), &size.width, &size.height);
+  return size.as<Core::u32>();
+}
 
 auto
 choose_swap_extent(const GLFWwindow* window,
@@ -117,21 +128,28 @@ Swapchain::create(const Core::Extent& input_size, bool vsync) -> void
                    colour_space,
                    colour_format);
 
+  for (auto& image : images)
+    vkDestroyImageView(device, image.view, nullptr);
+  images.clear();
+
   retrieve_and_store_swapchain_images(device, swapchain, vulkan_images, images);
 
   create_image_views(device, images, colour_format);
 
+  for (auto& command_buffer : command_buffers)
+    vkDestroyCommandPool(device, command_buffer.pool, nullptr);
+
   create_command_pools_and_buffers(
     device, command_buffers, queue_node_index, images.size());
 
-  setup_semaphores(device, semaphores);
+  setup_semaphores(device, semaphores, image_count);
 
+  for (auto& fence : wait_fences)
+    vkDestroyFence(device, fence, nullptr);
   setup_fences(device, wait_fences, images.size());
 
-  VkPipelineStageFlags pipeline_stage_flags =
-    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  prepare_submit_info(submit_info, semaphores, pipeline_stage_flags);
-
+  if (render_pass)
+    vkDestroyRenderPass(device, render_pass, nullptr);
   create_render_pass(device, render_pass, colour_format);
 
   create_framebuffers(device, framebuffers, render_pass, images, size);
@@ -155,19 +173,26 @@ Swapchain::destroy() -> void
   if (render_pass)
     vkDestroyRenderPass(device, render_pass, nullptr);
 
-  for (auto framebuffer : framebuffers)
+  for (auto& framebuffer : framebuffers)
     vkDestroyFramebuffer(device, framebuffer, nullptr);
 
-  if (semaphores.render_complete)
-    vkDestroySemaphore(device, semaphores.render_complete, nullptr);
+  for (auto& semaphore : semaphores) {
+    if (semaphore.render_complete)
+      vkDestroySemaphore(device, semaphore.render_complete, nullptr);
 
-  if (semaphores.present_complete)
-    vkDestroySemaphore(device, semaphores.present_complete, nullptr);
+    if (semaphore.present_complete)
+      vkDestroySemaphore(device, semaphore.present_complete, nullptr);
+  }
 
   for (auto& fence : wait_fences)
     vkDestroyFence(device, fence, nullptr);
 
   vkDeviceWaitIdle(device);
+}
+
+Swapchain::Swapchain(const Window* window)
+  : backpointer(window)
+{
 }
 
 Swapchain::~Swapchain()
@@ -176,38 +201,51 @@ Swapchain::~Swapchain()
 }
 
 auto
-Swapchain::acquire_next_image() -> Core::u32
+Swapchain::acquire_next_image() -> Core::Maybe<Core::u32>
 {
   const auto& device = Device::the().device();
 
   Core::u32 image_index{};
-  vkAcquireNextImageKHR(device,
-                        swapchain,
-                        UINT64_MAX,
-                        semaphores.present_complete,
-                        nullptr,
-                        &image_index);
+  auto result = vkAcquireNextImageKHR(
+    device,
+    swapchain,
+    UINT64_MAX,
+    semaphores.at(get_current_buffer_index()).present_complete,
+    nullptr,
+    &image_index);
+
+  if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+    info("Resize from acquire.");
+    on_resize(size);
+    return {};
+  } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+    error("Could not acquire image");
+    assert(false);
+  }
+
   return image_index;
 }
 
+static constexpr Core::u64 DEFAULT_FENCE_TIMEOUT = 100000000000;
 auto
-Swapchain::begin_frame() -> void
+Swapchain::begin_frame() -> bool
 {
-  // auto& queue =
-  // Renderer::GetRenderResourceReleaseQueue(m_CurrentBufferIndex);
-  // queue.Execute();
   const auto& device = Device::the().device();
 
-  current_image_index = acquire_next_image();
+  auto acquired = acquire_next_image();
+  if (!acquired)
+    return false;
+
+  current_image_index = acquired.value();
 
   vkResetCommandPool(device, command_buffers[current_buffer_index].pool, 0);
+  return true;
 }
 
 auto
 Swapchain::present() -> void
 {
   const auto& device = Device::the().device();
-  static constexpr Core::u64 DEFAULT_FENCE_TIMEOUT = 100000000000;
 
   VkPipelineStageFlags wait_stage_mask =
     VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -215,19 +253,21 @@ Swapchain::present() -> void
   VkSubmitInfo present_submit_info = {};
   present_submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   present_submit_info.pWaitDstStageMask = &wait_stage_mask;
-  present_submit_info.pWaitSemaphores = &semaphores.present_complete;
+  present_submit_info.pWaitSemaphores =
+    &semaphores.at(get_current_buffer_index()).present_complete;
   present_submit_info.waitSemaphoreCount = 1;
-  present_submit_info.pSignalSemaphores = &semaphores.render_complete;
+  present_submit_info.pSignalSemaphores =
+    &semaphores.at(get_current_buffer_index()).render_complete;
   present_submit_info.signalSemaphoreCount = 1;
   present_submit_info.pCommandBuffers =
     &command_buffers[current_buffer_index].command_buffer;
   present_submit_info.commandBufferCount = 1;
 
-  vkResetFences(device, 1, &wait_fences[current_buffer_index]);
-  vkQueueSubmit(Device::the().get_queue(QueueType::Graphics),
-                1,
-                &present_submit_info,
-                wait_fences[current_buffer_index]);
+  VK_CHECK(vkResetFences(device, 1, &wait_fences[current_buffer_index]));
+  VK_CHECK(vkQueueSubmit(Device::the().get_queue(QueueType::Graphics),
+                         1,
+                         &present_submit_info,
+                         wait_fences[current_buffer_index]));
 
   VkResult result;
   {
@@ -238,27 +278,31 @@ Swapchain::present() -> void
     present_info.pSwapchains = &swapchain;
     present_info.pImageIndices = &current_image_index;
 
-    present_info.pWaitSemaphores = &semaphores.render_complete;
+    present_info.pWaitSemaphores =
+      &semaphores.at(get_current_buffer_index()).render_complete;
     present_info.waitSemaphoreCount = 1;
-    result = vkQueuePresentKHR(Device::the().get_queue(QueueType::Graphics),
+    result = vkQueuePresentKHR(Device::the().get_queue(QueueType::Present),
                                &present_info);
   }
 
   if (result != VK_SUCCESS) {
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+      info("Resizing from present.");
+      auto size = recompute_size(backpointer->get_native());
       on_resize(size);
     } else {
-      // TODO: Inform
-      throw;
+      error("Failed to present swapchain image. Reason: {}",
+            static_cast<Core::u32>(result));
+      assert(false);
     }
   }
 
   current_buffer_index = (current_buffer_index + 1) % image_count;
-  vkWaitForFences(device,
-                  1,
-                  &wait_fences[current_buffer_index],
-                  VK_TRUE,
-                  DEFAULT_FENCE_TIMEOUT);
+  VK_CHECK(vkWaitForFences(device,
+                           1,
+                           &wait_fences[current_buffer_index],
+                           VK_TRUE,
+                           DEFAULT_FENCE_TIMEOUT));
 }
 
 auto

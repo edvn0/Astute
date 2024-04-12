@@ -36,7 +36,7 @@ public:
   auto should_close() -> bool;
   auto update() -> void;
 
-  auto begin_frame() -> void;
+  auto begin_frame() -> bool;
   auto present() -> void;
 
   auto set_event_handler(std::function<void(Core::Event&)>&&) -> void;
@@ -44,7 +44,9 @@ public:
   auto close() -> void;
 
   auto get_native() const -> const GLFWwindow* { return window; }
+  auto get_native() -> GLFWwindow* { return window; }
   auto get_swapchain() const -> const Swapchain& { return *swapchain; }
+  auto get_swapchain() -> Swapchain& { return *swapchain; }
 
 private:
   Core::Scope<Swapchain> swapchain;
