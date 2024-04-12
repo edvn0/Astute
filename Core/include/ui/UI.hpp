@@ -7,22 +7,19 @@
 
 namespace Engine::UI {
 
-namespace Detail {
-template<std::floating_point T, Core::usize N>
-  requires(N > 0 && N <= 4)
+namespace Impl {
 auto
-convert_to_imvec(const Core::Vector<T, N>& vector)
-{
-  ImVec4 result;
+coloured_text(const Core::Vec4&, std::string&&) -> void;
 
-  // Always set x; all your Vector instances have at least one component
-  result.x = static_cast<float>(vector.data.at(0));
-  result.y = N > 1 ? static_cast<float>(vector.data.at(1)) : 0.0f;
-  result.z = N > 2 ? static_cast<float>(vector.data.at(2)) : 0.0f;
-  result.w = N > 3 ? static_cast<float>(vector.data.at(3)) : 0.0f;
+auto
+begin(const std::string_view) -> bool;
 
-  return result;
-}
+auto
+end() -> void;
+
+auto
+get_window_size() -> Core::Vec2;
+
 }
 
 template<typename... Args>
@@ -31,9 +28,8 @@ coloured_text(const Core::Vec4& colour,
               std::format_string<Args...> format,
               Args&&... args)
 {
-  auto converted = Detail::convert_to_imvec(colour);
   std::string formatted = std::format(format, std::forward<Args>(args)...);
-  return ImGui::TextColored(converted, "%s", formatted.c_str());
+  return Impl::coloured_text(colour, std::move(formatted));
 }
 
 template<typename... Args>
@@ -49,22 +45,28 @@ auto
 begin(std::format_string<Args...> format, Args&&... args)
 {
   std::string formatted = std::format(format, std::forward<Args>(args)...);
-  return ImGui::Begin(formatted.c_str());
+  return Impl::begin(formatted.c_str());
 }
 
 inline auto
-end()
+end() -> void
 {
-  return ImGui::End();
+  return Impl::end();
+}
+
+inline auto
+get_window_size() -> Core::Vec2
+{
+  return Impl::get_window_size();
 }
 
 inline auto
 scope(const std::string_view name, auto&& func)
 {
-  ImGui::Begin(name.data());
+  Impl::begin(name);
   const auto size = ImGui::GetWindowSize();
   func(size.x, size.y);
-  ImGui::End();
+  end();
 }
 
 } // namespace Engine::UI

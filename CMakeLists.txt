@@ -18,3 +18,13 @@ endif(CCACHE_FOUND)
 add_subdirectory(Library)
 add_subdirectory(Core)
 add_subdirectory(Application)
+
+if(ENABLE_VALIDATION_LAYERS)
+    target_compile_definitions(Core PRIVATE ENABLE_VALIDATION_LAYERS)
+    target_compile_definitions(App PRIVATE ENABLE_VALIDATION_LAYERS)
+endif()
+
+target_compile_definitions(Core PRIVATE
+    $<$<CONFIG:Debug>:ENABLE_VALIDATION_LAYERS>)
+target_compile_definitions(App PRIVATE
+    $<$<CONFIG:Debug>:ENABLE_VALIDATION_LAYERS>)

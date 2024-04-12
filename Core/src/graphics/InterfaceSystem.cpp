@@ -3,7 +3,7 @@
 #include "graphics/InterfaceSystem.hpp"
 
 #include "core/Logger.hpp"
-#include "core/PlatformConfig.hpp"
+#include "core/Platform.hpp"
 #include "graphics/CommandBuffer.hpp"
 #include "graphics/Device.hpp"
 #include "graphics/Instance.hpp"

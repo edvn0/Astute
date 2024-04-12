@@ -8,7 +8,6 @@
 
 namespace Engine::Graphics {
 
-#define ENABLE_VALIDATION_LAYERS
 #ifdef ENABLE_VALIDATION_LAYERS
 constexpr auto enable_validation_layers = true;
 #else

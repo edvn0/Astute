@@ -8,6 +8,8 @@ cmake-build*
 
 *pipe-bin
 
+imgui_*.ini
+
 .vs
 
 .DS_Store

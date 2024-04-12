@@ -1,6 +1,7 @@
 #include "pch/CorePCH.hpp"
 
 #include "core/Logger.hpp"
+#include "core/Platform.hpp"
 
 #include <cctype>
 #include <cstdlib>
@@ -139,8 +140,8 @@ to_lower(const std::string& str)
 LogLevel
 Logger::get_log_level_from_environment()
 {
-  if (const auto env_value = std::getenv("LOG_LEVEL"); env_value != nullptr) {
-    std::cout << "Log level: " << env_value << "\n";
+  if (const auto env_value = Platform::get_environment_variable("LOG_LEVEL");
+      !env_value.empty()) {
     const std::string log_level = to_lower(env_value);
     if (log_level == "trace" || log_level == "t" || log_level == "tr" ||
         log_level == "tra")

@@ -48,11 +48,11 @@ public:
 
 private:
   const Window* backpointer{ nullptr };
-  VkSurfaceKHR surface;
+  VkSurfaceKHR surface{};
   bool is_vsync{ false };
 
-  VkFormat colour_format;
-  VkColorSpaceKHR colour_space;
+  VkFormat colour_format{};
+  VkColorSpaceKHR colour_space{};
 
   VkSwapchainKHR swapchain{ nullptr };
   Core::u32 image_count = 0;

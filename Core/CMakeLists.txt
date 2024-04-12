@@ -19,12 +19,14 @@ add_library(Core STATIC
     src/graphics/CommandBuffer.cpp
     include/graphics/InterfaceSystem.hpp
     src/graphics/InterfaceSystem.cpp
-    include/core/PlatformConfig.hpp
-    src/core/PlatformConfig.cpp
+    include/core/Platform.hpp
+    src/core/Platform.cpp
     include/graphics/Allocator.hpp
     src/graphics/Allocator.cpp
     include/core/Clock.hpp
     src/core/Clock.cpp
+    include/ui/UI.hpp
+    src/ui/UI.cpp
     include/core/Types.hpp
     include/graphics/Window.hpp
     src/graphics/Window.cpp)
