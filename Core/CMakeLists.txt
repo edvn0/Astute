@@ -9,6 +9,8 @@ add_library(Core STATIC
     src/core/Logger.cpp
     include/core/Input.hpp
     src/core/Input.cpp
+    include/core/Scene.hpp
+    src/core/Scene.cpp
     include/core/Camera.hpp
     src/core/Camera.cpp
     include/graphics/Instance.hpp
@@ -17,6 +19,10 @@ add_library(Core STATIC
     src/graphics/Device.cpp
     include/graphics/Swapchain.hpp
     src/graphics/Swapchain.cpp
+    include/graphics/Image.hpp
+    src/graphics/Image.cpp
+    include/graphics/Framebuffer.hpp
+    src/graphics/Framebuffer.cpp
     include/graphics/CommandBuffer.hpp
     src/graphics/CommandBuffer.cpp
     include/graphics/InterfaceSystem.hpp

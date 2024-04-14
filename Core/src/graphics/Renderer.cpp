@@ -2,15 +2,17 @@
 
 #include "graphics/Renderer.hpp"
 
+#include "core/Scene.hpp"
+
 namespace Engine::Graphics {
 
 auto
-Renderer::begin_frame() -> void
+Renderer::begin_scene(Core::Scene& scene) -> void
 {
 }
 
 auto
-Renderer::end_frame() -> void
+Renderer::end_scene() -> void
 {
 }
 

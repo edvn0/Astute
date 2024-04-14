@@ -22,9 +22,8 @@ AstuteApplication::update(f64 ts) -> void
   switch (scene_state) {
     using enum AstuteApplication::SceneState;
     case Edit:
-      // scene->update(ts);
-      // scene->render(renderer, ts);
-      // Scene will call renderer.begin_scene() and renderer.end_scene()
+      scene->on_update_editor(ts);
+      scene->on_render_editor(renderer, ts, camera);
     case Play:
       // TODO: Implement play mode
       break;
@@ -61,10 +60,9 @@ AstuteApplication::interface() -> void
   ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
 
   scope("Viewport", [&](auto w, auto h) {
-    coloured_text({ 1.0F, 1.0F, 0.1F, 1.0F }, "{}", "Test");
     const auto& statistics = get_statistics();
     coloured_text({ 1.0F, 0.1F, 1.0F, 1.0F },
-                  "FPS: {}ms, Frametime: {:5f}Hz",
+                  "FPS: {}, Frametime: {:5f}ms",
                   statistics.frames_per_seconds,
                   statistics.frame_time);
     // image(renderer.get_output_image(), w, h);

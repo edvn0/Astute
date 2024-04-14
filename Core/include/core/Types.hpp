@@ -109,6 +109,9 @@ template<class T, Detail::Deleter D, typename... Args>
 }
 
 template<class T>
+using Ref = std::shared_ptr<T>;
+
+template<class T>
 using Maybe = std::optional<T>;
 
 } // namespace Core

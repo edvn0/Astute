@@ -20,18 +20,18 @@ private:
   glm::vec3 position;
   glm::vec3 up;
   glm::vec3 front;
-  float yaw;
-  float pitch;
-  float aspect_ratio;
-  float field_of_view;
-  float near_clip;
-  float far_clip;
+  f32 yaw;
+  f32 pitch;
+  f32 aspect_ratio;
+  f32 field_of_view;
+  f32 near_clip;
+  f32 far_clip;
   ProjectionType projection_type;
-  float speed;
-  float mouse_sensitivity;
+  f32 speed;
+  f32 mouse_sensitivity;
   bool first_mouse;
-  float last_x, last_y;
-  float zoom;
+  f32 last_x, last_y;
+  f32 zoom;
 
   glm::mat4 view_matrix;
   glm::mat4 projection_matrix;
@@ -39,15 +39,15 @@ private:
 public:
   Camera(glm::vec3 init_position,
          glm::vec3 init_up,
-         float init_yaw,
-         float init_pitch,
-         float init_aspect_ratio,
-         float init_fov = 45.0f,
-         float init_near_clip = 0.1f,
-         float init_far_clip = 100.0f,
+         f32 init_yaw,
+         f32 init_pitch,
+         f32 init_aspect_ratio,
+         f32 init_fov = 45.0f,
+         f32 init_near_clip = 0.1f,
+         f32 init_far_clip = 100.0f,
          ProjectionType type = ProjectionType::Perspective,
-         float init_speed = 2.5f,
-         float init_mouse_sensitivity = 0.1f)
+         f32 init_speed = 2.5f,
+         f32 init_mouse_sensitivity = 0.1f)
     : position(init_position)
     , up(glm::normalize(init_up))
     , front(glm::vec3(0.0f, 0.0f, -1.0f))
@@ -72,17 +72,14 @@ public:
 
   auto update_camera_vectors() -> void
   {
-    // Calculate the new Front vector
     glm::vec3 new_front;
     new_front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
     new_front.y = sin(glm::radians(pitch));
     new_front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
     front = glm::normalize(new_front);
-    // Recalculate the Right and Up vector
-    glm::vec3 right = glm::normalize(
-      glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f))); // Fixed up vector
+    glm::vec3 right =
+      glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
     up = glm::normalize(glm::cross(right, front));
-    // Update view matrix
     view_matrix = glm::lookAt(position, position + front, up);
   }
 
@@ -92,8 +89,8 @@ public:
       projection_matrix =
         glm::perspective(glm::radians(zoom), aspect_ratio, near_clip, far_clip);
     } else {
-      float half_width = zoom * aspect_ratio;
-      float half_height = zoom;
+      f32 half_width = zoom * aspect_ratio;
+      f32 half_height = zoom;
       projection_matrix = glm::ortho(-half_width,
                                      half_width,
                                      -half_height,
@@ -107,28 +104,28 @@ public:
 
   auto get_projection_matrix() const -> glm::mat4 { return projection_matrix; }
 
-  auto move_forward(float delta_time) -> void
+  auto move_forward(f32 delta_time) -> void
   {
     position += speed * front * delta_time;
   }
 
-  auto move_backward(float delta_time) -> void
+  auto move_backward(f32 delta_time) -> void
   {
     position -= speed * front * delta_time;
   }
 
-  auto move_left(float delta_time) -> void
+  auto move_left(f32 delta_time) -> void
   {
     position -= glm::normalize(glm::cross(front, up)) * speed * delta_time;
   }
 
-  auto move_right(float delta_time) -> void
+  auto move_right(f32 delta_time) -> void
   {
     position += glm::normalize(glm::cross(front, up)) * speed * delta_time;
   }
 
-  auto process_mouse_movement(float x_offset,
-                              float y_offset,
+  auto process_mouse_movement(f32 x_offset,
+                              f32 y_offset,
                               bool constrain_pitch = true) -> void
   {
     x_offset *= mouse_sensitivity;
