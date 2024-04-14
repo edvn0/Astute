@@ -7,10 +7,40 @@
 AstuteApplication::~AstuteApplication() = default;
 
 AstuteApplication::AstuteApplication(Application::Configuration config)
-  : Application(config){};
+  : Application(config)
+  , camera(glm::vec3(-5, -5, -5),
+           glm::vec3(0, -1, 0),
+           0.0F,
+           0.0F,
+           config.size.aspect_ratio()){};
 
-auto AstuteApplication::update(f64) -> void{};
-auto AstuteApplication::interpolate(f64) -> void{};
+auto
+AstuteApplication::update(f64 ts) -> void
+{
+  camera.update_camera_vectors();
+
+  switch (scene_state) {
+    using enum AstuteApplication::SceneState;
+    case Edit:
+      // scene->update(ts);
+      // scene->render(renderer, ts);
+      // Scene will call renderer.begin_scene() and renderer.end_scene()
+    case Play:
+      // TODO: Implement play mode
+      break;
+    case Pause:
+      // TODO: Implement pause mode
+      break;
+    case Simulate:
+      // TODO: Implement simulate mode
+      break;
+  }
+}
+
+auto
+AstuteApplication::interpolate(f64) -> void
+{
+}
 
 static void
 ShowDockingDisabledMessage()
@@ -45,13 +75,15 @@ auto
 AstuteApplication::handle_events(Event& event) -> void
 {
   EventDispatcher dispatcher{ event };
-  dispatcher.dispatch<KeyPressedEvent>([this](KeyPressedEvent& event) -> bool {
-    if (event.get_keycode() == KeyCode::KEY_ESCAPE) {
+  dispatcher.dispatch<KeyPressedEvent>([this](KeyPressedEvent& ev) {
+    if (ev.get_keycode() == KeyCode::KEY_ESCAPE) {
       get_window().close();
       return true;
     }
     return false;
   });
+
+  camera.handle_events(event);
 };
 
 auto

@@ -8,3 +8,6 @@
 	path = Library/imgui
 	url = git@github.com:edvn0/imgui.git
 	branch = docking
+[submodule "Library/glm"]
+	path = Library/glm
+	url = git@github.com:g-truc/glm.git

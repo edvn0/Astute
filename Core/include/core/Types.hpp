@@ -65,6 +65,11 @@ struct BasicExtent
       static_cast<U>(height),
     };
   }
+
+  auto aspect_ratio() const -> f32
+  {
+    return static_cast<f32>(width) / static_cast<f32>(height);
+  }
 };
 
 using Extent = BasicExtent<u32>;

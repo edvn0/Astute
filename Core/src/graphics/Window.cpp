@@ -10,6 +10,8 @@
 
 namespace Engine::Graphics {
 
+static constexpr auto default_file_path = "window_size_and_position.txt";
+
 Window::Window(Configuration config)
   : configuration(config)
 {
@@ -26,8 +28,34 @@ Window::Window(Configuration config)
     };
   }
 
+  auto load_previous_window_size_and_position_from_file =
+    [](std::string_view file_path) {
+      std::ifstream file(file_path.data());
+      if (!file.is_open()) {
+        return std::make_tuple(1600U, 900U, 0, 0);
+      }
+
+      Core::u32 width{};
+      Core::u32 height{};
+      Core::i32 x{};
+      Core::i32 y{};
+      file >> width >> height >> x >> y;
+      return std::make_tuple(width, height, x, y);
+    };
+
+  auto [loaded_width, loaded_height, loaded_x, loaded_y] =
+    load_previous_window_size_and_position_from_file(default_file_path);
+
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+
+  if (loaded_width != 0 && loaded_height != 0) {
+    configuration.size = {
+      loaded_width,
+      loaded_height,
+    };
+  }
+
   auto&& [width, height] = configuration.size.as<Core::i32>();
 
   if (configuration.start_fullscreen) {
@@ -45,6 +73,10 @@ Window::Window(Configuration config)
     configuration.is_fullscreen = true;
   } else {
     window = glfwCreateWindow(width, height, "Astute", nullptr, nullptr);
+  }
+
+  if (loaded_x != 0 || loaded_y != 0) {
+    glfwSetWindowPos(window, loaded_x, loaded_y);
   }
 
   Core::Input::initialise(window);
@@ -141,6 +173,16 @@ Window::Window(Configuration config)
         self.user_data.event_callback(event);
       }
     });
+
+  glfwSetCursorPosCallback(
+    window, +[](GLFWwindow* win, double x, double y) {
+      const auto& self = *static_cast<Window*>(glfwGetWindowUserPointer(win));
+      Core::MouseMovedEvent event{
+        static_cast<float>(x),
+        static_cast<float>(y),
+      };
+      self.user_data.event_callback(event);
+    });
 }
 
 auto
@@ -181,6 +223,21 @@ Window::toggle_fullscreen() -> void
 
 Window::~Window()
 {
+  try {
+
+    // Write window size and position to file
+    std::ofstream file(default_file_path);
+    if (file.is_open()) {
+      Core::i32 width{};
+      Core::i32 height{};
+      glfwGetWindowPos(window, &width, &height);
+      file << configuration.size.width << ' ' << configuration.size.height
+           << ' ' << width << ' ' << height;
+    }
+  } catch (const std::exception& e) {
+    error("Failed to write window size and position to file: {}", e.what());
+  }
+
   swapchain.reset();
   glfwDestroyWindow(window);
   glfwTerminate();

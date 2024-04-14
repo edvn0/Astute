@@ -154,7 +154,6 @@ private:
 class WindowResizeEvent final : public Event
 {
 public:
-  // W, H (i32)
   WindowResizeEvent(i32 w, i32 h)
     : width{ w }
     , height{ h }
@@ -229,6 +228,44 @@ public:
 private:
   f32 x_offset{ 0.0F };
   f32 y_offset{ 0.0F };
+};
+
+class MouseMovedEvent final : public Event
+{
+public:
+  MouseMovedEvent(f32 input_x, f32 input_y)
+    : x{ input_x }
+    , y{ input_y }
+  {
+  }
+  ~MouseMovedEvent() override = default;
+
+  [[nodiscard]] auto get_event_type() const -> EventType override
+  {
+    return EventType::MouseMoved;
+  }
+  [[nodiscard]] auto get_name() const -> std::string_view override
+  {
+    return "MouseMovedEvent";
+  }
+  [[nodiscard]] auto get_category_flags() const -> i32 override
+  {
+    return EventCategoryMouse | EventCategoryInput;
+  }
+
+  [[nodiscard]] auto get_x() const -> f32 { return x; }
+  [[nodiscard]] auto get_y() const -> f32 { return y; }
+
+  [[nodiscard]] auto to_string() const -> std::string override
+  {
+    return std::format("MouseMovedEvent: ({}, {})", x, y);
+  }
+
+  static auto get_static_type() -> EventType { return EventType::MouseMoved; }
+
+private:
+  f32 x{ 0.0F };
+  f32 y{ 0.0F };
 };
 
 class MouseButtonPressedEvent final : public Event

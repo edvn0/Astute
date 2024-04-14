@@ -9,6 +9,8 @@ add_library(Core STATIC
     src/core/Logger.cpp
     include/core/Input.hpp
     src/core/Input.cpp
+    include/core/Camera.hpp
+    src/core/Camera.cpp
     include/graphics/Instance.hpp
     src/graphics/Instance.cpp
     include/graphics/Device.hpp
@@ -32,7 +34,7 @@ add_library(Core STATIC
     include/core/Types.hpp
     include/graphics/Window.hpp
     src/graphics/Window.cpp)
-target_include_directories(Core PUBLIC include ${CMAKE_SOURCE_DIR}/Library/imgui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(Core PUBLIC glfw Vulkan::Vulkan PRIVATE GPUOpen::VulkanMemoryAllocator imgui)
+target_include_directories(Core PUBLIC include ${CMAKE_SOURCE_DIR}/Library/imgui ${CMAKE_SOURCE_DIR}/Library/glm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(Core PUBLIC glfw Vulkan::Vulkan PRIVATE GPUOpen::VulkanMemoryAllocator imgui glm)
 
 target_precompile_headers(Core PRIVATE include/pch/CorePCH.hpp)

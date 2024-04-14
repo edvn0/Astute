@@ -80,4 +80,6 @@ compile_commands.json
 # Folders
 build*
 
+window_size_and_position.txt
+
 App/*.ini

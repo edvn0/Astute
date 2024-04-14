@@ -101,13 +101,11 @@ public:
   static auto construct() -> void
   {
     allocator = construct_allocator(Device::the(), Instance::the());
-    info("Created Allocator!");
   }
 
   static void destroy()
   {
     vmaDestroyAllocator(get_allocator());
-    info("Destroyed Allocator!");
     allocator = nullptr;
   }
 
