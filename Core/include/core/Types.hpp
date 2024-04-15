@@ -111,6 +111,12 @@ template<class T, Detail::Deleter D, typename... Args>
 template<class T>
 using Ref = std::shared_ptr<T>;
 
+template<class T, typename... Args>
+[[nodiscard]] auto inline make_ref(Args&&... args)
+{
+  return Ref<T>{ new T{ std::forward<Args>(args)... } };
+}
+
 template<class T>
 using Maybe = std::optional<T>;
 

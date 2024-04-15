@@ -17,8 +17,8 @@ auto
 Application::forward_incoming_events(Event& event) -> void
 {
   EventDispatcher dispatcher(event);
-  dispatcher.dispatch<WindowResizeEvent>([this](WindowResizeEvent& event) {
-    const BasicExtent extent{ event.get_width(), event.get_height() };
+  dispatcher.dispatch<WindowResizeEvent>([](const WindowResizeEvent& ev) {
+    const BasicExtent extent{ ev.get_width(), ev.get_height() };
     // on_resize(extent.as<u32>());
     return true;
   });
@@ -66,6 +66,8 @@ Application::run() -> i32
   auto accumulator = 0.0;
   i32 frame_count = 0;
 
+  construct();
+
   while (!window->should_close()) {
     window->update();
     if (!window->begin_frame()) {
@@ -103,6 +105,8 @@ Application::run() -> i32
            statistics.frames_per_seconds);
     }
   }
+
+  destruct();
 
   info("Exiting Astute Engine.");
 

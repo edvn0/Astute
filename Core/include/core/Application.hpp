@@ -10,11 +10,19 @@ namespace Engine::Core {
 class Application
 {
 public:
+  struct RendererConfiguration
+  {
+    const u32 shadow_pass_size{ 1024 };
+  };
+
   struct Configuration
   {
     const bool headless{ false };
     const Extent size{ 1920, 1080 };
     const bool fullscreen{ false };
+    const std::string scene_name{ "Astute Scene" };
+
+    const RendererConfiguration renderer{};
   };
 
   struct Statistics
@@ -28,6 +36,8 @@ public:
 
   auto run() -> i32;
 
+  virtual auto construct() -> void = 0;
+  virtual auto destruct() -> void = 0;
   virtual auto update(f64) -> void = 0;
   virtual auto interpolate(f64) -> void = 0;
   virtual auto handle_events(Event&) -> void = 0;

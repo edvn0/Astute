@@ -23,6 +23,8 @@ add_library(Core STATIC
     src/graphics/Image.cpp
     include/graphics/Framebuffer.hpp
     src/graphics/Framebuffer.cpp
+    include/graphics/GPUBuffer.hpp
+    src/graphics/GPUBuffer.cpp
     include/graphics/CommandBuffer.hpp
     src/graphics/CommandBuffer.cpp
     include/graphics/InterfaceSystem.hpp
@@ -40,7 +42,7 @@ add_library(Core STATIC
     include/core/Types.hpp
     include/graphics/Window.hpp
     src/graphics/Window.cpp)
-target_include_directories(Core PUBLIC include ${CMAKE_SOURCE_DIR}/Library/imgui ${CMAKE_SOURCE_DIR}/Library/glm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(Core PUBLIC glfw Vulkan::Vulkan PRIVATE GPUOpen::VulkanMemoryAllocator imgui glm)
+target_include_directories(Core PUBLIC include ${CMAKE_SOURCE_DIR}/Library/imgui ${CMAKE_SOURCE_DIR}/Library/glm ${CMAKE_SOURCE_DIR}/Library/src PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(Core PUBLIC glfw Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator PRIVATE imgui glm EnTT::EnTT)
 
 target_precompile_headers(Core PRIVATE include/pch/CorePCH.hpp)

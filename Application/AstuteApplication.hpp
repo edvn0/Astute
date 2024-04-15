@@ -11,6 +11,8 @@ public:
   ~AstuteApplication() override;
   explicit AstuteApplication(Application::Configuration);
 
+  auto construct() -> void override {}
+  auto destruct() -> void override {}
   auto update(f64 time_step) -> void override;
   auto interpolate(f64 superfluous_time_step) -> void override;
   auto interface() -> void override;

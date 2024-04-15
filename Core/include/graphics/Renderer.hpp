@@ -7,19 +7,49 @@
 #include "graphics/Framebuffer.hpp"
 #include "graphics/GraphicsPipeline.hpp"
 #include "graphics/Material.hpp"
+#include "graphics/CommandBuffer.hpp"
+
+#include <glm/glm.hpp>
 
 namespace Engine::Graphics {
+
+struct SceneRendererCamera
+{
+  const Core::Camera& camera;
+  glm::mat4 view_matrix;
+  Core::f32 near;
+  Core::f32 far;
+  Core::f32 fov;
+};
 
 class Renderer
 {
 public:
-  auto begin_scene(Core::Scene&) -> void;
+  struct Configuration
+  {
+    Core::u32 shadow_pass_size = 1024;
+  };
+  explicit Renderer(Configuration, const Window*);
+
+  auto begin_scene(Core::Scene&, SceneRendererCamera) -> void;
   auto end_scene() -> void;
 
 private:
-  Core::Scope<Framebuffer> geometry_framebuffer{ nullptr };
-  Core::Scope<GraphicsPipeline> geometry_pipeline{ nullptr };
-  Core::Scope<Material> geometry_material{ nullptr };
+  Core::Extent size{ 0, 0 };
+
+  Core::Scope<CommandBuffer> command_buffer{ nullptr };
+
+  Core::Scope<Framebuffer> predepth_framebuffer{ nullptr };
+  Core::Scope<GraphicsPipeline> predepth_pipeline{ nullptr };
+  Core::Scope<Material> predepth_material{ nullptr };
+
+  struct ShadowPassParameters
+  {
+    Core::u32 size{ 0 };
+  } shadow_pass_parameters;
+
+  auto predepth_pass() -> void;
+  auto flush_draw_lists() -> void;
 };
 
 }

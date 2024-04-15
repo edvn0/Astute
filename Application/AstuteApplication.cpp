@@ -4,6 +4,15 @@
 
 #include "graphics/Window.hpp"
 
+auto
+map_to_renderer_config(Application::Configuration config)
+  -> Renderer::Configuration
+{
+  Renderer::Configuration renderer_config;
+  renderer_config.shadow_pass_size = config.renderer.shadow_pass_size;
+  return renderer_config;
+}
+
 AstuteApplication::~AstuteApplication() = default;
 
 AstuteApplication::AstuteApplication(Application::Configuration config)
@@ -12,7 +21,11 @@ AstuteApplication::AstuteApplication(Application::Configuration config)
            glm::vec3(0, -1, 0),
            0.0F,
            0.0F,
-           config.size.aspect_ratio()){};
+           config.size.aspect_ratio())
+  , scene(std::make_shared<Scene>(config.scene_name))
+  , renderer(map_to_renderer_config(config), &get_window()){
+
+  };
 
 auto
 AstuteApplication::update(f64 ts) -> void

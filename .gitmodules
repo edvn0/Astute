@@ -11,3 +11,6 @@
 [submodule "Library/glm"]
 	path = Library/glm
 	url = git@github.com:g-truc/glm.git
+[submodule "Library/entt"]
+	path = Library/entt
+	url = git@github.com:skypjack/entt.git

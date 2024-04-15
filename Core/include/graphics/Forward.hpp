@@ -8,5 +8,8 @@ class Instance;
 class InterfaceSystem;
 class Swapchain;
 class Window;
+class Image;
+class Framebuffer;
+class Renderer;
 
 }

@@ -23,3 +23,4 @@ endfunction()
 add_imgui()
 
 add_subdirectory(glm)
+add_subdirectory(entt)

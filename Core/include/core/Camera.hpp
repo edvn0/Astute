@@ -143,6 +143,11 @@ public:
 
     update_camera_vectors();
   }
+
+  auto get_position() const -> const glm::vec3& { return position; }
+  auto get_near_plane() const -> f32 { return near_clip; }
+  auto get_far_plane() const -> f32 { return far_clip; }
+  auto get_fov() const -> f32 { return field_of_view; }
 };
 
 } // namespace Engine::Core
