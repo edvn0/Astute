@@ -4,10 +4,12 @@
 
 #include "core/Types.hpp"
 
+#include "graphics/CommandBuffer.hpp"
 #include "graphics/Framebuffer.hpp"
+#include "graphics/GPUBuffer.hpp"
 #include "graphics/GraphicsPipeline.hpp"
 #include "graphics/Material.hpp"
-#include "graphics/CommandBuffer.hpp"
+#include "graphics/Shader.hpp"
 
 #include <glm/glm.hpp>
 
@@ -31,7 +33,7 @@ public:
   };
   explicit Renderer(Configuration, const Window*);
 
-  auto begin_scene(Core::Scene&, SceneRendererCamera) -> void;
+  auto begin_scene(Core::Scene&, const SceneRendererCamera&) -> void;
   auto end_scene() -> void;
 
 private:
@@ -40,8 +42,13 @@ private:
   Core::Scope<CommandBuffer> command_buffer{ nullptr };
 
   Core::Scope<Framebuffer> predepth_framebuffer{ nullptr };
+  Core::Scope<Shader> predepth_shader{ nullptr };
   Core::Scope<GraphicsPipeline> predepth_pipeline{ nullptr };
   Core::Scope<Material> predepth_material{ nullptr };
+
+  // TEMP
+  Core::Scope<VertexBuffer> vertex_buffer{ nullptr };
+  Core::Scope<IndexBuffer> index_buffer{ nullptr };
 
   struct ShadowPassParameters
   {

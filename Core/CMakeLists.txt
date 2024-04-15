@@ -4,44 +4,51 @@ project(Core CXX)
 
 add_library(Core STATIC
     include/core/Application.hpp
-    src/core/Application.cpp
-    include/core/Logger.hpp
-    src/core/Logger.cpp
-    include/core/Input.hpp
-    src/core/Input.cpp
-    include/core/Scene.hpp
-    src/core/Scene.cpp
     include/core/Camera.hpp
-    src/core/Camera.cpp
-    include/graphics/Instance.hpp
-    src/graphics/Instance.cpp
-    include/graphics/Device.hpp
-    src/graphics/Device.cpp
-    include/graphics/Swapchain.hpp
-    src/graphics/Swapchain.cpp
-    include/graphics/Image.hpp
-    src/graphics/Image.cpp
-    include/graphics/Framebuffer.hpp
-    src/graphics/Framebuffer.cpp
-    include/graphics/GPUBuffer.hpp
-    src/graphics/GPUBuffer.cpp
-    include/graphics/CommandBuffer.hpp
-    src/graphics/CommandBuffer.cpp
-    include/graphics/InterfaceSystem.hpp
-    src/graphics/InterfaceSystem.cpp
-    include/graphics/Renderer.hpp
-    src/graphics/Renderer.cpp
-    include/core/Platform.hpp
-    src/core/Platform.cpp
-    include/graphics/Allocator.hpp
-    src/graphics/Allocator.cpp
     include/core/Clock.hpp
-    src/core/Clock.cpp
-    include/ui/UI.hpp
-    src/ui/UI.cpp
+    include/core/Input.hpp
+    include/core/Logger.hpp
+    include/core/Platform.hpp
+    include/core/Scene.hpp
     include/core/Types.hpp
+    include/graphics/Allocator.hpp
+    include/graphics/CommandBuffer.hpp
+    include/graphics/Device.hpp
+    include/graphics/Framebuffer.hpp
+    include/graphics/GPUBuffer.hpp
+    include/graphics/GraphicsPipeline.hpp
+    include/graphics/Image.hpp
+    include/graphics/Instance.hpp
+    include/graphics/InterfaceSystem.hpp
+    include/graphics/Renderer.hpp
+    include/graphics/RendererExtensions.hpp
+    include/graphics/Shader.hpp
+    include/graphics/Swapchain.hpp
     include/graphics/Window.hpp
-    src/graphics/Window.cpp)
+    include/ui/UI.hpp
+    src/core/Application.cpp
+    src/core/Camera.cpp
+    src/core/Clock.cpp
+    src/core/Input.cpp
+    src/core/Logger.cpp
+    src/core/Platform.cpp
+    src/core/Scene.cpp
+    src/graphics/Allocator.cpp
+    src/graphics/CommandBuffer.cpp
+    src/graphics/Device.cpp
+    src/graphics/Framebuffer.cpp
+    src/graphics/GPUBuffer.cpp
+    src/graphics/GraphicsPipeline.cpp
+    src/graphics/Image.cpp
+    src/graphics/Instance.cpp
+    src/graphics/InterfaceSystem.cpp
+    src/graphics/Renderer.cpp
+    src/graphics/RendererExtensions.cpp
+    src/graphics/Shader.cpp
+    src/graphics/Swapchain.cpp
+    src/graphics/Window.cpp
+    src/ui/UI.cpp
+)
 target_include_directories(Core PUBLIC include ${CMAKE_SOURCE_DIR}/Library/imgui ${CMAKE_SOURCE_DIR}/Library/glm ${CMAKE_SOURCE_DIR}/Library/src PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(Core PUBLIC glfw Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator PRIVATE imgui glm EnTT::EnTT)
 

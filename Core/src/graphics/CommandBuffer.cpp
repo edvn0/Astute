@@ -4,6 +4,8 @@
 #include "graphics/CommandBuffer.hpp"
 #include "graphics/Swapchain.hpp"
 
+#include "core/Logger.hpp"
+
 namespace Engine::Graphics {
 
 CommandBuffer::CommandBuffer(Properties props)
@@ -106,8 +108,6 @@ auto
 CommandBuffer::end() -> void
 {
   vkEndCommandBuffer(active_command_buffer);
-
-  active_command_buffer = nullptr;
 }
 auto
 CommandBuffer::submit() -> void
@@ -117,11 +117,10 @@ CommandBuffer::submit() -> void
 
   const auto& device = Device::the();
   auto frame_index = Core::Application::the().current_frame_index();
-
   VkSubmitInfo submit_info{};
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submit_info.commandBufferCount = 1;
-  VkCommandBuffer buffer = command_buffers[frame_index];
+  VkCommandBuffer buffer = active_command_buffer;
   submit_info.pCommandBuffers = &buffer;
 
   vkWaitForFences(
@@ -129,6 +128,8 @@ CommandBuffer::submit() -> void
 
   vkResetFences(device.device(), 1, &fences[frame_index]);
   vkQueueSubmit(queue, 1, &submit_info, fences[frame_index]);
+
+  active_command_buffer = nullptr;
 }
 
 } // namespace Engine::Graphics

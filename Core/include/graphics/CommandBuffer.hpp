@@ -36,9 +36,9 @@ private:
   const bool owned_by_swapchain;
   const bool primary;
 
-  VkCommandPool command_pool;
-  VkQueue queue; // Owned by device
-  VkCommandBuffer active_command_buffer;
+  VkCommandPool command_pool{ nullptr };
+  VkQueue queue{ nullptr }; // Owned by device
+  VkCommandBuffer active_command_buffer{ nullptr };
   std::vector<VkCommandBuffer> command_buffers;
   std::vector<VkFence> fences;
 

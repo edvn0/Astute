@@ -7,10 +7,10 @@
 namespace Engine::Graphics {
 
 static auto
-to_string(BufferType buffer_type) -> std::string
+to_string(GPUBuffer::Type buffer_type) -> std::string
 {
   switch (buffer_type) {
-    using enum Engine::Graphics::BufferType;
+    using enum Engine::Graphics::GPUBuffer::Type;
     case Vertex:
       return "Vertex";
     case Index:
@@ -22,11 +22,78 @@ to_string(BufferType buffer_type) -> std::string
   }
 }
 
+GPUBuffer::GPUBuffer(Type type, Core::usize input_size)
+  : size(input_size)
+  , buffer_type(type)
+{
+  construct_buffer();
+}
+
+GPUBuffer::~GPUBuffer()
+{
+  Allocator allocator{
+    std::format("GPUBuffer::~GPUBuffer({})", to_string(buffer_type)),
+  };
+  allocator.deallocate_buffer(allocation, buffer);
+}
+
+auto
+GPUBuffer::buffer_usage_flags() const -> VkBufferUsageFlags
+{
+  switch (buffer_type) {
+    using enum Engine::Graphics::GPUBuffer::Type;
+    case Vertex:
+      return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    case Index:
+      return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+    case Storage:
+      return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    default:
+      return 0;
+  }
+}
+
+auto
+GPUBuffer::construct_buffer() -> void
+{
+  Allocator allocator{
+    std::format("GPUBuffer::construct_buffer({})", to_string(buffer_type)),
+  };
+
+  VkBufferCreateInfo buffer_info{
+    .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+    .pNext = nullptr,
+    .flags = 0,
+    .size = size,
+    .usage = buffer_usage_flags(),
+    .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+    .queueFamilyIndexCount = 0,
+    .pQueueFamilyIndices = nullptr,
+  };
+
+  const auto is_uniform = buffer_type == Type::Uniform;
+
+  auto usage = is_uniform ? Usage::AUTO_PREFER_HOST : Usage::AUTO_PREFER_DEVICE;
+  auto creation = Creation::MAPPED_BIT;
+  if (is_uniform) {
+    creation |= Creation::HOST_ACCESS_RANDOM_BIT;
+  }
+
+  allocation = allocator.allocate_buffer(buffer,
+                                         allocation_info,
+                                         buffer_info,
+                                         {
+                                           .usage = usage,
+                                           .creation = creation,
+                                         });
+}
+
 auto
 GPUBuffer::write(const void* write_data, const Core::usize write_size) -> void
 {
-  Allocator allocator{ std::format("GPUBuffer::write({})",
-                                   to_string(buffer_type)) };
+  Allocator allocator{
+    std::format("GPUBuffer::write({})", to_string(buffer_type)),
+  };
   if (write_size > size) {
     throw std::runtime_error("Data size is larger than buffer size");
   }
