@@ -131,7 +131,7 @@ GraphicsPipeline::create_pipeline() -> void
   rasterization_info.polygonMode = VK_POLYGON_MODE_FILL;
   rasterization_info.lineWidth = 1.0f;
   rasterization_info.cullMode = VK_CULL_MODE_BACK_BIT;
-  rasterization_info.frontFace = VK_FRONT_FACE_CLOCKWISE;
+  rasterization_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
   rasterization_info.depthBiasEnable = VK_FALSE;
   rasterization_info.depthBiasConstantFactor = 0.0f;
   rasterization_info.depthBiasClamp = 0.0f;
@@ -151,7 +151,7 @@ GraphicsPipeline::create_pipeline() -> void
     VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
   depth_stencil_info.depthTestEnable = VK_TRUE;
   depth_stencil_info.depthWriteEnable = VK_TRUE;
-  depth_stencil_info.depthCompareOp = VK_COMPARE_OP_LESS;
+  depth_stencil_info.depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
   depth_stencil_info.depthBoundsTestEnable = VK_FALSE;
   depth_stencil_info.stencilTestEnable = VK_FALSE;
   pipeline_info.pDepthStencilState = &depth_stencil_info;
@@ -212,8 +212,11 @@ GraphicsPipeline::create_layout() -> void
 {
   VkPipelineLayoutCreateInfo layout_info{};
   layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  layout_info.setLayoutCount = 0;
-  layout_info.pSetLayouts = nullptr;
+
+  auto descriptor_set_layouts = shader->get_descriptor_set_layouts();
+  layout_info.setLayoutCount =
+    static_cast<Core::u32>(descriptor_set_layouts.size());
+  layout_info.pSetLayouts = descriptor_set_layouts.data();
   layout_info.pushConstantRangeCount = 0;
   layout_info.pPushConstantRanges = nullptr;
 

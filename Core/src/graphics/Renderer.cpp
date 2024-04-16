@@ -87,6 +87,12 @@ auto
 Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
   -> void
 {
+  auto& [view, proj, view_proj, camera_pos] = renderer_ubo.get_data();
+  view = camera.camera.get_view_matrix();
+  proj = camera.camera.get_projection_matrix();
+  view_proj = proj * view;
+  camera_pos = camera.camera.get_position();
+  renderer_ubo.update();
 }
 
 auto
@@ -130,6 +136,29 @@ Renderer::predepth_pass() -> void
                          1,
                          vertex_buffers.data(),
                          offsets.data());
+
+  auto write = predepth_shader->get_descriptor_set("RendererUBO", 0);
+
+  VkDescriptorSet allocated{};
+  VkWriteDescriptorSet write_descriptor_set{};
+  write_descriptor_set.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  write_descriptor_set.dstSet = allocated;
+  write_descriptor_set.dstBinding = write->dstBinding;
+  write_descriptor_set.dstArrayElement = write->dstBinding;
+  write_descriptor_set.descriptorType = write->descriptorType;
+  write_descriptor_set.descriptorCount = write->descriptorCount;
+  write_descriptor_set.pBufferInfo = &renderer_ubo.get_descriptor_info();
+  vkUpdateDescriptorSets(
+    Device::the().device(), 1, &write_descriptor_set, 0, nullptr);
+
+  vkCmdBindDescriptorSets(command_buffer->get_command_buffer(),
+                          VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          predepth_pipeline->get_layout(),
+                          0,
+                          1,
+                          &allocated,
+                          0,
+                          nullptr);
 
   vkCmdBindIndexBuffer(command_buffer->get_command_buffer(),
                        index_buffer->get_buffer(),

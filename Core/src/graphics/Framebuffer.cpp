@@ -260,7 +260,7 @@ Framebuffer::create_renderpass() -> void
   // Create clear values
   clear_values.resize(2);
   clear_values[0].color = { 0.0F, 0.0F, 0.0F, 0.0F };
-  clear_values[1].depthStencil = { 1.0F, 0 };
+  clear_values[1].depthStencil = { 0.0F, 0 };
 }
 
 auto

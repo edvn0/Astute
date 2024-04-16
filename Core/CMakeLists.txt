@@ -24,6 +24,7 @@ add_library(Core STATIC
     include/graphics/RendererExtensions.hpp
     include/graphics/Shader.hpp
     include/graphics/Swapchain.hpp
+    include/graphics/DescriptorResource.hpp
     include/graphics/Window.hpp
     include/ui/UI.hpp
     src/core/Application.cpp
@@ -47,6 +48,7 @@ add_library(Core STATIC
     src/graphics/Shader.cpp
     src/graphics/Swapchain.cpp
     src/graphics/Window.cpp
+    src/graphics/DescriptorResource.cpp
     src/ui/UI.cpp
 )
 target_include_directories(Core PUBLIC include ${CMAKE_SOURCE_DIR}/Library/imgui ${CMAKE_SOURCE_DIR}/Library/glm ${CMAKE_SOURCE_DIR}/Library/src PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

@@ -8,7 +8,7 @@
       "type": "cppvsdbg",
       "request": "launch",
       "name": "Debug",
-      "program": "${workspaceRoot}/build/Application/App",
+      "program": "${workspaceRoot}/build/Application/Debug/App",
       "cwd": "${workspaceRoot}",
       "args": [
         "-b",

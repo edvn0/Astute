@@ -17,6 +17,8 @@ to_string(GPUBuffer::Type buffer_type) -> std::string
       return "Index";
     case Storage:
       return "Storage";
+    case Uniform:
+      return "Uniform";
     default:
       return "Unknown";
   }
@@ -32,7 +34,7 @@ GPUBuffer::GPUBuffer(Type type, Core::usize input_size)
 GPUBuffer::~GPUBuffer()
 {
   Allocator allocator{
-    std::format("GPUBuffer::~GPUBuffer({})", to_string(buffer_type)),
+    std::format("GPUBuffer::~GPUBuffer({}, {})", to_string(buffer_type), size),
   };
   allocator.deallocate_buffer(allocation, buffer);
 }
@@ -48,6 +50,8 @@ GPUBuffer::buffer_usage_flags() const -> VkBufferUsageFlags
       return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
     case Storage:
       return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    case Uniform:
+      return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
     default:
       return 0;
   }
@@ -57,7 +61,8 @@ auto
 GPUBuffer::construct_buffer() -> void
 {
   Allocator allocator{
-    std::format("GPUBuffer::construct_buffer({})", to_string(buffer_type)),
+    std::format(
+      "GPUBuffer::construct_buffer({}, {})", to_string(buffer_type), size),
   };
 
   VkBufferCreateInfo buffer_info{
@@ -92,7 +97,7 @@ auto
 GPUBuffer::write(const void* write_data, const Core::usize write_size) -> void
 {
   Allocator allocator{
-    std::format("GPUBuffer::write({})", to_string(buffer_type)),
+    std::format("GPUBuffer::write({}, {})", to_string(buffer_type), size),
   };
   if (write_size > size) {
     throw std::runtime_error("Data size is larger than buffer size");

@@ -11,6 +11,8 @@
 #include "graphics/Material.hpp"
 #include "graphics/Shader.hpp"
 
+#include "graphics/ShaderBuffers.hpp"
+
 #include <glm/glm.hpp>
 
 namespace Engine::Graphics {
@@ -65,6 +67,9 @@ private:
 
   auto predepth_pass() -> void;
   auto flush_draw_lists() -> void;
+
+  // UBOs
+  UniformBufferObject<RendererUBO> renderer_ubo;
 };
 
 }

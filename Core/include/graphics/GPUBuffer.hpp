@@ -3,11 +3,18 @@
 #include "core/Types.hpp"
 
 #include <span>
+#include <type_traits>
 #include <vector>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
 namespace Engine::Graphics {
+
+template<class T>
+concept IsPOD = std::is_pod_v<T>;
+
+template<IsPOD T>
+class UniformBufferObject;
 
 class GPUBuffer
 {
@@ -57,6 +64,9 @@ private:
   auto write(const void*, Core::usize) -> void;
   auto construct_buffer() -> void;
   auto buffer_usage_flags() const -> VkBufferUsageFlags;
+
+  template<IsPOD T>
+  friend class UniformBufferObject;
 };
 
 class VertexBuffer
@@ -155,6 +165,50 @@ public:
 
 private:
   GPUBuffer buffer;
+};
+
+template<IsPOD T>
+class UniformBufferObject
+{
+public:
+  explicit UniformBufferObject(const T& data)
+  {
+    buffer.write(&data, sizeof(T));
+    descriptor_info = VkDescriptorBufferInfo{
+      .buffer = buffer.get_buffer(),
+      .offset = 0,
+      .range = sizeof(T),
+    };
+  }
+
+  explicit UniformBufferObject()
+  {
+    buffer.write(&pod_data, sizeof(T));
+    descriptor_info = VkDescriptorBufferInfo{
+      .buffer = buffer.get_buffer(),
+      .offset = 0,
+      .range = sizeof(T),
+    };
+  }
+
+  auto size() const -> Core::usize { return buffer.get_size(); }
+  auto get_buffer() const -> VkBuffer { return buffer.get_buffer(); }
+
+  auto update(const T& data) -> void { buffer.write(&data, sizeof(T)); }
+  auto update() -> void { buffer.write(&pod_data, sizeof(T)); }
+
+  auto get_data() const -> const T& { return pod_data; }
+  auto get_data() -> T& { return pod_data; }
+
+  auto get_descriptor_info() const -> const VkDescriptorBufferInfo&
+  {
+    return descriptor_info;
+  }
+
+private:
+  T pod_data;
+  GPUBuffer buffer{ GPUBuffer::Type::Uniform, sizeof(T) };
+  VkDescriptorBufferInfo descriptor_info{};
 };
 
 } // namespace Engine::Graphics

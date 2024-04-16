@@ -105,9 +105,8 @@ struct ShaderIncluder : public shaderc::CompileOptions::IncluderInterface
   {
     // Find the requested source file
     const std::filesystem::path requested_path = requested_source;
-    const auto absolute_requested_path = std::filesystem::path{ "shaders" } /
-                                         std::filesystem::path{ "include" } /
-                                         requested_path;
+    const auto absolute_requested_path =
+      std::filesystem::path{ "Assets/shaders/include" } / requested_path;
 
     // Check if the requested source file exists
     if (!std::filesystem::exists(absolute_requested_path)) {
