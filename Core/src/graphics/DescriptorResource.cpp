@@ -2,6 +2,7 @@
 
 #include "graphics/DescriptorResource.hpp"
 
+#include "core/Application.hpp"
 #include "core/Verify.hpp"
 #include "graphics/Device.hpp"
 
@@ -9,16 +10,15 @@ namespace Engine::Graphics {
 
 static constexpr Core::u32 frame_count = 3;
 
-DescriptorResource::DescriptorResource()
-{
-  // Initialize Vulkan objects
-  create_pool();
-}
-
 DescriptorResource::~DescriptorResource()
 {
-  // Cleanup Vulkan objects
-  for (const auto& descriptor_pool : descriptor_pools) {
+  destroy();
+}
+
+auto
+DescriptorResource::destroy() -> void
+{
+  for (auto& descriptor_pool : descriptor_pools) {
     vkDestroyDescriptorPool(Device::the().device(), descriptor_pool, nullptr);
   }
 }
@@ -66,9 +66,9 @@ DescriptorResource::allocate_many_descriptor_sets(
 }
 
 void
-DescriptorResource::begin_frame(Core::u32 frame)
+DescriptorResource::begin_frame()
 {
-  current_frame = frame;
+  current_frame = Core::Application::the().current_frame_index();
   // Cleanup or reset operations for the beginning of the frame
 
   vkResetDescriptorPool(
@@ -79,12 +79,6 @@ void
 DescriptorResource::end_frame()
 {
   // Cleanup or reset operations for the end of the frame
-}
-
-auto
-DescriptorResource::construct() -> Core::Scope<DescriptorResource>
-{
-  return Core::Scope<DescriptorResource>(new DescriptorResource());
 }
 
 void

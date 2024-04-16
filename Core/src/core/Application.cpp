@@ -5,6 +5,7 @@
 #include "core/Logger.hpp"
 
 #include "graphics/Allocator.hpp"
+#include "graphics/DescriptorResource.hpp"
 #include "graphics/Device.hpp"
 #include "graphics/Instance.hpp"
 #include "graphics/InterfaceSystem.hpp"
@@ -75,6 +76,8 @@ Application::run() -> i32
       continue;
     }
 
+    Graphics::DescriptorResource::the().begin_frame();
+
     auto current_frame_time = Clock::now();
     auto frame_duration = current_frame_time - last_frame_time;
     last_frame_time = current_frame_time;
@@ -95,8 +98,8 @@ Application::run() -> i32
     window->present();
 
     ++frame_count;
-    auto current_second_time = Clock::now();
-    if (current_second_time - last_fps_time >= 1) {
+    if (auto current_second_time = Clock::now();
+        current_second_time - last_fps_time >= 1) {
       statistics.frames_per_seconds = frame_count;
       frame_count = 0;
       last_fps_time = current_second_time;
@@ -106,8 +109,11 @@ Application::run() -> i32
            statistics.frame_time,
            statistics.frames_per_seconds);
     }
+
+    Graphics::DescriptorResource::the().end_frame();
   }
 
+  Graphics::DescriptorResource::the().destroy();
   vkDeviceWaitIdle(Graphics::Device::the().device());
 
   destruct();

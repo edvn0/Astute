@@ -130,7 +130,7 @@ GraphicsPipeline::create_pipeline() -> void
   rasterization_info.rasterizerDiscardEnable = VK_FALSE;
   rasterization_info.polygonMode = VK_POLYGON_MODE_FILL;
   rasterization_info.lineWidth = 1.0f;
-  rasterization_info.cullMode = VK_CULL_MODE_BACK_BIT;
+  rasterization_info.cullMode = VK_CULL_MODE_FRONT_BIT;
   rasterization_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
   rasterization_info.depthBiasEnable = VK_FALSE;
   rasterization_info.depthBiasConstantFactor = 0.0f;
@@ -162,23 +162,10 @@ GraphicsPipeline::create_pipeline() -> void
   color_blend_info.logicOpEnable = VK_FALSE;
   color_blend_info.logicOp = VK_LOGIC_OP_COPY;
 
-  std::array<VkPipelineColorBlendAttachmentState, 1> color_blend_attachments = {
-    VkPipelineColorBlendAttachmentState{
-      .blendEnable = VK_FALSE,
-      .srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
-      .dstColorBlendFactor = VK_BLEND_FACTOR_ZERO,
-      .colorBlendOp = VK_BLEND_OP_ADD,
-      .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
-      .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
-      .alphaBlendOp = VK_BLEND_OP_ADD,
-      .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-    },
-  };
-
+  auto color_blend_states = framebuffer->construct_blend_states();
   color_blend_info.attachmentCount =
-    static_cast<Core::u32>(color_blend_attachments.size());
-  color_blend_info.pAttachments = color_blend_attachments.data();
+    static_cast<Core::u32>(color_blend_states.size());
+  color_blend_info.pAttachments = color_blend_states.data();
   pipeline_info.pColorBlendState = &color_blend_info;
 
   VkPipelineDynamicStateCreateInfo dynamic_state_info{};

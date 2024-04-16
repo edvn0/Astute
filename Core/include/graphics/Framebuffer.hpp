@@ -13,6 +13,8 @@ public:
   struct Configuration
   {
     const Core::Extent size;
+    const std::vector<VkFormat> colour_attachment_formats{};
+    const VkFormat depth_attachment_format{ VK_FORMAT_UNDEFINED };
   };
   explicit Framebuffer(Configuration);
 
@@ -44,11 +46,15 @@ public:
   {
     return clear_values;
   }
+  auto construct_blend_states() const
+    -> std::vector<VkPipelineColorBlendAttachmentState >;
 
   auto on_resize(const Core::Extent&) -> void;
 
 private:
   Core::Extent size;
+  const std::vector<VkFormat> colour_attachment_formats;
+  const VkFormat depth_attachment_format;
 
   std::vector<VkClearValue> clear_values;
   std::vector<Core::Scope<Image>> colour_attachments;

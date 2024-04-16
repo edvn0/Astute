@@ -29,8 +29,9 @@ private:
   ProjectionType projection_type;
   f32 speed;
   f32 mouse_sensitivity;
-  bool first_mouse;
-  f32 last_x, last_y;
+  bool first_mouse{ true };
+  f32 last_x{ 0.0F };
+  f32 last_y{ 0.0F };
   f32 zoom;
 
   glm::mat4 view_matrix;
@@ -50,7 +51,7 @@ public:
          f32 init_mouse_sensitivity = 0.1f)
     : position(init_position)
     , up(glm::normalize(init_up))
-    , front(glm::vec3(0.0f, 0.0f, -1.0f))
+    , front(glm::vec3(0.0f, 0.0f, 1.0f))
     , yaw(init_yaw)
     , pitch(init_pitch)
     , aspect_ratio(init_aspect_ratio)
@@ -60,9 +61,6 @@ public:
     , projection_type(type)
     , speed(init_speed)
     , mouse_sensitivity(init_mouse_sensitivity)
-    , first_mouse(true)
-    , last_x(0.0f)
-    , last_y(0.0f)
   {
     update_camera_vectors();
     update_projection();
@@ -122,6 +120,25 @@ public:
   auto move_right(f32 delta_time) -> void
   {
     position += glm::normalize(glm::cross(front, up)) * speed * delta_time;
+  }
+
+  auto move_up(f32 delta_time) -> void { position += up * speed * delta_time; }
+
+  auto move_down(f32 delta_time) -> void
+  {
+    position -= up * speed * delta_time;
+  }
+
+  auto turn_left(f32 delta_time) -> void
+  {
+    yaw -= speed * delta_time;
+    update_camera_vectors();
+  }
+
+  auto turn_right(f32 delta_time) -> void
+  {
+    yaw += speed * delta_time;
+    update_camera_vectors();
   }
 
   auto process_mouse_movement(f32 x_offset,

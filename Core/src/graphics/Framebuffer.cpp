@@ -5,10 +5,14 @@
 #include "graphics/Framebuffer.hpp"
 #include "graphics/Image.hpp"
 
+#include "core/Verify.hpp"
+
 namespace Engine::Graphics {
 
 Framebuffer::Framebuffer(Configuration config)
   : size(config.size)
+  , colour_attachment_formats(config.colour_attachment_formats)
+  , depth_attachment_format(config.depth_attachment_format)
 {
   create_colour_attachments();
   create_depth_attachment();
@@ -38,77 +42,41 @@ Framebuffer::destroy() -> void
 auto
 Framebuffer::create_colour_attachments() -> void
 {
-  Core::Scope<Image> image = Core::make_scope<Image>();
-  create_image(size.width,
-               size.height,
-               1,
-               VK_SAMPLE_COUNT_1_BIT,
-               VK_FORMAT_B8G8R8A8_SRGB,
-               VK_IMAGE_TILING_OPTIMAL,
-               VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                 VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-                 VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-               image->image,
-               image->allocation,
-               image->allocation_info);
+  for (auto& format : colour_attachment_formats) {
+    Core::Scope<Image> image = Core::make_scope<Image>();
+    create_image(size.width,
+                 size.height,
+                 1,
+                 VK_SAMPLE_COUNT_1_BIT,
+                 format,
+                 VK_IMAGE_TILING_OPTIMAL,
+                 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                   VK_IMAGE_USAGE_SAMPLED_BIT,
+                 image->image,
+                 image->allocation,
+                 image->allocation_info);
+    image->aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;
+    image->view = create_view(image->image, format, VK_IMAGE_ASPECT_COLOR_BIT);
+    image->sampler = create_sampler(VK_FILTER_LINEAR,
+                                    VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                                    VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK);
 
-  VkImageViewCreateInfo view_create_info{};
-  view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-  view_create_info.image = image->image;
-  view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-  view_create_info.format = VK_FORMAT_B8G8R8A8_SRGB;
-  view_create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-  view_create_info.subresourceRange.baseMipLevel = 0;
-  view_create_info.subresourceRange.levelCount = 1;
-  view_create_info.subresourceRange.baseArrayLayer = 0;
-  view_create_info.subresourceRange.layerCount = 1;
-  view_create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-  view_create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-  view_create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-  view_create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+    auto& descriptor_info = image->descriptor_info;
+    descriptor_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    descriptor_info.imageView = image->view;
+    descriptor_info.sampler = image->sampler;
 
-  if (vkCreateImageView(
-        Device::the().device(), &view_create_info, nullptr, &image->view) !=
-      VK_SUCCESS) {
-    throw std::runtime_error("Failed to create image view");
+    colour_attachments.push_back(std::move(image));
   }
-
-  VkSamplerCreateInfo sampler_create_info{};
-  sampler_create_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-  sampler_create_info.magFilter = VK_FILTER_LINEAR;
-  sampler_create_info.minFilter = VK_FILTER_LINEAR;
-  sampler_create_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-  sampler_create_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-  sampler_create_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-  // sampler_create_info.anisotropyEnable = VK_TRUE;
-  // sampler_create_info.maxAnisotropy = 16;
-  sampler_create_info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
-  sampler_create_info.unnormalizedCoordinates = VK_FALSE;
-  sampler_create_info.compareEnable = VK_FALSE;
-  sampler_create_info.compareOp = VK_COMPARE_OP_ALWAYS;
-  sampler_create_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-  sampler_create_info.minLod = 0;
-  sampler_create_info.maxLod = 1;
-  sampler_create_info.mipLodBias = 0;
-
-  if (vkCreateSampler(Device::the().device(),
-                      &sampler_create_info,
-                      nullptr,
-                      &image->sampler) != VK_SUCCESS) {
-    throw std::runtime_error("Failed to create sampler");
-  }
-
-  auto& descriptor_info = image->descriptor_info;
-  descriptor_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-  descriptor_info.imageView = image->view;
-  descriptor_info.sampler = image->sampler;
-
-  colour_attachments.push_back(std::move(image));
 }
 
 auto
 Framebuffer::create_depth_attachment() -> void
 {
+  if (depth_attachment_format == VK_FORMAT_UNDEFINED) {
+    return;
+  }
+
   Core::Scope<Image> image = Core::make_scope<Image>();
   create_image(size.width,
                size.height,
@@ -121,52 +89,12 @@ Framebuffer::create_depth_attachment() -> void
                image->allocation,
                image->allocation_info);
   image->aspect_mask = VK_IMAGE_ASPECT_DEPTH_BIT;
+  image->view =
+    create_view(image->image, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT);
+  image->sampler = create_sampler(VK_FILTER_LINEAR,
+                                  VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                                  VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK);
 
-  VkImageViewCreateInfo view_create_info{};
-  view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-  view_create_info.image = image->image;
-  view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-  view_create_info.format = VK_FORMAT_D32_SFLOAT;
-  view_create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-  view_create_info.subresourceRange.baseMipLevel = 0;
-  view_create_info.subresourceRange.levelCount = 1;
-  view_create_info.subresourceRange.baseArrayLayer = 0;
-  view_create_info.subresourceRange.layerCount = 1;
-  view_create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-  view_create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-  view_create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-  view_create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-  if (vkCreateImageView(
-        Device::the().device(), &view_create_info, nullptr, &image->view) !=
-      VK_SUCCESS) {
-    throw std::runtime_error("Failed to create image view");
-  }
-
-  VkSamplerCreateInfo sampler_create_info{};
-  sampler_create_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-  sampler_create_info.magFilter = VK_FILTER_LINEAR;
-  sampler_create_info.minFilter = VK_FILTER_LINEAR;
-  sampler_create_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-  sampler_create_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-  sampler_create_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-  // sampler_create_info.anisotropyEnable = VK_TRUE;
-  // sampler_create_info.maxAnisotropy = 16;
-  sampler_create_info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
-  sampler_create_info.unnormalizedCoordinates = VK_FALSE;
-  sampler_create_info.compareEnable = VK_FALSE;
-  sampler_create_info.compareOp = VK_COMPARE_OP_ALWAYS;
-  sampler_create_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-  sampler_create_info.minLod = 0;
-  sampler_create_info.maxLod = 1;
-  sampler_create_info.mipLodBias = 0;
-
-  if (vkCreateSampler(Device::the().device(),
-                      &sampler_create_info,
-                      nullptr,
-                      &image->sampler) != VK_SUCCESS) {
-    throw std::runtime_error("Failed to create sampler");
-  }
   auto& descriptor_info = image->descriptor_info;
   descriptor_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
   descriptor_info.imageView = image->view;
@@ -178,43 +106,54 @@ Framebuffer::create_depth_attachment() -> void
 auto
 Framebuffer::create_renderpass() -> void
 {
-  VkAttachmentDescription colour_attachment_description{};
-  colour_attachment_description.format = VK_FORMAT_B8G8R8A8_SRGB;
-  colour_attachment_description.samples = VK_SAMPLE_COUNT_1_BIT;
-  colour_attachment_description.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  colour_attachment_description.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  colour_attachment_description.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  colour_attachment_description.stencilStoreOp =
-    VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  colour_attachment_description.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  colour_attachment_description.finalLayout =
-    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-  VkAttachmentDescription depth_attachment_description{};
-  depth_attachment_description.format = VK_FORMAT_D32_SFLOAT;
-  depth_attachment_description.samples = VK_SAMPLE_COUNT_1_BIT;
-  depth_attachment_description.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  depth_attachment_description.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  depth_attachment_description.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  depth_attachment_description.stencilStoreOp =
-    VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  depth_attachment_description.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  depth_attachment_description.finalLayout =
-    VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-  VkAttachmentReference colour_attachment_ref{};
-  colour_attachment_ref.attachment = 0;
-  colour_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
+  std::vector<VkAttachmentDescription> attachments;
+  std::vector<VkAttachmentReference> colour_attachment_refs;
   VkAttachmentReference depth_attachment_ref{};
-  depth_attachment_ref.attachment = 1;
-  depth_attachment_ref.layout =
-    VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+  attachments.reserve(colour_attachments.size() + 1);
+
+  for (const auto& format : colour_attachment_formats) {
+    VkAttachmentDescription attachment{};
+    attachment.format = format;
+    attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkAttachmentReference ref{};
+    ref.attachment = static_cast<Core::u32>(attachments.size());
+    ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    attachments.push_back(attachment);
+    colour_attachment_refs.push_back(ref);
+  }
+
+  if (depth_attachment_format != VK_FORMAT_UNDEFINED) {
+    VkAttachmentDescription attachment{};
+    attachment.format = depth_attachment_format;
+    attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+    depth_attachment_ref.attachment =
+      static_cast<Core::u32>(attachments.size());
+    depth_attachment_ref.layout =
+      VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    attachments.push_back(attachment);
+  }
 
   VkSubpassDescription subpass{};
   subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-  subpass.colorAttachmentCount = 1;
-  subpass.pColorAttachments = &colour_attachment_ref;
+  subpass.colorAttachmentCount =
+    static_cast<Core::u32>(colour_attachment_refs.size());
+  subpass.pColorAttachments = colour_attachment_refs.data();
   subpass.pDepthStencilAttachment = &depth_attachment_ref;
 
   VkSubpassDependency dependency{};
@@ -237,54 +176,56 @@ Framebuffer::create_renderpass() -> void
 
   std::array dependencies = { dependency, depth_dependency };
 
-  std::array attachments = {
-    colour_attachment_description,
-    depth_attachment_description,
-  };
-
   VkRenderPassCreateInfo render_pass_info{};
   render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-  render_pass_info.attachmentCount = static_cast<uint32_t>(attachments.size());
+  render_pass_info.attachmentCount = static_cast<Core::u32>(attachments.size());
   render_pass_info.pAttachments = attachments.data();
   render_pass_info.subpassCount = 1;
   render_pass_info.pSubpasses = &subpass;
-  render_pass_info.dependencyCount = static_cast<uint32_t>(dependencies.size());
+  render_pass_info.dependencyCount =
+    static_cast<Core::u32>(dependencies.size());
   render_pass_info.pDependencies = dependencies.data();
 
-  if (vkCreateRenderPass(
-        Device::the().device(), &render_pass_info, nullptr, &renderpass) !=
-      VK_SUCCESS) {
-    throw std::runtime_error("Failed to create render pass");
-  }
+  VK_CHECK(vkCreateRenderPass(
+    Device::the().device(), &render_pass_info, nullptr, &renderpass));
 
   // Create clear values
-  clear_values.resize(2);
-  clear_values[0].color = { 0.0F, 0.0F, 0.0F, 0.0F };
-  clear_values[1].depthStencil = { 0.0F, 0 };
+  for (const auto& format : colour_attachment_formats) {
+    VkClearValue clear_value{};
+    clear_value.color = { 0.0F, 0.0F, 0.0F, 1.0F };
+    clear_values.push_back(clear_value);
+  }
+
+  if (depth_attachment_format != VK_FORMAT_UNDEFINED) {
+    VkClearValue clear_value{};
+    clear_value.depthStencil = { 1.0F, 0 };
+    clear_values.push_back(clear_value);
+  }
 }
 
 auto
 Framebuffer::create_framebuffer() -> void
 {
-  std::array<VkImageView, 2> attachments = {
-    colour_attachments[0]->view,
-    depth_attachment->view,
-  };
+  std::vector<VkImageView> attachments;
+  for (const auto& image : colour_attachments) {
+    attachments.push_back(image->view);
+  }
+
+  if (depth_attachment_format != VK_FORMAT_UNDEFINED) {
+    attachments.push_back(depth_attachment->view);
+  }
 
   VkFramebufferCreateInfo framebuffer_info{};
   framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
   framebuffer_info.renderPass = get_renderpass();
-  framebuffer_info.attachmentCount = static_cast<uint32_t>(attachments.size());
+  framebuffer_info.attachmentCount = static_cast<Core::u32>(attachments.size());
   framebuffer_info.pAttachments = attachments.data();
   framebuffer_info.width = size.width;
   framebuffer_info.height = size.height;
   framebuffer_info.layers = 1;
 
-  if (vkCreateFramebuffer(
-        Device::the().device(), &framebuffer_info, nullptr, &framebuffer) !=
-      VK_SUCCESS) {
-    throw std::runtime_error("Failed to create framebuffer");
-  }
+  VK_CHECK(vkCreateFramebuffer(
+    Device::the().device(), &framebuffer_info, nullptr, &framebuffer));
 }
 
 auto
@@ -296,6 +237,25 @@ Framebuffer::on_resize(const Core::Extent& new_size) -> void
   create_depth_attachment();
   create_renderpass();
   create_framebuffer();
+}
+
+auto
+Framebuffer::construct_blend_states() const
+  -> std::vector<VkPipelineColorBlendAttachmentState>
+{
+  std::vector<VkPipelineColorBlendAttachmentState> color_blend_attachments;
+  color_blend_attachments.reserve(colour_attachment_formats.size());
+
+  for (const auto& format : colour_attachment_formats) {
+    VkPipelineColorBlendAttachmentState color_blend_attachment{};
+    color_blend_attachment.colorWriteMask =
+      VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+      VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    color_blend_attachment.blendEnable = VK_FALSE;
+    color_blend_attachments.push_back(color_blend_attachment);
+  }
+
+  return color_blend_attachments;
 }
 
 }

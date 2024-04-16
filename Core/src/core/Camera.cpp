@@ -17,25 +17,17 @@ Camera::handle_events(Event& event) -> void
       move_backward(0.1f);
     }
     if (e.get_keycode() == KeyCode::KEY_A) {
-      move_left(0.1f);
+      turn_left(0.1f);
     }
     if (e.get_keycode() == KeyCode::KEY_D) {
-      move_right(0.1f);
+      turn_right(0.1f);
     }
-    return false;
-  });
-
-  dispatcher.dispatch<MouseMovedEvent>([this](auto& e) {
-    static float lastX = 400; // Example initial window center width
-    static float lastY = 300; // Example initial window center height
-    float xoffset = e.get_x() - lastX;
-    float yoffset =
-      lastY -
-      e.get_y(); // Reversed since y-coordinates range from bottom to top
-    lastX = e.get_x();
-    lastY = e.get_y();
-
-    process_mouse_movement(xoffset, yoffset);
+    if (e.get_keycode() == KeyCode::KEY_Q) {
+      move_up(0.1f);
+    }
+    if (e.get_keycode() == KeyCode::KEY_E) {
+      move_down(0.1f);
+    }
     return false;
   });
 

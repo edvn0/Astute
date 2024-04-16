@@ -2,8 +2,9 @@
 
 #include "graphics/CommandBuffer.hpp"
 #include "graphics/Image.hpp"
-
 #include "graphics/Allocator.hpp"
+
+#include "core/Verify.hpp"
 
 // Hash impl for VkObjects
 namespace std {
@@ -151,6 +152,59 @@ copy_buffer_to_image(VkBuffer buffer,
                            1,
                            &region);
   });
+}
+
+auto
+create_view(VkImage& image, VkFormat format, VkImageAspectFlags aspect_mask)
+  -> VkImageView
+{
+  VkImageViewCreateInfo view_create_info{};
+  view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+  view_create_info.image = image;
+  view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+  view_create_info.format = format;
+  view_create_info.subresourceRange.aspectMask = aspect_mask;
+  view_create_info.subresourceRange.baseMipLevel = 0;
+  view_create_info.subresourceRange.levelCount = 1;
+  view_create_info.subresourceRange.baseArrayLayer = 0;
+  view_create_info.subresourceRange.layerCount = 1;
+  view_create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+  view_create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+  view_create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+  view_create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+  VkImageView view;
+  VK_CHECK(vkCreateImageView(
+    Device::the().device(), &view_create_info, nullptr, &view));
+  return view;
+}
+
+auto create_sampler(VkFilter filter,
+                    VkSamplerAddressMode address_mode,
+                    VkBorderColor border_color) -> VkSampler
+{
+  VkSamplerCreateInfo sampler_info{};
+  sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+  sampler_info.magFilter = filter;
+  sampler_info.minFilter = filter;
+  sampler_info.addressModeU = address_mode;
+  sampler_info.addressModeV = address_mode;
+  sampler_info.addressModeW = address_mode;
+  sampler_info.anisotropyEnable = VK_TRUE;
+  sampler_info.maxAnisotropy = 16;
+  sampler_info.borderColor = border_color;
+  sampler_info.unnormalizedCoordinates = VK_FALSE;
+  sampler_info.compareEnable = VK_FALSE;
+  sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
+  sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+  sampler_info.mipLodBias = 0.0f;
+  sampler_info.minLod = 0.0f;
+  sampler_info.maxLod = 0.0f;
+
+  VkSampler sampler;
+  VK_CHECK(vkCreateSampler(
+    Device::the().device(), &sampler_info, nullptr, &sampler));
+  return sampler;
 }
 
 auto

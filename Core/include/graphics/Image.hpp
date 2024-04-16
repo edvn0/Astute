@@ -31,6 +31,13 @@ copy_buffer_to_image(VkBuffer buffer,
                      Core::u32 width,
                      Core::u32 height);
 
+auto create_view(VkImage&, VkFormat, VkImageAspectFlags)
+  -> VkImageView;
+
+  auto create_sampler(VkFilter, VkSamplerAddressMode, VkBorderColor)
+    -> VkSampler;
+
+
 class Image
 {
 public:

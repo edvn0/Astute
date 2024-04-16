@@ -5,6 +5,7 @@
 #include "core/Logger.hpp"
 #include "core/Scene.hpp"
 
+#include "graphics/DescriptorResource.hpp"
 #include "graphics/GPUBuffer.hpp"
 #include "graphics/Swapchain.hpp"
 #include "graphics/Window.hpp"
@@ -19,28 +20,21 @@ struct Vertex
   glm::vec3 normal;
   glm::vec2 uv;
 };
-static constexpr std::array<const Vertex, 4> quad_vertices = {
-  Vertex{
-    { -0.5F, -0.5F, 0.0F },
-    { 0.0F, 0.0F, 1.0F },
-    { 0.0F, 0.0F },
-  },
-  Vertex{
-    { 0.5F, -0.5F, 0.0F },
-    { 0.0F, 0.0F, 1.0F },
-    { 1.0F, 0.0F },
-  },
-  Vertex{
-    { 0.5F, 0.5F, 0.0F },
-    { 0.0F, 0.0F, 1.0F },
-    { 1.0F, 1.0F },
-  },
-  Vertex{
-    { -0.5F, 0.5F, 0.0F },
-    { 0.0F, 0.0F, 1.0F },
-    { 0.0F, 1.0F },
-  },
+static constexpr std::array<const Vertex, 4> quad_vertices_counter_clockwise = {
+  Vertex{ .position = { -1.0f, -1.0f, 0.0f },
+          .normal = { 0.0f, 0.0f, 1.0f },
+          .uv = { 0.0f, 0.0f } },
+  Vertex{ .position = { 1.0f, -1.0f, 0.0f },
+          .normal = { 0.0f, 0.0f, 1.0f },
+          .uv = { 1.0f, 0.0f } },
+  Vertex{ .position = { 1.0f, 1.0f, 0.0f },
+          .normal = { 0.0f, 0.0f, 1.0f },
+          .uv = { 1.0f, 1.0f } },
+  Vertex{ .position = { -1.0f, 1.0f, 0.0f },
+          .normal = { 0.0f, 0.0f, 1.0f },
+          .uv = { 0.0f, 1.0f } },
 };
+
 static constexpr auto quad_indices = std::array{
   0U, 1U, 2U, 2U, 3U, 0U,
 };
@@ -57,11 +51,16 @@ Renderer::Renderer(Configuration config, const Window* window)
     .macro_definitions = {},
   });
 
-  vertex_buffer = Core::make_scope<VertexBuffer>(std::span{ quad_vertices });
+  vertex_buffer = Core::make_scope<VertexBuffer>(
+    std::span{ quad_vertices_counter_clockwise });
   index_buffer = Core::make_scope<IndexBuffer>(std::span{ quad_indices });
   predepth_framebuffer =
     Core::make_scope<Framebuffer>(Framebuffer::Configuration{
       .size = window->get_swapchain().get_size(),
+      .colour_attachment_formats = { VK_FORMAT_R32G32B32A32_SFLOAT,
+                                     VK_FORMAT_R32G32B32A32_SFLOAT,
+                                     VK_FORMAT_R32G32B32A32_SFLOAT },
+      .depth_attachment_format = VK_FORMAT_D32_SFLOAT,
     });
   predepth_shader = Shader::compile_graphics_scoped(
     "Assets/shaders/predepth.vert", "Assets/shaders/predepth.frag");
@@ -138,8 +137,15 @@ Renderer::predepth_pass() -> void
                          offsets.data());
 
   auto write = predepth_shader->get_descriptor_set("RendererUBO", 0);
+  VkDescriptorSetAllocateInfo alloc_info{};
+  alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  const auto& layouts = predepth_shader->get_descriptor_set_layouts();
+  alloc_info.descriptorSetCount = static_cast<Core::u32>(layouts.size());
+  alloc_info.pSetLayouts = layouts.data();
 
-  VkDescriptorSet allocated{};
+  auto allocated =
+    DescriptorResource::the().allocate_descriptor_set(alloc_info);
+
   VkWriteDescriptorSet write_descriptor_set{};
   write_descriptor_set.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
   write_descriptor_set.dstSet = allocated;

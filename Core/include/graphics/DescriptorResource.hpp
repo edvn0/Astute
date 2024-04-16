@@ -3,6 +3,7 @@
 #include <vulkan/vulkan.h>
 
 #include "core/Types.hpp"
+#include <mutex>
 
 namespace Engine::Graphics {
 
@@ -11,19 +12,28 @@ class DescriptorResource
 public:
   ~DescriptorResource();
 
+  DescriptorResource(const DescriptorResource&) = delete;
+  DescriptorResource& operator=(const DescriptorResource&) = delete;
+
   [[nodiscard]] auto allocate_descriptor_set(
     const VkDescriptorSetAllocateInfo& alloc_info) const -> VkDescriptorSet;
   [[nodiscard]] auto allocate_many_descriptor_sets(
     const VkDescriptorSetAllocateInfo& alloc_info) const
     -> std::vector<VkDescriptorSet>;
 
-  void begin_frame(Core::u32 frame);
+  void begin_frame();
   void end_frame();
 
-  static auto construct() -> Core::Scope<DescriptorResource>;
+  auto destroy() -> void;
+
+  static auto the() -> DescriptorResource&
+  {
+    static DescriptorResource instance;
+    return instance;
+  }
 
 private:
-  explicit DescriptorResource();
+  DescriptorResource() { create_pool(); }
 
   void create_pool();
   void handle_fragmentation() const;
@@ -32,9 +42,6 @@ private:
   Core::u32 current_frame{ 0 };
   std::array<VkDescriptorPool, 3> descriptor_pools;
   std::array<VkDescriptorPoolSize, 11> pool_sizes;
-
-  // Optional: Structure to keep track of allocated descriptor sets and their
-  // usage
 };
 
 } // namespace Engine::Graphics

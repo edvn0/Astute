@@ -154,7 +154,7 @@ class UniformBuffer
 {
 public:
   template<class T>
-  UniformBuffer(const std::span<T> data)
+  explicit UniformBuffer(const std::span<T> data)
     : buffer(GPUBuffer::Type::Uniform, data.size_bytes())
   {
     buffer.write(data);
@@ -200,13 +200,10 @@ public:
   auto get_data() const -> const T& { return pod_data; }
   auto get_data() -> T& { return pod_data; }
 
-  auto get_descriptor_info() const -> const VkDescriptorBufferInfo&
-  {
-    return descriptor_info;
-  }
+  auto get_descriptor_info() const -> const auto& { return descriptor_info; }
 
 private:
-  T pod_data;
+  T pod_data{};
   GPUBuffer buffer{ GPUBuffer::Type::Uniform, sizeof(T) };
   VkDescriptorBufferInfo descriptor_info{};
 };
