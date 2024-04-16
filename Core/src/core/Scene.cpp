@@ -18,7 +18,6 @@ Scene::on_update_editor(f64 ts) -> void
 
 auto
 Scene::on_render_editor(Graphics::Renderer& renderer,
-                        f64 ts,
                         const Camera& camera) -> void
 {
   renderer.begin_scene(*this,

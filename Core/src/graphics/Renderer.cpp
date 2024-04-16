@@ -19,7 +19,7 @@ struct Vertex
   glm::vec3 normal;
   glm::vec2 uv;
 };
-static constexpr std::array<Vertex, 4> quad_vertices = {
+static constexpr std::array<const Vertex, 4> quad_vertices = {
   Vertex{
     { -0.5F, -0.5F, 0.0F },
     { 0.0F, 0.0F, 1.0F },
@@ -49,27 +49,38 @@ Renderer::Renderer(Configuration config, const Window* window)
   : size(window->get_swapchain().get_size())
   , shadow_pass_parameters({ config.shadow_pass_size })
 {
-  vertex_buffer = Core::make_scope<VertexBuffer>(std::span{
-    quad_vertices.data(),
-    quad_vertices.size(),
+  Shader::initialise_compiler(Compilation::ShaderCompilerConfiguration{
+    .optimisation_level = 0,
+    .debug_information_level = Compilation::DebugInformationLevel::None,
+    .warnings_as_errors = false,
+    .include_directories = { std::filesystem::path{ "shaders" } },
+    .macro_definitions = {},
   });
+
+  vertex_buffer = Core::make_scope<VertexBuffer>(std::span{ quad_vertices });
   index_buffer = Core::make_scope<IndexBuffer>(std::span{ quad_indices });
   predepth_framebuffer =
     Core::make_scope<Framebuffer>(Framebuffer::Configuration{
       .size = window->get_swapchain().get_size(),
     });
-  predepth_shader =
-    Core::make_scope<Shader>("shaders/predepth.vert", "shaders/predepth.frag");
-  predepth_pipeline = Core::make_scope<GraphicsPipeline>();
-
-  info("Vertex Size: {}", vertex_buffer->size());
-  info("Index Size: {}", index_buffer->size());
+  predepth_shader = Shader::compile_graphics_scoped(
+    "Assets/shaders/predepth.vert", "Assets/shaders/predepth.frag");
+  predepth_pipeline =
+    Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
+      .framebuffer = predepth_framebuffer.get(),
+      .shader = predepth_shader.get(),
+    });
 
   command_buffer = Core::make_scope<CommandBuffer>(CommandBuffer::Properties{
     .image_count = window->get_swapchain().get_image_count(),
     .queue_type = QueueType::Graphics,
     .primary = true,
   });
+}
+
+Renderer::~Renderer()
+{
+  command_buffer.reset();
 }
 
 auto
@@ -82,6 +93,12 @@ auto
 Renderer::end_scene() -> void
 {
   flush_draw_lists();
+}
+
+auto
+Renderer::on_resize(const Core::Extent&) -> void
+{
+  predepth_framebuffer->on_resize(size);
 }
 
 auto
@@ -100,8 +117,8 @@ Renderer::predepth_pass() -> void
 
   RendererExtensions::begin_renderpass(*command_buffer, *predepth_framebuffer);
 
-  RendererExtensions::explicitly_clear_framebuffer(*command_buffer,
-                                                   *predepth_framebuffer);
+  // RendererExtensions::explicitly_clear_framebuffer(*command_buffer,
+  //                                                 *predepth_framebuffer);
 
   vkCmdBindPipeline(command_buffer->get_command_buffer(),
                     VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -113,12 +130,14 @@ Renderer::predepth_pass() -> void
                          1,
                          vertex_buffers.data(),
                          offsets.data());
+
   vkCmdBindIndexBuffer(command_buffer->get_command_buffer(),
                        index_buffer->get_buffer(),
                        0,
                        VK_INDEX_TYPE_UINT32);
+
   vkCmdDrawIndexed(command_buffer->get_command_buffer(),
-                   static_cast<Core::u32>(index_buffer->size()),
+                   static_cast<Core::u32>(index_buffer->count()),
                    1,
                    0,
                    0,

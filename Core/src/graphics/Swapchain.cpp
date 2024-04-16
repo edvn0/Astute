@@ -239,6 +239,7 @@ Swapchain::begin_frame() -> bool
   current_image_index = acquired.value();
 
   vkResetCommandPool(device, command_buffers[current_buffer_index].pool, 0);
+
   return true;
 }
 
@@ -260,14 +261,14 @@ Swapchain::present() -> void
     &semaphores.at(get_current_buffer_index()).render_complete;
   present_submit_info.signalSemaphoreCount = 1;
   present_submit_info.pCommandBuffers =
-    &command_buffers[current_buffer_index].command_buffer;
+    &command_buffers.at(get_current_buffer_index()).command_buffer;
   present_submit_info.commandBufferCount = 1;
 
-  VK_CHECK(vkResetFences(device, 1, &wait_fences[current_buffer_index]));
+  VK_CHECK(vkResetFences(device, 1, &wait_fences[get_current_buffer_index()]));
   VK_CHECK(vkQueueSubmit(Device::the().get_queue(QueueType::Graphics),
                          1,
                          &present_submit_info,
-                         wait_fences[current_buffer_index]));
+                         wait_fences[get_current_buffer_index()]));
 
   VkResult result;
   {
@@ -281,7 +282,7 @@ Swapchain::present() -> void
     present_info.pWaitSemaphores =
       &semaphores.at(get_current_buffer_index()).render_complete;
     present_info.waitSemaphoreCount = 1;
-    result = vkQueuePresentKHR(Device::the().get_queue(QueueType::Present),
+    result = vkQueuePresentKHR(Device::the().get_queue(QueueType::Graphics),
                                &present_info);
   }
 
@@ -297,11 +298,6 @@ Swapchain::present() -> void
     }
   }
 
-  VK_CHECK(vkWaitForFences(device,
-                           1,
-                           &wait_fences[current_buffer_index],
-                           VK_TRUE,
-                           DEFAULT_FENCE_TIMEOUT));
   current_buffer_index = (current_buffer_index + 1) % image_count;
 }
 

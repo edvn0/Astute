@@ -1,5 +1,6 @@
 #include "pch/CorePCH.hpp"
 
+#include "core/Logger.hpp"
 #include "graphics/Device.hpp"
 #include "graphics/Instance.hpp"
 
@@ -89,6 +90,13 @@ Device::is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface)
     is_suitable = false;
   }
 
+  // IS DISCRETE!
+  VkPhysicalDeviceProperties device_properties;
+  vkGetPhysicalDeviceProperties(device, &device_properties);
+  if (device_properties.deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+    is_suitable = false;
+  }
+
   return is_suitable;
 }
 
@@ -143,6 +151,13 @@ Device::create_device(VkSurfaceKHR surface) -> void
   for (const auto& device : devices) {
     if (is_device_suitable(device, surface)) {
       vk_physical_device = device;
+
+      VkPhysicalDeviceProperties device_properties;
+      vkGetPhysicalDeviceProperties(vk_physical_device, &device_properties);
+      std::string device_name = device_properties.deviceName;
+
+      info("Chose device: {}", device_name);
+
       break;
     }
   }
@@ -206,8 +221,6 @@ Device::create_device(VkSurfaceKHR surface) -> void
   command_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
   command_pool_create_info.queueFamilyIndex =
     queue_support.at(QueueType::Graphics).family_index;
-  command_pool_create_info.flags =
-    VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
   vkCreateCommandPool(
     device(), &command_pool_create_info, nullptr, &graphics_command_pool);
 
@@ -222,8 +235,11 @@ Device::execute_immediate(QueueType type,
                           std::function<void(VkCommandBuffer)>&& command)
   -> void
 {
-  // Create command buffer from pool
-  VkCommandBuffer cmdBuffer;
+  vkResetCommandPool(device(),
+                     type == QueueType::Compute ? compute_command_pool
+                                                : graphics_command_pool,
+                     0);
+  VkCommandBuffer command_buffer;
 
   VkCommandBufferAllocateInfo allocation_info = {};
   allocation_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -232,22 +248,20 @@ Device::execute_immediate(QueueType type,
   allocation_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   allocation_info.commandBufferCount = 1;
 
-  vkAllocateCommandBuffers(device(), &allocation_info, &cmdBuffer);
+  vkAllocateCommandBuffers(device(), &allocation_info, &command_buffer);
 
-  // If requested, also start the new command buffer
-  VkCommandBufferBeginInfo cmdBufferBeginInfo{};
-  cmdBufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  vkBeginCommandBuffer(cmdBuffer, &cmdBufferBeginInfo);
+  VkCommandBufferBeginInfo command_buffer_begin_info{};
+  command_buffer_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  command_buffer_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info);
 
-  // Execute function
-  command(cmdBuffer);
-  // End command buffer
-  vkEndCommandBuffer(cmdBuffer);
-  // Submit command buffer
+  auto func = std::move(command);
+  func(command_buffer);
+  vkEndCommandBuffer(command_buffer);
   VkSubmitInfo submitInfo = {};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submitInfo.commandBufferCount = 1;
-  submitInfo.pCommandBuffers = &cmdBuffer;
+  submitInfo.pCommandBuffers = &command_buffer;
 
   VkFenceCreateInfo fence_create_info = {};
   fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -263,7 +277,8 @@ Device::execute_immediate(QueueType type,
   vkWaitForFences(device(), 1, &fence, VK_TRUE, default_fence_timeout);
 
   vkDestroyFence(device(), fence, nullptr);
-  vkFreeCommandBuffers(device(), allocation_info.commandPool, 1, &cmdBuffer);
+  vkFreeCommandBuffers(
+    device(), allocation_info.commandPool, 1, &command_buffer);
 }
 
 auto
@@ -279,6 +294,13 @@ Device::create_secondary_command_buffer() -> VkCommandBuffer
   vkAllocateCommandBuffers(device(), &alloc_info, &command_buffer);
 
   return command_buffer;
+}
+
+auto
+Device::reset_command_pools() -> void
+{
+  vkResetCommandPool(device(), graphics_command_pool, 0);
+  vkResetCommandPool(device(), compute_command_pool, 0);
 }
 
 auto

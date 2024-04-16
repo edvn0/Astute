@@ -4,6 +4,7 @@
 
 #include "graphics/CommandBuffer.hpp"
 #include "graphics/Framebuffer.hpp"
+#include "graphics/Image.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -50,7 +51,8 @@ begin_renderpass(const CommandBuffer& command_buffer,
   vkCmdSetScissor(command_buffer.get_command_buffer(), 0, 1, &scissor);
 }
 
-auto end_renderpass(const CommandBuffer& command_buffer) -> void
+auto
+end_renderpass(const CommandBuffer& command_buffer) -> void
 {
   vkCmdEndRenderPass(command_buffer.get_command_buffer());
 }
@@ -59,30 +61,45 @@ auto
 explicitly_clear_framebuffer(const CommandBuffer& command_buffer,
                              const Framebuffer& framebuffer) -> void
 {
-  const auto& clear_values = framebuffer.get_clear_values();
+  const std::vector<VkClearValue>& fb_clear_values =
+    framebuffer.get_clear_values();
 
-  std::vector<VkClearAttachment> clear_attachments;
-  clear_attachments.reserve(clear_values.size());
+  const auto color_attachment_count = framebuffer.get_colour_attachment_count();
+  const auto total_attachment_count =
+    color_attachment_count + (framebuffer.has_depth_attachment() ? 1 : 0);
 
-  std::vector<VkClearRect> clear_rects;
-  clear_rects.reserve(clear_values.size());
+  const VkExtent2D extent_2_d = framebuffer.get_extent();
+  std::vector<VkClearAttachment> attachments(total_attachment_count);
+  std::vector<VkClearRect> clear_rects(total_attachment_count);
+  for (Core::u32 i = 0; i < color_attachment_count; i++) {
+    attachments[i].aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    attachments[i].colorAttachment = i;
+    attachments[i].clearValue = fb_clear_values[i];
 
-  for (Core::u32 i = 0; i < clear_values.size(); ++i) {
-    clear_attachments.emplace_back(
-      VK_IMAGE_ASPECT_COLOR_BIT, i, clear_values[i]);
-    clear_rects.emplace_back(
-      VkRect2D{
-        .offset = { 0, 0 },
-        .extent = framebuffer.get_extent(),
-      },
+    clear_rects[i].rect.offset = {
       0,
-      1);
+      0,
+    };
+    clear_rects[i].rect.extent = extent_2_d;
+    clear_rects[i].baseArrayLayer = 0;
+    clear_rects[i].layerCount = 1;
+  }
+
+  if (framebuffer.has_depth_attachment()) {
+    auto aspect_bits = framebuffer.get_depth_attachment()->get_aspect_flags();
+    attachments[color_attachment_count].aspectMask = aspect_bits;
+    attachments[color_attachment_count].clearValue =
+      fb_clear_values[color_attachment_count];
+    clear_rects[color_attachment_count].rect.offset = { 0, 0 };
+    clear_rects[color_attachment_count].rect.extent = extent_2_d;
+    clear_rects[color_attachment_count].baseArrayLayer = 0;
+    clear_rects[color_attachment_count].layerCount = 1;
   }
 
   vkCmdClearAttachments(command_buffer.get_command_buffer(),
-                        static_cast<Core::u32>(clear_attachments.size()),
-                        clear_attachments.data(),
-                        static_cast<Core::u32>(clear_rects.size()),
+                        static_cast<Core::u32>(total_attachment_count),
+                        attachments.data(),
+                        static_cast<Core::u32>(total_attachment_count),
                         clear_rects.data());
 }
 

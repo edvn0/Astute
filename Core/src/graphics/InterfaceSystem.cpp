@@ -166,6 +166,8 @@ InterfaceSystem::end_frame() -> void
   // DebugMarker::begin_region(draw_command_buffer, "Interface", { 1, 0, 0, 1
   // });
 
+  Device::the().reset_command_pools();
+
   vkCmdBeginRenderPass(draw_command_buffer,
                        &render_pass_begin_info,
                        VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);

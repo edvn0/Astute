@@ -18,8 +18,14 @@ Framebuffer::Framebuffer(Configuration config)
 
 Framebuffer::~Framebuffer()
 {
+  destroy();
+}
+
+auto
+Framebuffer::destroy() -> void
+{
   Allocator allocator{ "Framebuffer::~Framebuffer" };
-  for (auto& image : colour_attachments) {
+  for (const auto& image : colour_attachments) {
     image->destroy();
   }
 
@@ -39,7 +45,9 @@ Framebuffer::create_colour_attachments() -> void
                VK_SAMPLE_COUNT_1_BIT,
                VK_FORMAT_B8G8R8A8_SRGB,
                VK_IMAGE_TILING_OPTIMAL,
-               VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+               VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                 VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                 VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                image->image,
                image->allocation,
                image->allocation_info);
@@ -90,6 +98,11 @@ Framebuffer::create_colour_attachments() -> void
     throw std::runtime_error("Failed to create sampler");
   }
 
+  auto& descriptor_info = image->descriptor_info;
+  descriptor_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  descriptor_info.imageView = image->view;
+  descriptor_info.sampler = image->sampler;
+
   colour_attachments.push_back(std::move(image));
 }
 
@@ -107,6 +120,7 @@ Framebuffer::create_depth_attachment() -> void
                image->image,
                image->allocation,
                image->allocation_info);
+  image->aspect_mask = VK_IMAGE_ASPECT_DEPTH_BIT;
 
   VkImageViewCreateInfo view_create_info{};
   view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -153,6 +167,10 @@ Framebuffer::create_depth_attachment() -> void
                       &image->sampler) != VK_SUCCESS) {
     throw std::runtime_error("Failed to create sampler");
   }
+  auto& descriptor_info = image->descriptor_info;
+  descriptor_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+  descriptor_info.imageView = image->view;
+  descriptor_info.sampler = image->sampler;
 
   depth_attachment = std::move(image);
 }
@@ -170,13 +188,13 @@ Framebuffer::create_renderpass() -> void
     VK_ATTACHMENT_STORE_OP_DONT_CARE;
   colour_attachment_description.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   colour_attachment_description.finalLayout =
-    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
   VkAttachmentDescription depth_attachment_description{};
   depth_attachment_description.format = VK_FORMAT_D32_SFLOAT;
   depth_attachment_description.samples = VK_SAMPLE_COUNT_1_BIT;
   depth_attachment_description.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-  depth_attachment_description.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  depth_attachment_description.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
   depth_attachment_description.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
   depth_attachment_description.stencilStoreOp =
     VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -208,7 +226,18 @@ Framebuffer::create_renderpass() -> void
   dependency.dstAccessMask =
     VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-  std::array<VkAttachmentDescription, 2> attachments = {
+  VkSubpassDependency depth_dependency{};
+  depth_dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+  depth_dependency.dstSubpass = 0;
+  depth_dependency.srcStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+  depth_dependency.srcAccessMask = 0;
+  depth_dependency.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+  depth_dependency.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                                   VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+  std::array dependencies = { dependency, depth_dependency };
+
+  std::array attachments = {
     colour_attachment_description,
     depth_attachment_description,
   };
@@ -219,8 +248,8 @@ Framebuffer::create_renderpass() -> void
   render_pass_info.pAttachments = attachments.data();
   render_pass_info.subpassCount = 1;
   render_pass_info.pSubpasses = &subpass;
-  render_pass_info.dependencyCount = 1;
-  render_pass_info.pDependencies = &dependency;
+  render_pass_info.dependencyCount = static_cast<uint32_t>(dependencies.size());
+  render_pass_info.pDependencies = dependencies.data();
 
   if (vkCreateRenderPass(
         Device::the().device(), &render_pass_info, nullptr, &renderpass) !=
@@ -230,7 +259,7 @@ Framebuffer::create_renderpass() -> void
 
   // Create clear values
   clear_values.resize(2);
-  clear_values[0].color = { 0.0F, 0.0F, 0.0F, 1.0F };
+  clear_values[0].color = { 0.0F, 0.0F, 0.0F, 0.0F };
   clear_values[1].depthStencil = { 1.0F, 0 };
 }
 
@@ -256,6 +285,17 @@ Framebuffer::create_framebuffer() -> void
       VK_SUCCESS) {
     throw std::runtime_error("Failed to create framebuffer");
   }
+}
+
+auto
+Framebuffer::on_resize(const Core::Extent& new_size) -> void
+{
+  size = new_size;
+  destroy();
+  create_colour_attachments();
+  create_depth_attachment();
+  create_renderpass();
+  create_framebuffer();
 }
 
 }

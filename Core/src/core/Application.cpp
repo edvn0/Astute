@@ -76,7 +76,7 @@ Application::run() -> i32
     }
 
     auto current_frame_time = Clock::now();
-    double frame_duration = current_frame_time - last_frame_time;
+    auto frame_duration = current_frame_time - last_frame_time;
     last_frame_time = current_frame_time;
     accumulator += frame_duration;
 
@@ -85,6 +85,8 @@ Application::run() -> i32
       accumulator -= delta_time;
     }
     interpolate(accumulator / delta_time);
+
+    render();
 
     interface_system->begin_frame();
     interface();
@@ -105,6 +107,8 @@ Application::run() -> i32
            statistics.frames_per_seconds);
     }
   }
+
+  vkDeviceWaitIdle(Graphics::Device::the().device());
 
   destruct();
 

@@ -47,7 +47,6 @@ CommandBuffer::create_command_pool() -> void
   VkCommandPoolCreateInfo pool_info = {};
   pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
   pool_info.queueFamilyIndex = queue_family_index;
-  pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
   vkCreateCommandPool(
     Device::the().device(), &pool_info, nullptr, &command_pool);
@@ -92,14 +91,18 @@ CommandBuffer::begin(const VkCommandBufferBeginInfo* begin_info) -> void
     default_begin_info.pInheritanceInfo = begin_info->pInheritanceInfo;
     default_begin_info.pNext = begin_info->pNext;
   }
+  default_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-  auto frame_index = Core::Application::the().current_frame_index();
+  current_frame_index = Core::Application::the().current_frame_index();
   if (owned_by_swapchain) {
     active_command_buffer =
-      Core::Application::the().get_swapchain().get_command_buffer(frame_index);
+      Core::Application::the().get_swapchain().get_command_buffer(
+        current_frame_index);
   } else {
-    active_command_buffer = command_buffers[frame_index];
+    active_command_buffer = command_buffers[current_frame_index];
   }
+
+  vkResetCommandPool(Device::the().device(), command_pool, 0);
 
   vkBeginCommandBuffer(active_command_buffer, &default_begin_info);
 }
@@ -116,7 +119,6 @@ CommandBuffer::submit() -> void
     return;
 
   const auto& device = Device::the();
-  auto frame_index = Core::Application::the().current_frame_index();
   VkSubmitInfo submit_info{};
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submit_info.commandBufferCount = 1;
@@ -124,10 +126,10 @@ CommandBuffer::submit() -> void
   submit_info.pCommandBuffers = &buffer;
 
   vkWaitForFences(
-    device.device(), 1, &fences[frame_index], VK_TRUE, UINT64_MAX);
+    device.device(), 1, &fences[current_frame_index], VK_TRUE, UINT64_MAX);
 
-  vkResetFences(device.device(), 1, &fences[frame_index]);
-  vkQueueSubmit(queue, 1, &submit_info, fences[frame_index]);
+  vkResetFences(device.device(), 1, &fences[current_frame_index]);
+  vkQueueSubmit(queue, 1, &submit_info, fences[current_frame_index]);
 
   active_command_buffer = nullptr;
 }

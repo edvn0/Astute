@@ -23,7 +23,7 @@ AstuteApplication::AstuteApplication(Application::Configuration config)
            0.0F,
            config.size.aspect_ratio())
   , scene(std::make_shared<Scene>(config.scene_name))
-  , renderer(map_to_renderer_config(config), &get_window()){
+  , renderer(new Renderer{ map_to_renderer_config(config), &get_window() }){
 
   };
 
@@ -36,7 +36,7 @@ AstuteApplication::update(f64 ts) -> void
     using enum AstuteApplication::SceneState;
     case Edit:
       scene->on_update_editor(ts);
-      scene->on_render_editor(renderer, ts, camera);
+      break;
     case Play:
       // TODO: Implement play mode
       break;
@@ -52,6 +52,21 @@ AstuteApplication::update(f64 ts) -> void
 auto
 AstuteApplication::interpolate(f64) -> void
 {
+}
+
+auto
+AstuteApplication::render() -> void
+{
+  switch (scene_state) {
+    using enum AstuteApplication::SceneState;
+    case Edit:
+      scene->on_render_editor(*renderer, camera);
+      break;
+    default:
+      break;
+  }
+
+  vkDeviceWaitIdle(Device::the().device());
 }
 
 static void
@@ -78,8 +93,13 @@ AstuteApplication::interface() -> void
                   "FPS: {}, Frametime: {:5f}ms",
                   statistics.frames_per_seconds,
                   statistics.frame_time);
-    // image(renderer.get_output_image(), w, h);
   });
+
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0F, 0.0F));
+  scope("Output", [&](f32 w, f32 h) {
+    image<f32>(*renderer->get_output_image(), { .extent = { w, h } });
+  });
+  ImGui::PopStyleVar();
 }
 
 auto
@@ -101,4 +121,12 @@ auto
 AstuteApplication::on_resize(const Extent& ext) -> void
 {
   Application::on_resize(ext);
+  renderer->on_resize(ext);
+}
+
+auto
+AstuteApplication::destruct() -> void
+{
+  scene.reset();
+  renderer.reset();
 }

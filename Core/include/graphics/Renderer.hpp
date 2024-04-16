@@ -32,9 +32,17 @@ public:
     Core::u32 shadow_pass_size = 1024;
   };
   explicit Renderer(Configuration, const Window*);
+  ~Renderer();
 
   auto begin_scene(Core::Scene&, const SceneRendererCamera&) -> void;
   auto end_scene() -> void;
+
+  auto get_output_image() const -> const Image*
+  {
+    return predepth_framebuffer->get_colour_attachment(0);
+  }
+
+  auto on_resize(const Core::Extent&) -> void;
 
 private:
   Core::Extent size{ 0, 0 };

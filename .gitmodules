@@ -14,3 +14,6 @@
 [submodule "Library/entt"]
 	path = Library/entt
 	url = git@github.com:skypjack/entt.git
+[submodule "Library/SPIRV-Cross"]
+	path = Library/SPIRV-Cross
+	url = git@github.com:KhronosGroup/SPIRV-Cross.git

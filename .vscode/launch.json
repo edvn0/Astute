@@ -9,8 +9,7 @@
       "request": "launch",
       "name": "Debug",
       "program": "${workspaceRoot}/build/Application/App",
-      "cwd": "${workspaceRoot}/Application",
-      "preLaunchTask": "build",
+      "cwd": "${workspaceRoot}",
       "args": [
         "-b",
         "1920",

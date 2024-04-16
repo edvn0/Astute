@@ -43,6 +43,7 @@ public:
   virtual auto handle_events(Event&) -> void = 0;
   virtual auto interface() -> void = 0;
   virtual auto on_resize(const Extent&) -> void;
+  virtual auto render() -> void = 0;
 
   static auto the() -> Application&;
 

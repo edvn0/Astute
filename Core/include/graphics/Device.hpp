@@ -50,6 +50,7 @@ public:
   }
 
   auto create_secondary_command_buffer() -> VkCommandBuffer;
+  auto reset_command_pools() -> void;
 
 private:
   auto deinitialise() -> void;

@@ -11,5 +11,6 @@ class Window;
 class Image;
 class Framebuffer;
 class Renderer;
+class Shader;
 
 }

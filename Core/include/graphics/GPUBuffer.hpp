@@ -26,8 +26,14 @@ public:
 
   auto get_size() const -> Core::usize { return size; }
 
-  template<class T>
-  auto write(const std::span<T> data) -> void
+  template<class T, Core::usize Extent = std::dynamic_extent>
+  auto write(std::span<T, Extent> data) -> void
+  {
+    write(data.data(), data.size_bytes());
+  }
+
+  template<class T, Core::usize Extent = std::dynamic_extent>
+  auto write(std::span<const T, Extent> data) -> void
   {
     write(data.data(), data.size_bytes());
   }
@@ -56,9 +62,30 @@ private:
 class VertexBuffer
 {
 public:
+  template<class VertexType, Core::usize Extent = std::dynamic_extent>
+  VertexBuffer(std::span<VertexType, Extent> vertices)
+    : buffer(GPUBuffer::Type::Vertex, vertices.size_bytes())
+  {
+    buffer.write(vertices);
+  }
+
+  template<class VertexType, Core::usize Extent = std::dynamic_extent>
+  VertexBuffer(std::span<const VertexType, Extent> vertices)
+    : buffer(GPUBuffer::Type::Vertex, vertices.size_bytes())
+  {
+    buffer.write(vertices);
+  }
+
   template<class VertexType>
-  VertexBuffer(const std::span<VertexType> vertices)
-    : buffer(GPUBuffer::Type::Vertex, vertices.size() * sizeof(VertexType))
+  VertexBuffer(std::span<VertexType> vertices)
+    : buffer(GPUBuffer::Type::Vertex, vertices.size_bytes())
+  {
+    buffer.write(vertices);
+  }
+
+  template<class VertexType>
+  VertexBuffer(std::span<const VertexType> vertices)
+    : buffer(GPUBuffer::Type::Vertex, vertices.size_bytes())
   {
     buffer.write(vertices);
   }
@@ -74,17 +101,22 @@ class IndexBuffer
 {
 public:
   explicit IndexBuffer(const std::span<const Core::u32> indices)
-    : buffer(GPUBuffer::Type::Index, indices.size() * sizeof(Core::u32))
+    : buffer(GPUBuffer::Type::Index, indices.size_bytes())
   {
     buffer.write(indices);
   }
+
   explicit IndexBuffer(const std::span<Core::u32> indices)
-    : buffer(GPUBuffer::Type::Index, indices.size() * sizeof(Core::u32))
+    : buffer(GPUBuffer::Type::Index, indices.size_bytes())
   {
     buffer.write(indices);
   }
 
   auto size() const -> Core::usize { return buffer.get_size(); }
+  auto count() const -> Core::usize
+  {
+    return buffer.get_size() / sizeof(Core::u32);
+  }
   auto get_buffer() const -> VkBuffer { return buffer.get_buffer(); }
 
 private:

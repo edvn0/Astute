@@ -235,10 +235,18 @@ check_result(VkResult result)
     if (result == VK_ERROR_DEVICE_LOST) {
       using namespace std::chrono_literals;
       std::this_thread::sleep_for(3s);
-      //::Hazel::Utils::RetrieveDiagnosticCheckpoints();
-      info("Here");
+      info("Device lost, exiting...");
     }
     assert(result == VK_SUCCESS);
+  }
+}
+
+inline auto
+ensure(bool condition, std::string_view message)
+{
+  if (!condition) {
+    error("Assertion failed: {0}", message);
+    assert(condition);
   }
 }
 

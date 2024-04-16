@@ -17,6 +17,7 @@ namespace Engine::Graphics {
 Allocator::Allocator(const std::string& resource)
   : resource_name(resource)
 {
+  trace("Allocator '{}' created", resource_name);
 }
 
 auto

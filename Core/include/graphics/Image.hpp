@@ -6,9 +6,9 @@
 namespace Engine::Graphics {
 
 void
-create_image(uint32_t width,
-             uint32_t height,
-             uint32_t mip_levels,
+create_image(Core::u32 width,
+             Core::u32 height,
+             Core::u32 mip_levels,
              VkSampleCountFlagBits sample_count,
              VkFormat format,
              VkImageTiling tiling,
@@ -17,18 +17,19 @@ create_image(uint32_t width,
              VmaAllocation& allocation,
              VmaAllocationInfo& allocation_info);
 
-void
-transition_image_layout(VkImage image,
-                        VkFormat format,
-                        VkImageLayout old_layout,
-                        VkImageLayout new_layout,
-                        uint32_t mip_levels);
+auto
+transition_image_layout(
+  VkImage image,
+  VkImageLayout old_layout,
+  VkImageLayout new_layout,
+  VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT,
+  Core::u32 mip_levels = 1) -> void;
 
 void
 copy_buffer_to_image(VkBuffer buffer,
                      VkImage image,
-                     uint32_t width,
-                     uint32_t height);
+                     Core::u32 width,
+                     Core::u32 height);
 
 class Image
 {
@@ -38,9 +39,12 @@ public:
   VmaAllocationInfo allocation_info{};
   VkImageView view{ nullptr };
   VkSampler sampler{ nullptr };
+  VkImageAspectFlags aspect_mask{ VK_IMAGE_ASPECT_COLOR_BIT };
 
   VkDescriptorImageInfo descriptor_info{};
 
+  auto get_aspect_flags() const -> VkImageAspectFlags { return aspect_mask; }
+  auto hash() const -> Core::usize;
   auto destroy() -> void;
   auto get_descriptor_info() const -> const VkDescriptorImageInfo&;
 };

@@ -1,11 +1,21 @@
 #pragma once
 
 #include "core/Maths.hpp"
+#include "core/Types.hpp"
+#include "graphics/Image.hpp"
 
 #include <format>
 #include <imgui.h>
 
 namespace Engine::UI {
+
+template<class T>
+struct InterfaceImageProperties
+{
+  Core::BasicExtent<T> extent{ T{ 64 }, T{ 64 } };
+  Core::Vec4 colour{ 1.0, 1.0, 1.0, 1.0 };
+  bool flipped{ false };
+};
 
 namespace Impl {
 auto
@@ -19,6 +29,12 @@ end() -> void;
 
 auto
 get_window_size() -> Core::Vec2;
+
+auto
+image(const Graphics::Image& image,
+      const Core::FloatExtent& extent,
+      const Core::Vec4& colour,
+      bool flipped) -> void;
 
 }
 
@@ -67,6 +83,21 @@ scope(const std::string_view name, auto&& func)
   const auto size = ImGui::GetWindowSize();
   func(size.x, size.y);
   end();
+}
+
+template<class T>
+auto
+image(const Graphics::Image& image, InterfaceImageProperties<T> properties = {})
+  -> void
+{
+  if constexpr (std::is_same_v<T, Core::f32>) {
+    return Impl::image(
+      image, properties.extent, properties.colour, properties.flipped);
+  } else {
+
+    auto ext = properties.extent.as<Core::f32>();
+    return Impl::image(image, ext, properties.colour, properties.flipped);
+  }
 }
 
 } // namespace Engine::UI

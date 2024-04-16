@@ -18,8 +18,22 @@ public:
 
   ~Framebuffer();
 
-  auto get_colour_attachment(Core::u32) -> const Image* { return nullptr; }
-  auto get_depth_attachment() -> const Image* { return nullptr; }
+  auto get_colour_attachment(Core::u32 index) const -> const Image*
+  {
+    return colour_attachments[index].get();
+  }
+  auto get_colour_attachment_count() const -> Core::u32
+  {
+    return static_cast<Core::u32>(colour_attachments.size());
+  }
+  auto has_depth_attachment() const -> bool
+  {
+    return depth_attachment != nullptr;
+  }
+  auto get_depth_attachment() const -> const Image*
+  {
+    return depth_attachment.get();
+  }
   auto get_renderpass() -> VkRenderPass { return renderpass; }
   auto get_renderpass() const -> VkRenderPass { return renderpass; }
   auto get_framebuffer() -> VkFramebuffer { return framebuffer; }
@@ -31,6 +45,8 @@ public:
     return clear_values;
   }
 
+  auto on_resize(const Core::Extent&) -> void;
+
 private:
   Core::Extent size;
 
@@ -41,6 +57,7 @@ private:
   VkFramebuffer framebuffer{ VK_NULL_HANDLE };
   VkRenderPass renderpass{ VK_NULL_HANDLE };
 
+  auto destroy() -> void;
   auto create_colour_attachments() -> void;
   auto create_depth_attachment() -> void;
   auto create_renderpass() -> void;
