@@ -4,7 +4,10 @@
 
 #include "graphics/CommandBuffer.hpp"
 #include "graphics/Framebuffer.hpp"
+#include "graphics/GPUBuffer.hpp"
 #include "graphics/Image.hpp"
+
+#include <array>
 
 #include <vulkan/vulkan.h>
 
@@ -95,6 +98,21 @@ explicitly_clear_framebuffer(const CommandBuffer& command_buffer,
                         attachments.data(),
                         total_attachment_count,
                         clear_rects.data());
+}
+
+auto
+bind_vertex_buffer(const CommandBuffer& command,
+                   const VertexBuffer& buffer,
+                   VertexBufferBinding binding,
+                   VertexBufferOffset offset) -> void
+{
+  std::array<VkDeviceSize, 1> offsets{ offset };
+  auto cmd_buffer = command.get_command_buffer();
+
+  std::array vk_buffers{ buffer.get_buffer() };
+
+  vkCmdBindVertexBuffers(
+    cmd_buffer, binding, 1, vk_buffers.data(), offsets.data());
 }
 
 } // namespace Engine::Graphics

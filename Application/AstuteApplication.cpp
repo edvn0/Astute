@@ -87,18 +87,19 @@ AstuteApplication::interface() -> void
   using namespace Engine::UI;
   ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
 
-  scope("Viewport", [&]() {
-    const auto& statistics = get_statistics();
-    coloured_text({ 1.0F, 0.1F, 1.0F, 1.0F },
-                  "FPS: {}, Frametime: {:5f}ms",
-                  statistics.frames_per_seconds,
-                  statistics.frame_time);
-  });
-
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0F, 0.0F));
   scope("Output", [&](f32 w, f32 h) {
     image<f32>(*renderer->get_output_image(), { .extent = { w, h } });
   });
+
+  scope("Output 1", [&](f32 w, f32 h) {
+    image<f32>(*renderer->get_output_image(1), { .extent = { w, h } });
+  });
+
+  scope("Output 2", [&](f32 w, f32 h) {
+    image<f32>(*renderer->get_output_image(2), { .extent = { w, h } });
+  });
+
   ImGui::PopStyleVar();
 }
 
@@ -131,6 +132,8 @@ AstuteApplication::on_resize(const Extent& ext) -> void
 auto
 AstuteApplication::destruct() -> void
 {
+  renderer->destruct();
+
   scene.reset();
   renderer.reset();
 }

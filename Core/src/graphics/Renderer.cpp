@@ -90,22 +90,29 @@ Renderer::Renderer(Configuration config, const Window* window)
     .primary = true,
   });
 
-  construct_main_geometry_pass(window);
+  construct_predepth_pass(window);
+  construct_main_geometry_pass(
+    window, predepth_render_pass.framebuffer->get_depth_attachment());
   construct_shadow_pass(window, config.shadow_pass_size);
 
   transform_buffers.resize(3);
   static constexpr auto total_size = 100 * 1000 * sizeof(TransformVertexData);
   for (auto& [vertex_buffer, transform_buffer] : transform_buffers) {
-    vertex_buffer = Core::make_scope<
-      UniformBufferObject<TransformMapData, GPUBufferType::Vertex>>(
-      total_size, "TransformBuffer");
+    vertex_buffer = Core::make_scope<VertexBuffer>(total_size);
     transform_buffer = Core::make_scope<Core::DataBuffer>(total_size);
     transform_buffer->fill_zero();
   }
 }
 
-Renderer::~Renderer()
+Renderer::~Renderer() = default;
+
+auto
+Renderer::destruct() -> void
 {
+  predepth_render_pass.destruct();
+  main_geometry_render_pass.destruct();
+  shadow_render_pass.destruct();
+
   command_buffer.reset();
 }
 
@@ -207,11 +214,14 @@ Renderer::flush_draw_lists() -> void
   vb->write(std::span{ output });
 
   command_buffer->begin();
+
   // Predepth pass
-  main_geometry_pass();
+  predepth_pass();
   // Shadow pass
   shadow_pass();
   // Geometry pass
+  main_geometry_pass();
+
   command_buffer->end();
   command_buffer->submit();
 

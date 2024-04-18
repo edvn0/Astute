@@ -17,6 +17,8 @@ public:
     const VkFormat depth_attachment_format{ VK_FORMAT_UNDEFINED };
     const VkSampleCountFlagBits sample_count{ VK_SAMPLE_COUNT_1_BIT };
     const bool resizable{ true };
+    const std::vector<Core::Ref<Image>> dependent_attachments{};
+    const std::string name;
   };
   explicit Framebuffer(Configuration);
 
@@ -24,14 +26,9 @@ public:
 
   auto get_colour_attachment(Core::u32 index) const -> const Image*
   {
-    const auto is_even = index % 2 == 0;
-    if (is_msaa() && is_even) {
-      const auto next_possible_odd_index = index + 1;
-      if (next_possible_odd_index >= colour_attachments.size()) {
-        return nullptr;
-      }
-
-      return colour_attachments[next_possible_odd_index].get();
+    if (is_msaa()) {
+      auto actual = 2 * index + 1;
+      return colour_attachments[actual].get();
     }
     return colour_attachments[index].get();
   }
@@ -43,9 +40,9 @@ public:
   {
     return depth_attachment != nullptr;
   }
-  auto get_depth_attachment() const -> const Image*
+  auto get_depth_attachment() const -> const Core::Ref<Image>&
   {
-    return depth_attachment.get();
+    return depth_attachment;
   }
   auto get_renderpass() -> VkRenderPass { return renderpass; }
   auto get_renderpass() const -> VkRenderPass { return renderpass; }
@@ -66,13 +63,17 @@ public:
 private:
   Core::Extent size;
   const std::vector<VkFormat> colour_attachment_formats;
-  const VkFormat depth_attachment_format;
+  VkFormat depth_attachment_format;
   const VkSampleCountFlagBits sample_count{ VK_SAMPLE_COUNT_1_BIT };
   const bool resizable;
+  const std::vector<Core::Ref<Image>> dependent_attachments{};
+  const std::string name;
+
+  auto search_dependents_for_depth_format() -> const Image*;
 
   std::vector<VkClearValue> clear_values;
-  std::vector<Core::Scope<Image>> colour_attachments;
-  Core::Scope<Image> depth_attachment;
+  std::vector<Core::Ref<Image>> colour_attachments;
+  Core::Ref<Image> depth_attachment;
 
   VkFramebuffer framebuffer{ VK_NULL_HANDLE };
   VkRenderPass renderpass{ VK_NULL_HANDLE };

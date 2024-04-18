@@ -40,8 +40,7 @@ struct TransformMapData
 };
 struct SubmeshTransformBuffer
 {
-  Core::Scope<UniformBufferObject<TransformMapData, GPUBufferType::Vertex>>
-    transform_buffer{ nullptr };
+  Core::Scope<Graphics::VertexBuffer> transform_buffer{ nullptr };
   Core::Scope<Core::DataBuffer> data_buffer{ nullptr };
 };
 
@@ -51,6 +50,14 @@ struct RenderPass
   Core::Scope<Shader> shader{ nullptr };
   Core::Scope<GraphicsPipeline> pipeline{ nullptr };
   Core::Scope<Material> material{ nullptr };
+
+  auto destruct() -> void
+  {
+    framebuffer.reset();
+    shader.reset();
+    pipeline.reset();
+    material.reset();
+  }
 };
 
 struct SceneRendererCamera
@@ -81,6 +88,8 @@ public:
   explicit Renderer(Configuration, const Window*);
   ~Renderer();
 
+  auto destruct() -> void;
+
   auto begin_scene(Core::Scene&, const SceneRendererCamera&) -> void;
   auto end_scene() -> void;
 
@@ -89,9 +98,10 @@ public:
                           const glm::mat4&,
                           const glm::vec4& = { 1, 1, 1, 1 }) -> void;
 
-  auto get_output_image() const -> const Image*
+  auto get_output_image(Core::u32 attachment = 0) const -> const Image*
   {
-    return main_geometry_render_pass.framebuffer->get_colour_attachment(0);
+    return main_geometry_render_pass.framebuffer->get_colour_attachment(
+      attachment);
   }
 
   auto on_resize(const Core::Extent&) -> void;
@@ -100,10 +110,14 @@ private:
   Core::Extent size{ 0, 0 };
   Core::Scope<CommandBuffer> command_buffer{ nullptr };
 
+  RenderPass predepth_render_pass{};
   RenderPass main_geometry_render_pass{};
   RenderPass shadow_render_pass{};
 
-  auto construct_main_geometry_pass(const Window*) -> void;
+  auto construct_predepth_pass(const Window*) -> void;
+  auto predepth_pass() -> void;
+
+  auto construct_main_geometry_pass(const Window*, Core::Ref<Image>) -> void;
   auto main_geometry_pass() -> void;
 
   auto construct_shadow_pass(const Window*, Core::u32) -> void;

@@ -9,12 +9,21 @@
 
 namespace Engine::Graphics {
 
+static constexpr auto depth_formats = std::array{
+  VK_FORMAT_D32_SFLOAT,
+  VK_FORMAT_D16_UNORM_S8_UINT,
+  VK_FORMAT_D24_UNORM_S8_UINT,
+  VK_FORMAT_D32_SFLOAT_S8_UINT,
+};
+
 Framebuffer::Framebuffer(Configuration config)
   : size(config.size)
   , colour_attachment_formats(config.colour_attachment_formats)
   , depth_attachment_format(config.depth_attachment_format)
   , sample_count(config.sample_count)
   , resizable(config.resizable)
+  , dependent_attachments(config.dependent_attachments)
+  , name(config.name)
 {
   create_colour_attachments();
   create_depth_attachment();
@@ -28,14 +37,37 @@ Framebuffer::~Framebuffer()
 }
 
 auto
+Framebuffer::search_dependents_for_depth_format() -> const Image*
+{
+  if (dependent_attachments.empty())
+    return nullptr;
+
+  const auto found =
+    std::ranges::find_if(dependent_attachments, [](auto& image) {
+      bool found = false;
+      for (const auto& fmt : depth_formats) {
+        if (fmt == image->format) {
+          found = true;
+          break;
+        }
+      }
+      return found;
+    });
+
+  return found != dependent_attachments.end() ? found->get() : nullptr;
+}
+
+auto
 Framebuffer::destroy() -> void
 {
-  Allocator allocator{ "Framebuffer::~Framebuffer" };
-  for (const auto& image : colour_attachments) {
-    image->destroy();
+  if (depth_attachment) {
+    depth_attachment->destroy();
+    depth_attachment.reset();
   }
 
-  depth_attachment->destroy();
+  for (auto& image : colour_attachments) {
+    image->destroy();
+  }
 
   vkDestroyFramebuffer(Device::the().device(), framebuffer, nullptr);
   vkDestroyRenderPass(Device::the().device(), renderpass, nullptr);
@@ -46,7 +78,7 @@ Framebuffer::create_colour_attachments() -> void
 {
   for (auto& format : colour_attachment_formats) {
     if (sample_count != VK_SAMPLE_COUNT_1_BIT) {
-      Core::Scope<Image> image = Core::make_scope<Image>();
+      Core::Ref<Image> image = Core::make_ref<Image>();
       create_image(size.width,
                    size.height,
                    1,
@@ -57,7 +89,10 @@ Framebuffer::create_colour_attachments() -> void
                      VK_IMAGE_USAGE_SAMPLED_BIT,
                    image->image,
                    image->allocation,
-                   image->allocation_info);
+                   image->allocation_info,
+                   name + "-Colour Attachment MSAA");
+      image->format = format;
+      image->layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
       image->aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;
       image->view =
         create_view(image->image, format, VK_IMAGE_ASPECT_COLOR_BIT);
@@ -66,14 +101,14 @@ Framebuffer::create_colour_attachments() -> void
                                       VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK);
 
       auto& descriptor_info = image->descriptor_info;
-      descriptor_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+      descriptor_info.imageLayout = image->layout;
       descriptor_info.imageView = image->view;
       descriptor_info.sampler = image->sampler;
 
       colour_attachments.push_back(std::move(image));
     }
 
-    Core::Scope<Image> resolve_image = Core::make_scope<Image>();
+    Core::Ref<Image> resolve_image = Core::make_ref<Image>();
     create_image(size.width,
                  size.height,
                  1,
@@ -84,7 +119,10 @@ Framebuffer::create_colour_attachments() -> void
                    VK_IMAGE_USAGE_SAMPLED_BIT,
                  resolve_image->image,
                  resolve_image->allocation,
-                 resolve_image->allocation_info);
+                 resolve_image->allocation_info,
+                 name + "-Colour Attachment (1 Sample)");
+    resolve_image->format = format;
+    resolve_image->layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     resolve_image->aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;
     resolve_image->view =
       create_view(resolve_image->image, format, VK_IMAGE_ASPECT_COLOR_BIT);
@@ -104,34 +142,79 @@ Framebuffer::create_colour_attachments() -> void
 auto
 Framebuffer::create_depth_attachment() -> void
 {
-  if (depth_attachment_format == VK_FORMAT_UNDEFINED) {
+
+  if (depth_attachment_format == VK_FORMAT_UNDEFINED &&
+      dependent_attachments.empty()) {
     return;
   }
 
-  Core::Scope<Image> image = Core::make_scope<Image>();
-  create_image(size.width,
-               size.height,
-               1,
-               sample_count,
-               VK_FORMAT_D32_SFLOAT,
-               VK_IMAGE_TILING_OPTIMAL,
-               VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-               image->image,
-               image->allocation,
-               image->allocation_info);
-  image->aspect_mask = VK_IMAGE_ASPECT_DEPTH_BIT;
-  image->view =
-    create_view(image->image, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT);
-  image->sampler = create_sampler(VK_FILTER_LINEAR,
-                                  VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                                  VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK);
+  if (depth_attachment_format != VK_FORMAT_UNDEFINED &&
+      dependent_attachments.empty()) {
+    // Valid, create from 'depth_attachment_format'.
+  }
 
-  auto& descriptor_info = image->descriptor_info;
-  descriptor_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-  descriptor_info.imageView = image->view;
-  descriptor_info.sampler = image->sampler;
+  if (depth_attachment_format == VK_FORMAT_UNDEFINED &&
+      !dependent_attachments.empty()) {
+    // Possibly valid, search for a depth format among 'dependent_attachments'.
+    depth_attachment_format = search_dependents_for_depth_format()->format;
+  }
 
-  depth_attachment = std::move(image);
+  if (depth_attachment_format != VK_FORMAT_UNDEFINED &&
+      !dependent_attachments.empty()) {
+    // Possibly valid, search for a depth format among 'dependent_attachments'.
+    // IDEA: Maybe first search, and if not found, choose the format.
+    auto* found = search_dependents_for_depth_format();
+    if (found) {
+      depth_attachment_format = found->format;
+    }
+  }
+
+  auto depth_image_iterator =
+    std::ranges::find_if(dependent_attachments, [](auto& image) {
+      bool found = false;
+      for (const auto& fmt : depth_formats) {
+        if (fmt == image->format) {
+          found = true;
+          break;
+        }
+      }
+      return found;
+    });
+  auto image = depth_image_iterator != dependent_attachments.end()
+                 ? *depth_image_iterator
+                 : nullptr;
+
+  if (!image) {
+    Core::Ref<Image> image = Core::make_ref<Image>();
+    create_image(size.width,
+                 size.height,
+                 1,
+                 sample_count,
+                 depth_attachment_format,
+                 VK_IMAGE_TILING_OPTIMAL,
+                 VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                 image->image,
+                 image->allocation,
+                 image->allocation_info);
+    image->format = depth_attachment_format;
+    image->layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    image->aspect_mask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    image->view = create_view(
+      image->image, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT);
+    image->sampler = create_sampler(VK_FILTER_LINEAR,
+                                    VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                                    VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK);
+
+    auto& descriptor_info = image->descriptor_info;
+    descriptor_info.imageLayout =
+      VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    descriptor_info.imageView = image->view;
+    descriptor_info.sampler = image->sampler;
+
+    depth_attachment = std::move(image);
+  } else {
+    depth_attachment = image;
+  }
 }
 
 auto
@@ -183,15 +266,20 @@ Framebuffer::create_renderpass() -> void
   }
 
   // Depth attachment if needed
-  if (depth_attachment_format != VK_FORMAT_UNDEFINED) {
+  if (depth_attachment != nullptr) {
+    const auto* found_image = search_dependents_for_depth_format();
+    const bool should_clear = found_image == nullptr;
+
     VkAttachmentDescription depth_attachment_desc{};
     depth_attachment_desc.format = depth_attachment_format;
     depth_attachment_desc.samples = sample_count;
-    depth_attachment_desc.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depth_attachment_desc.loadOp =
+      should_clear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
     depth_attachment_desc.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depth_attachment_desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     depth_attachment_desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depth_attachment_desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depth_attachment_desc.initialLayout =
+      should_clear ? VK_IMAGE_LAYOUT_UNDEFINED : found_image->layout;
     depth_attachment_desc.finalLayout =
       VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     attachments.push_back(depth_attachment_desc);

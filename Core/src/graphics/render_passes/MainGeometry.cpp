@@ -16,7 +16,9 @@
 namespace Engine::Graphics {
 
 auto
-Renderer::construct_main_geometry_pass(const Window* window) -> void
+Renderer::construct_main_geometry_pass(const Window* window,
+                                       Core::Ref<Image> predepth_attachment)
+  -> void
 {
   auto& [main_geometry_framebuffer,
          main_geometry_shader,
@@ -28,8 +30,9 @@ Renderer::construct_main_geometry_pass(const Window* window) -> void
       .colour_attachment_formats = { VK_FORMAT_R32G32B32A32_SFLOAT,
                                      VK_FORMAT_R32G32B32A32_SFLOAT,
                                      VK_FORMAT_R32G32B32A32_SFLOAT, },
-      .depth_attachment_format = VK_FORMAT_D32_SFLOAT,
       .sample_count = VK_SAMPLE_COUNT_4_BIT,
+      .dependent_attachments = {predepth_attachment},
+      .name = "MainGeometry",
     });
   main_geometry_shader = Shader::compile_graphics_scoped(
     "Assets/shaders/main_geometry.vert", "Assets/shaders/main_geometry.frag");
@@ -92,13 +95,9 @@ Renderer::main_geometry_pass() -> void
     const auto& transform_vertex_buffer =
       transform_buffers.at(Core::Application::the().current_frame_index())
         .transform_buffer;
-    auto vb = transform_vertex_buffer->get_buffer();
     auto offset = mesh_transform_map.at(key).offset;
-
-    offsets = std::array{ VkDeviceSize{ offset } };
-
-    vkCmdBindVertexBuffers(
-      command_buffer->get_command_buffer(), 1, 1, &vb, offsets.data());
+    RendererExtensions::bind_vertex_buffer(
+      *command_buffer, *transform_vertex_buffer, 1, offset);
 
     vkCmdBindIndexBuffer(command_buffer->get_command_buffer(),
                          index_buffer->get_buffer(),

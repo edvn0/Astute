@@ -65,6 +65,7 @@ private:
 
   template<class T, GPUBufferType BufferType>
   friend class UniformBufferObject;
+  friend class VertexBuffer;
 };
 
 class VertexBuffer
@@ -98,8 +99,22 @@ public:
     buffer.write(vertices);
   }
 
+  explicit VertexBuffer(Core::usize new_size)
+    : buffer(GPUBufferType::Vertex, new_size)
+  {
+    Core::DataBuffer temp_buffer{ new_size };
+    temp_buffer.fill_zero();
+    buffer.write(temp_buffer.raw(), new_size);
+  }
+
   auto size() const -> Core::usize { return buffer.get_size(); }
   auto get_buffer() const -> VkBuffer { return buffer.get_buffer(); }
+
+  template<typename U>
+  void write(std::span<U> data)
+  {
+    buffer.write(data.data(), data.size_bytes());
+  }
 
 private:
   GPUBuffer buffer;

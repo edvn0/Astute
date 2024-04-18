@@ -3,6 +3,8 @@
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
+#include <string_view>
+
 namespace Engine::Graphics {
 
 void
@@ -15,7 +17,8 @@ create_image(Core::u32 width,
              VkImageUsageFlags usage,
              VkImage& image,
              VmaAllocation& allocation,
-             VmaAllocationInfo& allocation_info);
+             VmaAllocationInfo& allocation_info,
+             std::string_view additional_name_data = "");
 
 auto
 transition_image_layout(
@@ -31,12 +34,10 @@ copy_buffer_to_image(VkBuffer buffer,
                      Core::u32 width,
                      Core::u32 height);
 
-auto create_view(VkImage&, VkFormat, VkImageAspectFlags)
-  -> VkImageView;
+auto
+create_view(VkImage&, VkFormat, VkImageAspectFlags) -> VkImageView;
 
-  auto create_sampler(VkFilter, VkSamplerAddressMode, VkBorderColor)
-    -> VkSampler;
-
+auto create_sampler(VkFilter, VkSamplerAddressMode, VkBorderColor) -> VkSampler;
 
 class Image
 {
@@ -47,6 +48,10 @@ public:
   VkImageView view{ nullptr };
   VkSampler sampler{ nullptr };
   VkImageAspectFlags aspect_mask{ VK_IMAGE_ASPECT_COLOR_BIT };
+  VkFormat format{ VK_FORMAT_UNDEFINED };
+  VkImageLayout layout{ VK_IMAGE_LAYOUT_UNDEFINED };
+
+  bool destroyed{ false };
 
   VkDescriptorImageInfo descriptor_info{};
 

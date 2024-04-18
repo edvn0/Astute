@@ -55,6 +55,7 @@ add_library(Core STATIC
     src/graphics/DescriptorResource.cpp
     src/ui/UI.cpp
 
+    src/graphics/render_passes/Predepth.cpp
     src/graphics/render_passes/MainGeometry.cpp
     src/graphics/render_passes/Shadow.cpp
 )
