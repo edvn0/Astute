@@ -15,17 +15,12 @@ layout(location = 7) in vec4 transform_row_one;
 layout(location = 8) in vec4 transform_row_two;
 layout(location = 9) in vec4 instance_colour;
 
-layout(location = 0) out vec3 fragment_normal;
-layout(location = 1) out vec2 fragment_uvs;
-
 void
 main()
 {
   mat4 model = from_instance_to_model_matrix(
     transform_row_zero, transform_row_one, transform_row_two);
-  mat4 view_proj = renderer.view_projection;
+  mat4 view_proj = shadow.view_projection;
   vec4 computed = model * vec4(position, 1.0);
   gl_Position = view_proj * computed;
-  fragment_normal = normal;
-  fragment_uvs = uvs;
 }

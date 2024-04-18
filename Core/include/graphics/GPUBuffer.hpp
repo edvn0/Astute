@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/DataBuffer.hpp"
 #include "core/Types.hpp"
 
 #include <span>
@@ -10,25 +11,22 @@
 
 namespace Engine::Graphics {
 
-template<class T>
-concept IsPOD = std::is_pod_v<T>;
+enum class GPUBufferType : Core::u8
+{
+  Invalid,
+  Vertex,
+  Index,
+  Uniform,
+  Storage,
+};
 
-template<IsPOD T>
+template<class T, GPUBufferType BufferType>
 class UniformBufferObject;
 
 class GPUBuffer
 {
 public:
-  enum class Type : Core::u8
-  {
-    Invalid,
-    Vertex,
-    Index,
-    Uniform,
-    Storage,
-  };
-
-  GPUBuffer(Type, Core::usize);
+  GPUBuffer(GPUBufferType, Core::usize);
   ~GPUBuffer();
 
   auto get_size() const -> Core::usize { return size; }
@@ -56,7 +54,7 @@ public:
 private:
   Core::usize size;
 
-  Type buffer_type{ Type::Invalid };
+  GPUBufferType buffer_type{ GPUBufferType::Invalid };
   VkBuffer buffer;
   VmaAllocation allocation;
   VmaAllocationInfo allocation_info;
@@ -65,7 +63,7 @@ private:
   auto construct_buffer() -> void;
   auto buffer_usage_flags() const -> VkBufferUsageFlags;
 
-  template<IsPOD T>
+  template<class T, GPUBufferType BufferType>
   friend class UniformBufferObject;
 };
 
@@ -73,29 +71,29 @@ class VertexBuffer
 {
 public:
   template<class VertexType, Core::usize Extent = std::dynamic_extent>
-  VertexBuffer(std::span<VertexType, Extent> vertices)
-    : buffer(GPUBuffer::Type::Vertex, vertices.size_bytes())
+  explicit VertexBuffer(std::span<VertexType, Extent> vertices)
+    : buffer(GPUBufferType::Vertex, vertices.size_bytes())
   {
     buffer.write(vertices);
   }
 
   template<class VertexType, Core::usize Extent = std::dynamic_extent>
-  VertexBuffer(std::span<const VertexType, Extent> vertices)
-    : buffer(GPUBuffer::Type::Vertex, vertices.size_bytes())
+  explicit VertexBuffer(std::span<const VertexType, Extent> vertices)
+    : buffer(GPUBufferType::Vertex, vertices.size_bytes())
   {
     buffer.write(vertices);
   }
 
   template<class VertexType>
-  VertexBuffer(std::span<VertexType> vertices)
-    : buffer(GPUBuffer::Type::Vertex, vertices.size_bytes())
+  explicit VertexBuffer(std::span<VertexType> vertices)
+    : buffer(GPUBufferType::Vertex, vertices.size_bytes())
   {
     buffer.write(vertices);
   }
 
   template<class VertexType>
-  VertexBuffer(std::span<const VertexType> vertices)
-    : buffer(GPUBuffer::Type::Vertex, vertices.size_bytes())
+  explicit VertexBuffer(std::span<const VertexType> vertices)
+    : buffer(GPUBufferType::Vertex, vertices.size_bytes())
   {
     buffer.write(vertices);
   }
@@ -111,13 +109,13 @@ class IndexBuffer
 {
 public:
   explicit IndexBuffer(const std::span<const Core::u32> indices)
-    : buffer(GPUBuffer::Type::Index, indices.size_bytes())
+    : buffer(GPUBufferType::Index, indices.size_bytes())
   {
     buffer.write(indices);
   }
 
   explicit IndexBuffer(const std::span<Core::u32> indices)
-    : buffer(GPUBuffer::Type::Index, indices.size_bytes())
+    : buffer(GPUBufferType::Index, indices.size_bytes())
   {
     buffer.write(indices);
   }
@@ -138,7 +136,7 @@ class StorageBuffer
 public:
   template<class T>
   StorageBuffer(const std::span<T> data)
-    : buffer(GPUBuffer::Type::Storage, data.size_bytes())
+    : buffer(GPUBufferType::Storage, data.size_bytes())
   {
     buffer.write(data);
   }
@@ -155,7 +153,7 @@ class UniformBuffer
 public:
   template<class T>
   explicit UniformBuffer(const std::span<T> data)
-    : buffer(GPUBuffer::Type::Uniform, data.size_bytes())
+    : buffer(GPUBufferType::Uniform, data.size_bytes())
   {
     buffer.write(data);
   }
@@ -167,45 +165,88 @@ private:
   GPUBuffer buffer;
 };
 
-template<IsPOD T>
-class UniformBufferObject
+class IShaderBindable
 {
 public:
-  explicit UniformBufferObject(const T& data)
+  virtual ~IShaderBindable() = default;
+  virtual auto get_buffer() const -> VkBuffer = 0;
+  virtual auto get_descriptor_info() const -> const VkDescriptorBufferInfo& = 0;
+  virtual auto get_name() const -> const std::string& = 0;
+  virtual auto size() const -> Core::usize = 0;
+};
+
+template<class T, GPUBufferType BufferType = GPUBufferType::Uniform>
+class UniformBufferObject : public IShaderBindable
+{
+public:
+  explicit UniformBufferObject(const T& data,
+                               const std::string_view input_identifier)
+    : identifier(input_identifier)
   {
-    buffer.write(&data, sizeof(T));
+    buffer = Core::make_scope<GPUBuffer>(BufferType, sizeof(T));
+    buffer->write(&pod_data, sizeof(T));
     descriptor_info = VkDescriptorBufferInfo{
-      .buffer = buffer.get_buffer(),
+      .buffer = buffer->get_buffer(),
       .offset = 0,
       .range = sizeof(T),
     };
   }
 
-  explicit UniformBufferObject()
+  explicit UniformBufferObject(const std::string_view input_identifier)
+    : identifier(input_identifier)
   {
-    buffer.write(&pod_data, sizeof(T));
+    buffer = Core::make_scope<GPUBuffer>(BufferType, sizeof(T));
+    buffer->write(&pod_data, sizeof(T));
     descriptor_info = VkDescriptorBufferInfo{
-      .buffer = buffer.get_buffer(),
+      .buffer = buffer->get_buffer(),
       .offset = 0,
       .range = sizeof(T),
     };
   }
 
-  auto size() const -> Core::usize { return buffer.get_size(); }
-  auto get_buffer() const -> VkBuffer { return buffer.get_buffer(); }
+  explicit UniformBufferObject(Core::usize size,
+                               const std::string_view input_identifier)
+    : identifier(input_identifier)
+  {
+    buffer = Core::make_scope<GPUBuffer>(BufferType, size);
+    Core::DataBuffer zero{ size };
+    zero.fill_zero();
+    buffer->write(zero.raw(), size);
+    descriptor_info = VkDescriptorBufferInfo{
+      .buffer = buffer->get_buffer(),
+      .offset = 0,
+      .range = size,
+    };
+  }
 
-  auto update(const T& data) -> void { buffer.write(&data, sizeof(T)); }
-  auto update() -> void { buffer.write(&pod_data, sizeof(T)); }
+  ~UniformBufferObject() override = default;
 
+  auto size() const -> Core::usize override { return buffer->get_size(); }
+  auto get_buffer() const -> VkBuffer override { return buffer->get_buffer(); }
+
+  auto update(const T& data) -> void { buffer->write(&data, sizeof(T)); }
+  auto update() -> void { buffer->write(&pod_data, sizeof(T)); }
+
+  template<typename U>
+  void write(std::span<U> data)
+  {
+    buffer->write(data.data(), data.size_bytes());
+  }
   auto get_data() const -> const T& { return pod_data; }
   auto get_data() -> T& { return pod_data; }
 
-  auto get_descriptor_info() const -> const auto& { return descriptor_info; }
+  auto get_descriptor_info() const -> const VkDescriptorBufferInfo& override
+  {
+    return descriptor_info;
+  }
+
+  auto get_name() const -> const std::string& override { return identifier; }
 
 private:
   T pod_data{};
-  GPUBuffer buffer{ GPUBuffer::Type::Uniform, sizeof(T) };
+  Core::Scope<GPUBuffer> buffer;
   VkDescriptorBufferInfo descriptor_info{};
+  std::string identifier;
 };
 
 } // namespace Engine::Graphics

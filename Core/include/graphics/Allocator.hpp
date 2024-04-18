@@ -58,10 +58,38 @@ operator|=(Creation& left, Creation right) -> Creation&
   return left = left | right;
 }
 
+enum class RequiredFlags : Core::u32
+{
+  DEVICE_LOCAL_BIT = 0x00000001,
+  HOST_VISIBLE_BIT = 0x00000002,
+  HOST_COHERENT_BIT = 0x00000004,
+  HOST_CACHED_BIT = 0x00000008,
+  LAZILY_ALLOCATED_BIT = 0x00000010,
+  PROTECTED_BIT = 0x00000020,
+  DEVICE_COHERENT_BIT_AMD = 0x00000040,
+  DEVICE_UNCACHED_BIT_AMD = 0x00000080,
+  RDMA_CAPABLE_BIT_NV = 0x00000100,
+  FLAG_BITS_MAX_ENUM = 0x7FFFFFFF
+};
+
+constexpr auto
+operator|(RequiredFlags left, RequiredFlags right) -> RequiredFlags
+{
+  return static_cast<RequiredFlags>(static_cast<Core::u32>(left) |
+                                    static_cast<Core::u32>(right));
+}
+
+constexpr auto
+operator|=(RequiredFlags& left, RequiredFlags right) -> RequiredFlags&
+{
+  return left = left | right;
+}
+
 struct AllocationProperties
 {
   Usage usage{ Usage::AUTO };
   Creation creation{ Creation::HOST_ACCESS_RANDOM_BIT };
+  RequiredFlags flags{ RequiredFlags::FLAG_BITS_MAX_ENUM };
 };
 
 class Allocator

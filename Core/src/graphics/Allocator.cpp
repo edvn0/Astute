@@ -17,7 +17,6 @@ namespace Engine::Graphics {
 Allocator::Allocator(const std::string& resource)
   : resource_name(resource)
 {
-  trace("Allocator '{}' created", resource_name);
 }
 
 auto
@@ -70,6 +69,10 @@ Allocator::allocate_image(VkImage& image,
   // ensure(allocator != nullptr, "Allocator was null.");
   VmaAllocationCreateInfo allocation_create_info = {};
   allocation_create_info.usage = static_cast<VmaMemoryUsage>(props.usage);
+  if (props.flags != RequiredFlags::FLAG_BITS_MAX_ENUM) {
+    allocation_create_info.flags =
+      static_cast<VmaAllocationCreateFlags>(props.flags);
+  }
 
   VmaAllocation allocation{};
   vmaCreateImage(allocator,
@@ -92,6 +95,10 @@ Allocator::allocate_image(VkImage& image,
   // ensure(allocator != nullptr, "Allocator was null.");
   VmaAllocationCreateInfo allocation_create_info = {};
   allocation_create_info.usage = static_cast<VmaMemoryUsage>(props.usage);
+  if (props.flags != RequiredFlags::FLAG_BITS_MAX_ENUM) {
+    allocation_create_info.flags =
+      static_cast<VmaAllocationCreateFlags>(props.flags);
+  }
 
   VmaAllocation allocation{};
   vmaCreateImage(allocator,

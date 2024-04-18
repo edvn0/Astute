@@ -7,10 +7,10 @@
 namespace Engine::Graphics {
 
 static auto
-to_string(GPUBuffer::Type buffer_type) -> std::string
+to_string(GPUBufferType buffer_type) -> std::string
 {
   switch (buffer_type) {
-    using enum Engine::Graphics::GPUBuffer::Type;
+    using enum Engine::Graphics::GPUBufferType;
     case Vertex:
       return "Vertex";
     case Index:
@@ -24,7 +24,7 @@ to_string(GPUBuffer::Type buffer_type) -> std::string
   }
 }
 
-GPUBuffer::GPUBuffer(Type type, Core::usize input_size)
+GPUBuffer::GPUBuffer(GPUBufferType type, Core::usize input_size)
   : size(input_size)
   , buffer_type(type)
 {
@@ -43,7 +43,7 @@ auto
 GPUBuffer::buffer_usage_flags() const -> VkBufferUsageFlags
 {
   switch (buffer_type) {
-    using enum Engine::Graphics::GPUBuffer::Type;
+    using enum Engine::Graphics::GPUBufferType;
     case Vertex:
       return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
     case Index:
@@ -65,6 +65,10 @@ GPUBuffer::construct_buffer() -> void
       "GPUBuffer::construct_buffer({}, {})", to_string(buffer_type), size),
   };
 
+  trace("Creating buffer of type: {}, size: {}",
+        to_string(buffer_type),
+        Core::human_readable_size(size));
+
   VkBufferCreateInfo buffer_info{
     .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
     .pNext = nullptr,
@@ -76,7 +80,7 @@ GPUBuffer::construct_buffer() -> void
     .pQueueFamilyIndices = nullptr,
   };
 
-  const auto is_uniform = buffer_type == Type::Uniform;
+  const auto is_uniform = buffer_type == GPUBufferType::Uniform;
 
   auto usage = is_uniform ? Usage::AUTO_PREFER_HOST : Usage::AUTO_PREFER_DEVICE;
   auto creation = Creation::MAPPED_BIT;
@@ -104,10 +108,10 @@ GPUBuffer::write(const void* write_data, const Core::usize write_size) -> void
   }
 
   if (this->allocation_info.pMappedData != nullptr) {
-    std::memcpy(this->allocation_info.pMappedData, write_data, size);
+    std::memcpy(this->allocation_info.pMappedData, write_data, write_size);
   } else {
     auto* mapped = allocator.map_memory(this->allocation);
-    std::memcpy(mapped, write_data, size);
+    std::memcpy(mapped, write_data, write_size);
     allocator.unmap_memory(this->allocation);
   }
 }

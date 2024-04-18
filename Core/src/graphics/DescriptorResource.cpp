@@ -10,10 +10,7 @@ namespace Engine::Graphics {
 
 static constexpr Core::u32 frame_count = 3;
 
-DescriptorResource::~DescriptorResource()
-{
-  destroy();
-}
+DescriptorResource::~DescriptorResource() = default;
 
 auto
 DescriptorResource::destroy() -> void
@@ -21,6 +18,8 @@ DescriptorResource::destroy() -> void
   for (auto& descriptor_pool : descriptor_pools) {
     vkDestroyDescriptorPool(Device::the().device(), descriptor_pool, nullptr);
   }
+
+  descriptor_pools = {};
 }
 
 auto

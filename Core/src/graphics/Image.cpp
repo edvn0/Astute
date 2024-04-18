@@ -1,8 +1,8 @@
 #include "pch/CorePCH.hpp"
 
+#include "graphics/Allocator.hpp"
 #include "graphics/CommandBuffer.hpp"
 #include "graphics/Image.hpp"
-#include "graphics/Allocator.hpp"
 
 #include "core/Verify.hpp"
 
@@ -52,6 +52,9 @@ create_image(Core::u32 width,
 
   AllocationProperties alloc_props{};
   alloc_props.usage = Usage::AUTO_PREFER_DEVICE;
+  if (sample_count != VK_SAMPLE_COUNT_1_BIT) {
+    alloc_props.flags = RequiredFlags::LAZILY_ALLOCATED_BIT;
+  }
 
   allocation =
     allocator.allocate_image(image, allocation_info, imageInfo, alloc_props);
@@ -179,9 +182,10 @@ create_view(VkImage& image, VkFormat format, VkImageAspectFlags aspect_mask)
   return view;
 }
 
-auto create_sampler(VkFilter filter,
-                    VkSamplerAddressMode address_mode,
-                    VkBorderColor border_color) -> VkSampler
+auto
+create_sampler(VkFilter filter,
+               VkSamplerAddressMode address_mode,
+               VkBorderColor border_color) -> VkSampler
 {
   VkSamplerCreateInfo sampler_info{};
   sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -202,8 +206,8 @@ auto create_sampler(VkFilter filter,
   sampler_info.maxLod = 0.0f;
 
   VkSampler sampler;
-  VK_CHECK(vkCreateSampler(
-    Device::the().device(), &sampler_info, nullptr, &sampler));
+  VK_CHECK(
+    vkCreateSampler(Device::the().device(), &sampler_info, nullptr, &sampler));
   return sampler;
 }
 

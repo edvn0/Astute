@@ -32,5 +32,5 @@ private:
   Ref<Scene> scene{ nullptr };
 
   Scope<Renderer> renderer;
-  Camera camera;
+  Scope<Camera> camera;
 };

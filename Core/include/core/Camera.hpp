@@ -2,169 +2,270 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include "core/Event.hpp"
 
 namespace Engine::Core {
 
+enum class CameraType : std::uint8_t
+{
+  Perspective,
+  Orthographic
+};
+
 class Camera
 {
 public:
-  enum class ProjectionType
+  Camera() = default;
+  Camera(const Camera&) = default;
+  Camera(const glm::mat4& projection, const glm::mat4& unreversed_projection);
+  Camera(float degree_fov,
+         float width,
+         float height,
+         float near_plane,
+         float far_plane);
+
+  virtual ~Camera() = default;
+
+  virtual void focus(const glm::vec3&);
+  virtual void on_update(float);
+  virtual void on_event(Event&) {}
+
+  [[nodiscard]] virtual auto get_near_clip() const -> float = 0;
+  [[nodiscard]] virtual auto get_far_clip() const -> float = 0;
+  virtual auto set_near_clip(float set_value) -> void = 0;
+  virtual auto set_far_clip(float set_value) -> void = 0;
+
+  virtual auto get_fov() const -> float { return 0; }
+
+  [[nodiscard]] virtual auto get_position() const -> const glm::vec3& = 0;
+  [[nodiscard]] virtual auto get_direction() const -> const glm::vec3& = 0;
+  [[nodiscard]] virtual auto get_position() -> glm::vec3& = 0;
+  [[nodiscard]] virtual auto get_direction() -> glm::vec3& = 0;
+
+  [[nodiscard]] virtual auto get_projection_matrix() const -> const glm::mat4&
   {
-    Perspective,
-    Orthographic
-  };
+    return projection_matrix;
+  }
+  [[nodiscard]] virtual auto get_view_matrix() const -> const glm::mat4&
+  {
+    return view_matrix;
+  }
+  [[nodiscard]] virtual auto get_unreversed_projection_matrix() const
+    -> const glm::mat4&
+  {
+    return unreversed_projection_matrix;
+  }
+  [[nodiscard]] auto get_view_projection() const -> glm::mat4
+  {
+    return get_projection_matrix() * get_view_matrix();
+  }
+
+  void set_projection_matrix(const glm::mat4& projection,
+                             const glm::mat4& unreversed_projection)
+  {
+    projection_matrix = projection;
+    unreversed_projection_matrix = unreversed_projection;
+  }
+
+  void set_perspective_projection_matrix(float radians_fov,
+                                         float width,
+                                         float height,
+                                         float near_plane,
+                                         float far_plane);
+  void set_perspective_projection_matrix(float radians_fov,
+                                         std::integral auto width,
+                                         std::integral auto height,
+                                         float near_plane,
+                                         float far_plane)
+  {
+    return set_perspective_projection_matrix(radians_fov,
+                                             static_cast<float>(width),
+                                             static_cast<float>(height),
+                                             near_plane,
+                                             far_plane);
+  }
+
+  void set_ortho_projection_matrix(float width,
+                                   float height,
+                                   float near_plane,
+                                   float far_plane);
+
+  [[nodiscard]] auto get_exposure() const -> float { return exposure; }
+  auto get_exposure() -> float& { return exposure; }
+
+protected:
+  float exposure = 0.8f;
 
 private:
-  glm::vec3 position;
-  glm::vec3 up;
-  glm::vec3 front;
-  f32 yaw;
-  f32 pitch;
-  f32 aspect_ratio;
-  f32 field_of_view;
-  f32 near_clip;
-  f32 far_clip;
-  ProjectionType projection_type;
-  f32 speed;
-  f32 mouse_sensitivity;
-  bool first_mouse{ true };
-  f32 last_x{ 0.0F };
-  f32 last_y{ 0.0F };
-  f32 zoom;
+  glm::mat4 projection_matrix{ 1.0F };
+  glm::mat4 unreversed_projection_matrix{ 1.0F };
+  glm::mat4 view_matrix{ 1.0F };
+};
 
-  glm::mat4 view_matrix;
-  glm::mat4 projection_matrix;
+enum class CameraMode : std::uint8_t
+{
+  None,
+  Flycam,
+  Arcball
+};
 
+class EditorCamera : public Camera
+{
 public:
-  Camera(glm::vec3 init_position,
-         glm::vec3 init_up,
-         f32 init_yaw,
-         f32 init_pitch,
-         f32 init_aspect_ratio,
-         f32 init_fov = 45.0f,
-         f32 init_near_clip = 0.1f,
-         f32 init_far_clip = 100.0f,
-         ProjectionType type = ProjectionType::Perspective,
-         f32 init_speed = 2.5f,
-         f32 init_mouse_sensitivity = 0.1f)
-    : position(init_position)
-    , up(glm::normalize(init_up))
-    , front(glm::vec3(0.0f, 0.0f, 1.0f))
-    , yaw(init_yaw)
-    , pitch(init_pitch)
-    , aspect_ratio(init_aspect_ratio)
-    , field_of_view(init_fov)
-    , near_clip(init_near_clip)
-    , far_clip(init_far_clip)
-    , projection_type(type)
-    , speed(init_speed)
-    , mouse_sensitivity(init_mouse_sensitivity)
+  EditorCamera(float degree_fov,
+               float width,
+               float height,
+               float near_plane,
+               float far_plane,
+               const EditorCamera* previous_camera = nullptr);
+  void init(const EditorCamera* previous_camera = nullptr);
+
+  void focus(const glm::vec3& focus_point) final;
+  void on_update(float time_step) final;
+  void on_event(Event& event) final;
+
+  [[nodiscard]] auto is_active() const -> bool { return this->active; }
+  void set_active(bool in) { this->active = in; }
+
+  [[nodiscard]] auto get_current_mode() const -> CameraMode
   {
-    update_camera_vectors();
-    update_projection();
+    return camera_mode;
   }
 
-  auto handle_events(Event&) -> void;
+  [[nodiscard]] auto get_distance() const -> float { return distance; }
+  void set_distance(float in) { distance = in; }
 
-  auto update_camera_vectors() -> void
+  [[nodiscard]] auto get_focal_point() const -> const glm::vec3&
   {
-    glm::vec3 new_front;
-    new_front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-    new_front.y = sin(glm::radians(pitch));
-    new_front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-    front = glm::normalize(new_front);
-    glm::vec3 right =
-      glm::normalize(glm::cross(front, glm::vec3(0.0f, 1.0f, 0.0f)));
-    up = glm::normalize(glm::cross(right, front));
-    view_matrix = glm::lookAt(position, position + front, up);
+    return focal_point;
   }
 
-  auto update_projection() -> void
+  template<IsNumber T>
+  void set_viewport_size(const BasicExtent<T>& extent)
   {
-    if (projection_type == ProjectionType::Perspective) {
-      projection_matrix =
-        glm::perspective(glm::radians(zoom), aspect_ratio, near_clip, far_clip);
+    if constexpr (std::is_same_v<T, u32>) {
+      if (viewport.width == extent.width && viewport.height == extent.height) {
+        return;
+      }
     } else {
-      f32 half_width = zoom * aspect_ratio;
-      f32 half_height = zoom;
-      projection_matrix = glm::ortho(-half_width,
-                                     half_width,
-                                     -half_height,
-                                     half_height,
-                                     near_clip,
-                                     far_clip);
+      auto as_u32 = extent.as<u32>();
+      if (viewport.width == as_u32.width && viewport.height == as_u32.height) {
+        return;
+      }
     }
+    aspect_ratio = glm::radians(static_cast<float>(viewport.width) /
+                                static_cast<float>(viewport.height));
+    set_perspective_projection_matrix(vertical_fov,
+                                      static_cast<float>(viewport.width),
+                                      static_cast<float>(viewport.height),
+                                      far_clip,
+                                      near_clip);
+    update_camera_view();
   }
 
-  auto get_view_matrix() const -> glm::mat4 { return view_matrix; }
-
-  auto get_projection_matrix() const -> glm::mat4 { return projection_matrix; }
-
-  auto move_forward(f32 delta_time) -> void
+  [[nodiscard]] auto get_view_matrix() const -> const glm::mat4& override
   {
-    position += speed * front * delta_time;
+    return view_matrix;
   }
-
-  auto move_backward(f32 delta_time) -> void
+  [[nodiscard]] auto get_unreversed_view_projection() const
   {
-    position -= speed * front * delta_time;
+    return get_unreversed_projection_matrix() * view_matrix;
   }
 
-  auto move_left(f32 delta_time) -> void
+  [[nodiscard]] auto get_up_direction() const -> glm::vec3;
+  [[nodiscard]] auto get_right_direction() const -> glm::vec3;
+  [[nodiscard]] auto get_forward_direction() const -> glm::vec3;
+
+  [[nodiscard]] auto get_position() -> glm::vec3& override { return position; }
+  [[nodiscard]] auto get_direction() -> glm::vec3& override
   {
-    position -= glm::normalize(glm::cross(front, up)) * speed * delta_time;
+    return direction;
   }
-
-  auto move_right(f32 delta_time) -> void
+  [[nodiscard]] auto get_position() const -> const glm::vec3& override
   {
-    position += glm::normalize(glm::cross(front, up)) * speed * delta_time;
+    return position;
   }
-
-  auto move_up(f32 delta_time) -> void { position += up * speed * delta_time; }
-
-  auto move_down(f32 delta_time) -> void
+  [[nodiscard]] auto get_direction() const -> const glm::vec3& override
   {
-    position -= up * speed * delta_time;
+    return direction;
   }
 
-  auto turn_left(f32 delta_time) -> void
+  [[nodiscard]] auto get_orientation() const -> glm::quat;
+
+  [[nodiscard]] auto get_vertical_fov() const -> float { return vertical_fov; }
+  [[nodiscard]] auto get_aspect_ratio() const -> float { return aspect_ratio; }
+  [[nodiscard]] auto get_near_clip() const -> float override
   {
-    yaw -= speed * delta_time;
-    update_camera_vectors();
+    return near_clip;
   }
+  [[nodiscard]] auto get_far_clip() const -> float override { return far_clip; }
+  auto get_fov() const -> float override { return vertical_fov; }
 
-  auto turn_right(f32 delta_time) -> void
+  auto set_near_clip(float set_value) -> void override
   {
-    yaw += speed * delta_time;
-    update_camera_vectors();
+    near_clip = set_value;
+    update_camera_view();
+    set_perspective_projection_matrix(
+      vertical_fov, viewport.width, viewport.height, far_clip, near_clip);
   }
-
-  auto process_mouse_movement(f32 x_offset,
-                              f32 y_offset,
-                              bool constrain_pitch = true) -> void
+  auto set_far_clip(float set_value) -> void override
   {
-    x_offset *= mouse_sensitivity;
-    y_offset *= mouse_sensitivity;
-
-    yaw += x_offset;
-    pitch -= y_offset;
-
-    if (constrain_pitch) {
-      if (pitch > 89.0f)
-        pitch = 89.0f;
-      if (pitch < -89.0f)
-        pitch = -89.0f;
-    }
-
-    update_camera_vectors();
+    far_clip = set_value;
+    update_camera_view();
+    set_perspective_projection_matrix(
+      vertical_fov, viewport.width, viewport.height, far_clip, near_clip);
   }
 
-  auto get_position() const -> const glm::vec3& { return position; }
-  auto get_near_plane() const -> f32 { return near_clip; }
-  auto get_far_plane() const -> f32 { return far_clip; }
-  auto get_fov() const -> f32 { return field_of_view; }
+  [[nodiscard]] auto get_pitch() const -> float { return pitch; }
+  [[nodiscard]] auto get_yaw() const -> float { return yaw; }
+  [[nodiscard]] auto get_camera_speed() const -> float;
+
+private:
+  void update_camera_view();
+  auto on_mouse_scroll(MouseScrolledEvent& e) -> bool;
+  void mouse_pan(const glm::vec2& delta);
+  void mouse_rotate(const glm::vec2& delta);
+  void mouse_zoom(float delta);
+
+  [[nodiscard]] auto calculate_position() const -> glm::vec3;
+
+  [[nodiscard]] auto pan_speed() const -> std::pair<float, float>;
+  static auto rotation_speed() -> float;
+  [[nodiscard]] auto zoom_speed() const -> float;
+
+  glm::mat4 view_matrix{ 1.0F };
+  glm::vec3 position = { 2, 2, -2 };
+  glm::vec3 direction{ 0.F };
+  glm::vec3 focal_point{ 0.0F };
+
+  float vertical_fov{ 0 };
+  float aspect_ratio{ 0 };
+  float near_clip{ 0 };
+  float far_clip{ 0 };
+
+  bool active{ true };
+  glm::vec2 initial_mouse_position{};
+
+  float distance;
+  float normal_speed{ 0.85F };
+
+  float pitch = glm::radians(-30.0F);
+  float yaw = 0;
+  float pitch_delta{};
+  float yaw_delta{};
+  glm::vec3 position_delta{};
+  glm::vec3 right_direction{};
+
+  CameraMode camera_mode{ CameraMode::Arcball };
+
+  float min_focus_distance{ 100.0F };
+
+  Extent viewport{ 1600, 900 };
+
+  constexpr static float min_speed{ 0.002F };
+  constexpr static float max_speed{ 2.0F };
 };
 
 } // namespace Engine::Core

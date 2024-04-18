@@ -81,7 +81,16 @@ scope(const std::string_view name, auto&& func)
 {
   Impl::begin(name);
   const auto size = ImGui::GetWindowSize();
-  func(size.x, size.y);
+  if constexpr (std::is_invocable_v<decltype(func), Core::Vec2>) {
+    func({ size.x, size.y });
+  } else if constexpr (std::is_invocable_v<decltype(func)>) {
+    func();
+  } else if constexpr (std::
+                         is_invocable_v<decltype(func), Core::f32, Core::f32>) {
+    func(size.x, size.y);
+  } else {
+    func(size);
+  }
   end();
 }
 

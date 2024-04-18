@@ -32,18 +32,12 @@ begin_renderpass(const CommandBuffer& command_buffer,
 
   VkViewport viewport = {};
   viewport.x = 0.0F;
-  viewport.y = static_cast<float>(height);
+  viewport.y = 0.0F;
   viewport.width = static_cast<float>(width);
-  viewport.height = -static_cast<float>(height);
-  viewport.minDepth = 1.0F;
-  viewport.maxDepth = 0.0F;
+  viewport.height = static_cast<float>(height);
+  viewport.minDepth = 0.0F;
+  viewport.maxDepth = 1.0F;
 
-  /*
-    if (!framebuffer.get_properties().flip_viewport) {
-      viewport.y = 0.0F;
-      viewport.height = static_cast<float>(framebuffer.get_height());
-    }
-  */
   vkCmdSetViewport(command_buffer.get_command_buffer(), 0, 1, &viewport);
 
   VkRect2D scissor = {};
@@ -97,9 +91,9 @@ explicitly_clear_framebuffer(const CommandBuffer& command_buffer,
   }
 
   vkCmdClearAttachments(command_buffer.get_command_buffer(),
-                        static_cast<Core::u32>(total_attachment_count),
+                        total_attachment_count,
                         attachments.data(),
-                        static_cast<Core::u32>(total_attachment_count),
+                        total_attachment_count,
                         clear_rects.data());
 }
 

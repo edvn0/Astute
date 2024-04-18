@@ -13,6 +13,7 @@ public:
   {
     const Framebuffer* framebuffer;
     const Shader* shader;
+    const VkSampleCountFlagBits sample_count{ VK_SAMPLE_COUNT_1_BIT };
   };
 
   explicit GraphicsPipeline(Configuration);
@@ -24,6 +25,7 @@ public:
 private:
   VkPipeline pipeline{ VK_NULL_HANDLE };
   VkPipelineLayout layout{ VK_NULL_HANDLE };
+  const VkSampleCountFlagBits sample_count{ VK_SAMPLE_COUNT_1_BIT };
 
   const Framebuffer* framebuffer{ nullptr };
   const Shader* shader{ nullptr };

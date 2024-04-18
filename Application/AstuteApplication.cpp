@@ -17,20 +17,20 @@ AstuteApplication::~AstuteApplication() = default;
 
 AstuteApplication::AstuteApplication(Application::Configuration config)
   : Application(config)
-  , camera(glm::vec3(-5, -5, -5),
-           glm::vec3(0, -1, 0),
-           0.0F,
-           0.0F,
-           config.size.aspect_ratio())
   , scene(std::make_shared<Scene>(config.scene_name))
-  , renderer(new Renderer{ map_to_renderer_config(config), &get_window() }){
+  , renderer(new Renderer{ map_to_renderer_config(config), &get_window() })
+  , camera(new EditorCamera{ 45.0F,
+                             static_cast<f32>(config.size.width),
+                             static_cast<f32>(config.size.height),
+                             0.1F,
+                             1000.0F }){
 
   };
 
 auto
 AstuteApplication::update(f64 ts) -> void
 {
-  camera.update_camera_vectors();
+  camera->on_update(ts);
 
   switch (scene_state) {
     using enum AstuteApplication::SceneState;
@@ -60,7 +60,7 @@ AstuteApplication::render() -> void
   switch (scene_state) {
     using enum AstuteApplication::SceneState;
     case Edit:
-      scene->on_render_editor(*renderer, camera);
+      scene->on_render_editor(*renderer, *camera);
       break;
     default:
       break;
@@ -87,7 +87,7 @@ AstuteApplication::interface() -> void
   using namespace Engine::UI;
   ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
 
-  scope("Viewport", [&](auto w, auto h) {
+  scope("Viewport", [&]() {
     const auto& statistics = get_statistics();
     coloured_text({ 1.0F, 0.1F, 1.0F, 1.0F },
                   "FPS: {}, Frametime: {:5f}ms",
@@ -114,7 +114,7 @@ AstuteApplication::handle_events(Event& event) -> void
     return false;
   });
 
-  camera.handle_events(event);
+  camera->on_event(event);
 };
 
 auto
@@ -122,6 +122,10 @@ AstuteApplication::on_resize(const Extent& ext) -> void
 {
   Application::on_resize(ext);
   renderer->on_resize(ext);
+
+  if (auto* editor = dynamic_cast<EditorCamera*>(camera.get())) {
+    editor->set_viewport_size(ext);
+  }
 }
 
 auto

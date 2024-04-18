@@ -6,12 +6,15 @@
 #include "graphics/GraphicsPipeline.hpp"
 #include "graphics/Shader.hpp"
 
+#include "graphics/Vertex.hpp"
+
 #include <glm/glm.hpp>
 
 namespace Engine::Graphics {
 
 GraphicsPipeline::GraphicsPipeline(Configuration config)
-  : framebuffer(config.framebuffer)
+  : sample_count(config.sample_count)
+  , framebuffer(config.framebuffer)
   , shader(config.shader)
 {
   create_layout();
@@ -81,39 +84,23 @@ GraphicsPipeline::create_pipeline() -> void
   vertex_input_info.sType =
     VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
-  std::array<VkVertexInputBindingDescription, 1> binding_descriptions = {};
+  std::array<VkVertexInputBindingDescription, 2> binding_descriptions = {};
   binding_descriptions[0].binding = 0;
-  binding_descriptions[0].stride = sizeof(glm::vec3) * 2 + sizeof(glm::vec2);
+  binding_descriptions[0].stride = sizeof(Vertex);
   binding_descriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+  binding_descriptions[1].binding = 1;
+  binding_descriptions[1].stride = sizeof(glm::mat4);
+  binding_descriptions[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
 
   vertex_input_info.vertexBindingDescriptionCount =
     static_cast<Core::u32>(binding_descriptions.size());
   vertex_input_info.pVertexBindingDescriptions = binding_descriptions.data();
 
-  std::array<VkVertexInputAttributeDescription, 3> attribute_descriptions = {
-    VkVertexInputAttributeDescription{
-      .location = 0,
-      .binding = 0,
-      .format = VK_FORMAT_R32G32B32_SFLOAT,
-      .offset = 0,
-    },
-    VkVertexInputAttributeDescription{
-      .location = 1,
-      .binding = 0,
-      .format = VK_FORMAT_R32G32B32_SFLOAT,
-      .offset = sizeof(glm::vec3),
-    },
-    VkVertexInputAttributeDescription{
-      .location = 2,
-      .binding = 0,
-      .format = VK_FORMAT_R32G32_SFLOAT,
-      .offset = sizeof(glm::vec3) * 2,
-    },
-  };
+  auto attributes = generate_attributes();
   vertex_input_info.vertexAttributeDescriptionCount =
-    static_cast<Core::u32>(attribute_descriptions.size());
-  vertex_input_info.pVertexAttributeDescriptions =
-    attribute_descriptions.data();
+    static_cast<Core::u32>(attributes.size());
+  vertex_input_info.pVertexAttributeDescriptions = attributes.data();
   pipeline_info.pVertexInputState = &vertex_input_info;
 
   VkPipelineInputAssemblyStateCreateInfo input_assembly_info{};
@@ -142,7 +129,7 @@ GraphicsPipeline::create_pipeline() -> void
   multisample_info.sType =
     VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
   multisample_info.sampleShadingEnable = VK_FALSE;
-  multisample_info.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+  multisample_info.rasterizationSamples = sample_count;
 
   pipeline_info.pMultisampleState = &multisample_info;
 
@@ -151,7 +138,7 @@ GraphicsPipeline::create_pipeline() -> void
     VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
   depth_stencil_info.depthTestEnable = VK_TRUE;
   depth_stencil_info.depthWriteEnable = VK_TRUE;
-  depth_stencil_info.depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
+  depth_stencil_info.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
   depth_stencil_info.depthBoundsTestEnable = VK_FALSE;
   depth_stencil_info.stencilTestEnable = VK_FALSE;
   pipeline_info.pDepthStencilState = &depth_stencil_info;

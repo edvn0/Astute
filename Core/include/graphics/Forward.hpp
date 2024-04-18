@@ -12,5 +12,7 @@ class Image;
 class Framebuffer;
 class Renderer;
 class Shader;
+class VertexBuffer;
+class IndexBuffer;
 
 }

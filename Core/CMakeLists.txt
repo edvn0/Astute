@@ -11,6 +11,7 @@ add_library(Core STATIC
     include/core/Platform.hpp
     include/core/Scene.hpp
     include/core/Types.hpp
+    include/core/DataBuffer.hpp
     include/graphics/Allocator.hpp
     include/graphics/CommandBuffer.hpp
     include/graphics/Device.hpp
@@ -26,6 +27,7 @@ add_library(Core STATIC
     include/graphics/Swapchain.hpp
     include/graphics/DescriptorResource.hpp
     include/graphics/Window.hpp
+    include/graphics/Vertex.hpp
     include/ui/UI.hpp
     src/core/Application.cpp
     src/core/Camera.cpp
@@ -34,6 +36,7 @@ add_library(Core STATIC
     src/core/Logger.cpp
     src/core/Platform.cpp
     src/core/Scene.cpp
+    src/core/DataBuffer.cpp
     src/graphics/Allocator.cpp
     src/graphics/CommandBuffer.cpp
     src/graphics/Device.cpp
@@ -48,8 +51,12 @@ add_library(Core STATIC
     src/graphics/Shader.cpp
     src/graphics/Swapchain.cpp
     src/graphics/Window.cpp
+    src/graphics/Vertex.cpp
     src/graphics/DescriptorResource.cpp
     src/ui/UI.cpp
+
+    src/graphics/render_passes/Predepth.cpp
+    src/graphics/render_passes/Shadow.cpp
 )
 target_include_directories(Core PUBLIC include ${CMAKE_SOURCE_DIR}/Library/imgui ${CMAKE_SOURCE_DIR}/Library/glm ${CMAKE_SOURCE_DIR}/Library/src PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(Core PUBLIC ShaderCompilation glfw Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator PRIVATE imgui glm EnTT::EnTT)
