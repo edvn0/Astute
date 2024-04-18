@@ -16,13 +16,13 @@
 namespace Engine::Graphics {
 
 auto
-Renderer::construct_predepth_pass(const Window* window) -> void
+Renderer::construct_main_geometry_pass(const Window* window) -> void
 {
-  auto& [predepth_framebuffer,
-         predepth_shader,
-         predepth_pipeline,
-         predepth_material] = predepth_render_pass;
-  predepth_framebuffer =
+  auto& [main_geometry_framebuffer,
+         main_geometry_shader,
+         main_geometry_pipeline,
+         main_geometry_material] = main_geometry_render_pass;
+  main_geometry_framebuffer =
     Core::make_scope<Framebuffer>(Framebuffer::Configuration{
       .size = window->get_swapchain().get_size(),
       .colour_attachment_formats = { VK_FORMAT_R32G32B32A32_SFLOAT,
@@ -31,45 +31,46 @@ Renderer::construct_predepth_pass(const Window* window) -> void
       .depth_attachment_format = VK_FORMAT_D32_SFLOAT,
       .sample_count = VK_SAMPLE_COUNT_4_BIT,
     });
-  predepth_shader = Shader::compile_graphics_scoped(
-    "Assets/shaders/predepth.vert", "Assets/shaders/predepth.frag");
-  predepth_pipeline =
+  main_geometry_shader = Shader::compile_graphics_scoped(
+    "Assets/shaders/main_geometry.vert", "Assets/shaders/main_geometry.frag");
+  main_geometry_pipeline =
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
-      .framebuffer = predepth_framebuffer.get(),
-      .shader = predepth_shader.get(),
+      .framebuffer = main_geometry_framebuffer.get(),
+      .shader = main_geometry_shader.get(),
       .sample_count = VK_SAMPLE_COUNT_4_BIT,
     });
 }
 
 auto
-Renderer::predepth_pass() -> void
+Renderer::main_geometry_pass() -> void
 {
-  const auto& [predepth_framebuffer,
-               predepth_shader,
-               predepth_pipeline,
-               predepth_material] = predepth_render_pass;
+  const auto& [main_geometry_framebuffer,
+               main_geometry_shader,
+               main_geometry_pipeline,
+               main_geometry_material] = main_geometry_render_pass;
   VkRenderPassBeginInfo render_pass_info{};
   render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-  render_pass_info.renderPass = predepth_framebuffer->get_renderpass();
-  render_pass_info.framebuffer = predepth_framebuffer->get_framebuffer();
+  render_pass_info.renderPass = main_geometry_framebuffer->get_renderpass();
+  render_pass_info.framebuffer = main_geometry_framebuffer->get_framebuffer();
   render_pass_info.renderArea.offset = { 0, 0 };
-  render_pass_info.renderArea.extent = predepth_framebuffer->get_extent();
-  const auto& clear_values = predepth_framebuffer->get_clear_values();
+  render_pass_info.renderArea.extent = main_geometry_framebuffer->get_extent();
+  const auto& clear_values = main_geometry_framebuffer->get_clear_values();
   render_pass_info.clearValueCount =
     static_cast<Core::u32>(clear_values.size());
   render_pass_info.pClearValues = clear_values.data();
 
-  RendererExtensions::begin_renderpass(*command_buffer, *predepth_framebuffer);
+  RendererExtensions::begin_renderpass(*command_buffer,
+                                       *main_geometry_framebuffer);
 
   vkCmdBindPipeline(command_buffer->get_command_buffer(),
                     VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    predepth_pipeline->get_pipeline());
+                    main_geometry_pipeline->get_pipeline());
   auto descriptor_set =
-    generate_and_update_descriptor_write_sets(predepth_shader.get());
+    generate_and_update_descriptor_write_sets(main_geometry_shader.get());
 
   vkCmdBindDescriptorSets(command_buffer->get_command_buffer(),
                           VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          predepth_pipeline->get_layout(),
+                          main_geometry_pipeline->get_layout(),
                           0,
                           1,
                           &descriptor_set,

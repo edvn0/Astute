@@ -90,7 +90,7 @@ Renderer::Renderer(Configuration config, const Window* window)
     .primary = true,
   });
 
-  construct_predepth_pass(window);
+  construct_main_geometry_pass(window);
   construct_shadow_pass(window, config.shadow_pass_size);
 
   transform_buffers.resize(3);
@@ -181,7 +181,7 @@ auto
 Renderer::on_resize(const Core::Extent& new_size) -> void
 {
   size = new_size;
-  predepth_render_pass.framebuffer->on_resize(new_size);
+  main_geometry_render_pass.framebuffer->on_resize(new_size);
 }
 
 auto
@@ -208,7 +208,7 @@ Renderer::flush_draw_lists() -> void
 
   command_buffer->begin();
   // Predepth pass
-  predepth_pass();
+  main_geometry_pass();
   // Shadow pass
   shadow_pass();
   // Geometry pass

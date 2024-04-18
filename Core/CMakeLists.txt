@@ -55,7 +55,7 @@ add_library(Core STATIC
     src/graphics/DescriptorResource.cpp
     src/ui/UI.cpp
 
-    src/graphics/render_passes/Predepth.cpp
+    src/graphics/render_passes/MainGeometry.cpp
     src/graphics/render_passes/Shadow.cpp
 )
 target_include_directories(Core PUBLIC include ${CMAKE_SOURCE_DIR}/Library/imgui ${CMAKE_SOURCE_DIR}/Library/glm ${CMAKE_SOURCE_DIR}/Library/src PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

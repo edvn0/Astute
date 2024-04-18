@@ -91,7 +91,7 @@ public:
 
   auto get_output_image() const -> const Image*
   {
-    return predepth_render_pass.framebuffer->get_colour_attachment(0);
+    return main_geometry_render_pass.framebuffer->get_colour_attachment(0);
   }
 
   auto on_resize(const Core::Extent&) -> void;
@@ -100,11 +100,11 @@ private:
   Core::Extent size{ 0, 0 };
   Core::Scope<CommandBuffer> command_buffer{ nullptr };
 
-  RenderPass predepth_render_pass{};
+  RenderPass main_geometry_render_pass{};
   RenderPass shadow_render_pass{};
 
-  auto construct_predepth_pass(const Window*) -> void;
-  auto predepth_pass() -> void;
+  auto construct_main_geometry_pass(const Window*) -> void;
+  auto main_geometry_pass() -> void;
 
   auto construct_shadow_pass(const Window*, Core::u32) -> void;
   auto shadow_pass() -> void;
