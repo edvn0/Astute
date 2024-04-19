@@ -14,8 +14,8 @@ namespace Engine::Core {
 
 struct SimpleMeshComponent
 {
-  Scope<Graphics::VertexBuffer> vertex_buffer{ nullptr };
-  Scope<Graphics::IndexBuffer> index_buffer{ nullptr };
+  Ref<Graphics::VertexBuffer> vertex_buffer{ nullptr };
+  Ref<Graphics::IndexBuffer> index_buffer{ nullptr };
 };
 
 struct TransformComponent
@@ -33,7 +33,7 @@ struct TransformComponent
 
 struct LightEnvironment
 {
-  glm::vec3 position{ 0 };
+  glm::vec3 sun_position{ 0 };
   glm::vec4 colour_and_intensity{ 0 };
   glm::vec4 specular_colour_and_intensity{ 0 };
 };

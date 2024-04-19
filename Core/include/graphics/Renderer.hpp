@@ -103,6 +103,10 @@ public:
     return main_geometry_render_pass.framebuffer->get_colour_attachment(
       attachment);
   }
+  auto get_shadow_output_image() const -> const Image*
+  {
+    return shadow_render_pass.framebuffer->get_depth_attachment().get();
+  }
 
   auto on_resize(const Core::Extent&) -> void;
 

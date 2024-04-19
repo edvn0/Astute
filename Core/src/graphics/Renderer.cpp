@@ -120,23 +120,31 @@ auto
 Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
   -> void
 {
-  auto& [view, proj, view_proj, camera_pos] = renderer_ubo.get_data();
+  const auto& light_environment = scene.get_light_environment();
+  auto& [view,
+         proj,
+         view_proj,
+         light_colour_intensity,
+         specular_colour_intensity,
+         camera_pos] = renderer_ubo.get_data();
   view = camera.camera.get_view_matrix();
   proj = camera.camera.get_projection_matrix();
   view_proj = proj * view;
   camera_pos = camera.camera.get_position();
+  light_colour_intensity = light_environment.colour_and_intensity;
+  specular_colour_intensity = light_environment.specular_colour_and_intensity;
   renderer_ubo.update();
 
-  const auto& light_environment = scene.get_light_environment();
   auto& [light_view, light_proj, light_view_proj, light_pos] =
     shadow_ubo.get_data();
   auto projection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 0.1f, 20.0f);
-  auto view_matrix = glm::lookAt(
-    light_environment.position, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+  auto view_matrix = glm::lookAt(light_environment.sun_position,
+                                 glm::vec3(0.0f),
+                                 glm::vec3(0.0f, 1.0f, 0.0f));
   light_view = view_matrix;
   light_proj = projection;
   light_view_proj = projection * view_matrix;
-  light_pos = light_environment.position;
+  light_pos = light_environment.sun_position;
   shadow_ubo.update();
 }
 
@@ -150,13 +158,22 @@ Renderer::submit_static_mesh(const Graphics::VertexBuffer& vertex_buffer,
 
   auto& mesh_transform = mesh_transform_map[key].transforms.emplace_back();
   mesh_transform.transform_rows[0] = {
-    transform[0][0], transform[1][0], transform[2][0], transform[3][0]
+    transform[0][0],
+    transform[1][0],
+    transform[2][0],
+    transform[3][0],
   };
   mesh_transform.transform_rows[1] = {
-    transform[0][1], transform[1][1], transform[2][1], transform[3][1]
+    transform[0][1],
+    transform[1][1],
+    transform[2][1],
+    transform[3][1],
   };
   mesh_transform.transform_rows[2] = {
-    transform[0][2], transform[1][2], transform[2][2], transform[3][2]
+    transform[0][2],
+    transform[1][2],
+    transform[2][2],
+    transform[3][2],
   };
   // We also instance the colour :)
   mesh_transform.transform_rows[3] = tint;

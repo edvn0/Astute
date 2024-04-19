@@ -192,12 +192,13 @@ Framebuffer::create_depth_attachment() -> void
                  sample_count,
                  depth_attachment_format,
                  VK_IMAGE_TILING_OPTIMAL,
-                 VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                 VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
+                   VK_IMAGE_USAGE_SAMPLED_BIT,
                  image->image,
                  image->allocation,
                  image->allocation_info);
     image->format = depth_attachment_format;
-    image->layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    image->layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
     image->aspect_mask = VK_IMAGE_ASPECT_DEPTH_BIT;
     image->view = create_view(
       image->image, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT);
@@ -207,7 +208,7 @@ Framebuffer::create_depth_attachment() -> void
 
     auto& descriptor_info = image->descriptor_info;
     descriptor_info.imageLayout =
-      VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+      VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
     descriptor_info.imageView = image->view;
     descriptor_info.sampler = image->sampler;
 
@@ -251,7 +252,7 @@ Framebuffer::create_renderpass() -> void
       resolve_attachment.format = format;
       resolve_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
       resolve_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-      resolve_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+      resolve_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
       resolve_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
       resolve_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
       resolve_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -275,7 +276,7 @@ Framebuffer::create_renderpass() -> void
     depth_attachment_desc.samples = sample_count;
     depth_attachment_desc.loadOp =
       should_clear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
-    depth_attachment_desc.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth_attachment_desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     depth_attachment_desc.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     depth_attachment_desc.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depth_attachment_desc.initialLayout =

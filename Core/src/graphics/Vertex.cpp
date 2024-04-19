@@ -2,6 +2,10 @@
 
 #include "graphics/Vertex.hpp"
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/hash.hpp>
+#include <unordered_map>
+
 namespace Engine::Graphics {
 
 auto
@@ -36,7 +40,7 @@ generate_attributes() -> std::vector<VkVertexInputAttributeDescription>
   attributes[5].binding = 0;
   attributes[5].location = 5;
   attributes[5].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-  attributes[5].offset = offsetof(Vertex, color);
+  attributes[5].offset = offsetof(Vertex, colour);
 
   // 6, 7, 8, 9 are for row_zero, row_one, row_two and instance_colour
   // respectively
@@ -65,3 +69,16 @@ generate_attributes() -> std::vector<VkVertexInputAttributeDescription>
 }
 
 } // namespace Engine::Graphics
+
+auto
+std::hash<Engine::Graphics::Vertex>::operator()(
+  const Engine::Graphics::Vertex& k) const -> std::size_t
+{
+  auto hash = std::hash<glm::vec3>{}(k.position);
+  hash = hash * 37 + std::hash<glm::vec2>{}(k.uvs);
+  hash = hash * 37 + std::hash<glm::vec3>{}(k.normals);
+  hash = hash * 37 + std::hash<glm::vec3>{}(k.tangent);
+  hash = hash * 37 + std::hash<glm::vec3>{}(k.bitangent);
+  hash = hash * 37 + std::hash<glm::vec4>{}(k.colour);
+  return hash;
+}

@@ -67,7 +67,7 @@ auto
 read_file(const std::filesystem::path& path) -> std::string
 {
   // Convert to an absolute path and open the file
-  const auto& absolute_path = absolute(path);
+  const auto& absolute_path = std::filesystem::absolute(path);
   const std::ifstream file(absolute_path, std::ios::in | std::ios::binary);
 
   // Check if the file was successfully opened

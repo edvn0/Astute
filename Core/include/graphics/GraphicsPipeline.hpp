@@ -14,6 +14,8 @@ public:
     const Framebuffer* framebuffer;
     const Shader* shader;
     const VkSampleCountFlagBits sample_count{ VK_SAMPLE_COUNT_1_BIT };
+    const VkCullModeFlags cull_mode{ VK_CULL_MODE_NONE };
+    const VkFrontFace face_mode{ VK_FRONT_FACE_CLOCKWISE };
   };
 
   explicit GraphicsPipeline(Configuration);
@@ -26,6 +28,8 @@ private:
   VkPipeline pipeline{ VK_NULL_HANDLE };
   VkPipelineLayout layout{ VK_NULL_HANDLE };
   const VkSampleCountFlagBits sample_count{ VK_SAMPLE_COUNT_1_BIT };
+  const VkCullModeFlags cull_mode{ VK_CULL_MODE_NONE };
+  const VkFrontFace face_mode{ VK_FRONT_FACE_CLOCKWISE };
 
   const Framebuffer* framebuffer{ nullptr };
   const Shader* shader{ nullptr };

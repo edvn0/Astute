@@ -117,8 +117,8 @@ GraphicsPipeline::create_pipeline() -> void
   rasterization_info.rasterizerDiscardEnable = VK_FALSE;
   rasterization_info.polygonMode = VK_POLYGON_MODE_FILL;
   rasterization_info.lineWidth = 1.0f;
-  rasterization_info.cullMode = VK_CULL_MODE_FRONT_BIT;
-  rasterization_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+  rasterization_info.cullMode = cull_mode;
+  rasterization_info.frontFace = face_mode;
   rasterization_info.depthBiasEnable = VK_FALSE;
   rasterization_info.depthBiasConstantFactor = 0.0f;
   rasterization_info.depthBiasClamp = 0.0f;

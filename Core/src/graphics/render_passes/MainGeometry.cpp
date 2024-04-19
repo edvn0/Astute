@@ -8,6 +8,7 @@
 #include "core/Application.hpp"
 #include "graphics/DescriptorResource.hpp"
 #include "graphics/GPUBuffer.hpp"
+#include "graphics/Image.hpp"
 #include "graphics/Swapchain.hpp"
 #include "graphics/Window.hpp"
 
@@ -41,6 +42,8 @@ Renderer::construct_main_geometry_pass(const Window* window,
       .framebuffer = main_geometry_framebuffer.get(),
       .shader = main_geometry_shader.get(),
       .sample_count = VK_SAMPLE_COUNT_4_BIT,
+      .cull_mode = VK_CULL_MODE_BACK_BIT,
+      .face_mode = VK_FRONT_FACE_COUNTER_CLOCKWISE,
     });
 }
 
@@ -70,6 +73,21 @@ Renderer::main_geometry_pass() -> void
                     main_geometry_pipeline->get_pipeline());
   auto descriptor_set =
     generate_and_update_descriptor_write_sets(main_geometry_shader.get());
+
+  VkWriteDescriptorSet write_descriptor_set_image{};
+  write_descriptor_set_image.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  write_descriptor_set_image.dstSet = descriptor_set;
+  write_descriptor_set_image.dstBinding = 10;
+  write_descriptor_set_image.dstArrayElement = 0;
+  write_descriptor_set_image.descriptorType =
+    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  write_descriptor_set_image.descriptorCount = 1;
+  write_descriptor_set_image.pImageInfo =
+    &shadow_render_pass.framebuffer->get_depth_attachment()
+       ->get_descriptor_info();
+
+  vkUpdateDescriptorSets(
+    Device::the().device(), 1, &write_descriptor_set_image, 0, nullptr);
 
   vkCmdBindDescriptorSets(command_buffer->get_command_buffer(),
                           VK_PIPELINE_BIND_POINT_GRAPHICS,

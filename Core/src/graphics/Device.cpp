@@ -260,10 +260,10 @@ Device::execute_immediate(QueueType type,
   auto func = std::move(command);
   func(command_buffer);
   vkEndCommandBuffer(command_buffer);
-  VkSubmitInfo submitInfo = {};
-  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submitInfo.commandBufferCount = 1;
-  submitInfo.pCommandBuffers = &command_buffer;
+  VkSubmitInfo submit_info = {};
+  submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submit_info.commandBufferCount = 1;
+  submit_info.pCommandBuffers = &command_buffer;
 
   VkFenceCreateInfo fence_create_info = {};
   fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -274,7 +274,7 @@ Device::execute_immediate(QueueType type,
 
   // Submit to queue
   auto queue = get_queue(type);
-  vkQueueSubmit(queue, 1, &submitInfo, fence);
+  vkQueueSubmit(queue, 1, &submit_info, fence);
   static constexpr auto default_fence_timeout = 100000000000;
   vkWaitForFences(device(), 1, &fence, VK_TRUE, default_fence_timeout);
 

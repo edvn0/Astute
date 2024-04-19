@@ -49,6 +49,8 @@ main(int argc, char** argv) -> int
     .fullscreen = fullscreen_opt->value_or(false),
   };
 
+  info("Current path: {}", std::filesystem::current_path().string());
+
   AstuteApplication application{ config };
   return application.run();
 }

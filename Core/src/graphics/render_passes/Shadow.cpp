@@ -61,9 +61,6 @@ Renderer::shadow_pass() -> void
 
   RendererExtensions::begin_renderpass(*command_buffer, *shadow_framebuffer);
 
-  // RendererExtensions::explicitly_clear_framebuffer(*command_buffer,
-  //                                                 *shadow_framebuffer);
-
   vkCmdBindPipeline(command_buffer->get_command_buffer(),
                     VK_PIPELINE_BIND_POINT_GRAPHICS,
                     shadow_pipeline->get_pipeline());

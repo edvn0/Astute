@@ -1,7 +1,17 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <unordered_map>
 #include <vulkan/vulkan.h>
+
+namespace Engine::Graphics {
+struct Vertex;
+}
+template<>
+struct std::hash<Engine::Graphics::Vertex>
+{
+  auto operator()(const Engine::Graphics::Vertex& k) const -> std::size_t;
+};
 
 namespace Engine::Graphics {
 
@@ -15,7 +25,9 @@ struct Vertex
   glm::vec3 normals;
   glm::vec3 tangent;
   glm::vec3 bitangent;
-  glm::vec4 color;
+  glm::vec4 colour;
+
+  constexpr auto operator<=>(const Vertex&) const = default;
 };
 
 using Index = std::uint32_t;

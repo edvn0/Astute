@@ -69,18 +69,6 @@ AstuteApplication::render() -> void
   vkDeviceWaitIdle(Device::the().device());
 }
 
-static void
-ShowDockingDisabledMessage()
-{
-  auto& io = ImGui::GetIO();
-  ImGui::Text("ERROR: Docking is not enabled! See Demo > Configuration.");
-  ImGui::Text(
-    "Set io.ConfigFlags |= ImGuiConfigFlags_DockingEnable in your code, or ");
-  ImGui::SameLine(0.0f, 0.0f);
-  if (ImGui::SmallButton("click here"))
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-}
-
 auto
 AstuteApplication::interface() -> void
 {
@@ -98,6 +86,10 @@ AstuteApplication::interface() -> void
 
   scope("Output 2", [&](f32 w, f32 h) {
     image<f32>(*renderer->get_output_image(2), { .extent = { w, h } });
+  });
+
+  scope("Output Depth", [&](f32 w, f32 h) {
+    image<f32>(*renderer->get_shadow_output_image(), { .extent = { w, h } });
   });
 
   ImGui::PopStyleVar();
