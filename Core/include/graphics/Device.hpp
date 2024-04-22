@@ -42,11 +42,17 @@ public:
     return queue_support.at(t).family_index;
   }
 
-  auto execute_immediate(QueueType, std::function<void(VkCommandBuffer)>&&)
-    -> void;
+  auto execute_immediate(QueueType,
+                         std::function<void(VkCommandBuffer)>&&,
+                         VkFence fence = nullptr) -> void;
   auto execute_immediate(std::function<void(VkCommandBuffer)>&& command) -> void
   {
-    execute_immediate(QueueType::Graphics, std::move(command));
+    execute_immediate(QueueType::Graphics, std::move(command), nullptr);
+  }
+  auto execute_immediate(std::function<void(VkCommandBuffer)>&& command,
+                         VkFence fence) -> void
+  {
+    execute_immediate(QueueType::Graphics, std::move(command), fence);
   }
 
   auto create_secondary_command_buffer() -> VkCommandBuffer;

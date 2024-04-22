@@ -31,7 +31,7 @@ namespace Engine::Graphics {
 
 struct TransformVertexData
 {
-  std::array<glm::vec4, 4> transform_rows{};
+  std::array<glm::vec4, 3> transform_rows{};
 };
 struct TransformMapData
 {
@@ -73,6 +73,7 @@ struct CommandKey
 {
   const VertexBuffer* vertex_buffer{ nullptr };
   const IndexBuffer* index_buffer{ nullptr };
+  const Material* material{ nullptr };
   Core::u32 submesh_index{ 0 };
 
   auto operator<=>(const CommandKey&) const = default;
@@ -95,6 +96,7 @@ public:
 
   auto submit_static_mesh(const Graphics::VertexBuffer&,
                           const Graphics::IndexBuffer&,
+                          Graphics::Material&,
                           const glm::mat4&,
                           const glm::vec4& = { 1, 1, 1, 1 }) -> void;
 
@@ -107,8 +109,21 @@ public:
   {
     return shadow_render_pass.framebuffer->get_depth_attachment().get();
   }
+  auto get_final_output() const -> const Image*
+  {
+    return deferred_render_pass.framebuffer->get_colour_attachment(0);
+  }
 
   auto on_resize(const Core::Extent&) -> void;
+
+  static auto get_white_texture() -> const Core::Ref<Image>&
+  {
+    return white_texture;
+  }
+  static auto get_black_texture() -> const Core::Ref<Image>&
+  {
+    return black_texture;
+  }
 
 private:
   Core::Extent size{ 0, 0 };
@@ -117,6 +132,7 @@ private:
   RenderPass predepth_render_pass{};
   RenderPass main_geometry_render_pass{};
   RenderPass shadow_render_pass{};
+  RenderPass deferred_render_pass{};
 
   auto construct_predepth_pass(const Window*) -> void;
   auto predepth_pass() -> void;
@@ -127,21 +143,28 @@ private:
   auto construct_shadow_pass(const Window*, Core::u32) -> void;
   auto shadow_pass() -> void;
 
+  auto construct_deferred_pass(const Window*, const Framebuffer&) -> void;
+  auto deferred_pass() -> void;
+
   auto flush_draw_lists() -> void;
 
   auto generate_and_update_descriptor_write_sets(const Shader*)
     -> VkDescriptorSet;
+  auto generate_and_update_descriptor_write_sets(Material&) -> VkDescriptorSet;
   auto get_buffer_info(const std::string_view) const
     -> const VkDescriptorBufferInfo*;
 
   // UBOs
-  UniformBufferObject<RendererUBO> renderer_ubo{ "RendererUBO" };
-  UniformBufferObject<ShadowUBO> shadow_ubo{ "ShadowUBO" };
+  UniformBufferObject<RendererUBO> renderer_ubo{};
+  UniformBufferObject<ShadowUBO> shadow_ubo{};
+  UniformBufferObject<PointLightUBO> point_light_ubo{};
+  UniformBufferObject<SpotLightUBO> spot_light_ubo{};
 
   struct DrawCommand
   {
     const Graphics::VertexBuffer* vertex_buffer;
     const Graphics::IndexBuffer* index_buffer;
+    Graphics::Material* material;
     Core::u32 submesh_index{ 0 };
     Core::u32 instance_count{ 0 };
   };
@@ -151,6 +174,9 @@ private:
 
   std::vector<SubmeshTransformBuffer> transform_buffers;
   std::unordered_map<CommandKey, TransformMapData> mesh_transform_map;
+
+  static inline Core::Ref<Image> white_texture;
+  static inline Core::Ref<Image> black_texture;
 };
 
 }
@@ -161,9 +187,15 @@ inline auto
 hash<Engine::Graphics::CommandKey>::operator()(
   const Engine::Graphics::CommandKey& key) const noexcept -> Engine::Core::usize
 {
-  return std::hash<const Engine::Graphics::VertexBuffer*>()(key.vertex_buffer) ^
-         std::hash<const Engine::Graphics::IndexBuffer*>()(key.index_buffer) ^
-         std::hash<Engine::Core::u32>()(key.submesh_index);
+  static constexpr auto combine = []<class... T>(auto& seed,
+                                                 const T&... values) {
+    (...,
+     (seed ^= std::hash<T>{}(values) + 0x9e3779b9 + (seed << 6) + (seed >> 2)));
+    return seed;
+  };
+  std::size_t seed{ 0 };
+  return combine(
+    seed, key.vertex_buffer, key.index_buffer, key.material, key.submesh_index);
 }
 
 } // namespace std

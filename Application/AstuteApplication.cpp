@@ -17,13 +17,13 @@ AstuteApplication::~AstuteApplication() = default;
 
 AstuteApplication::AstuteApplication(Application::Configuration config)
   : Application(config)
-  , scene(std::make_shared<Scene>(config.scene_name))
   , renderer(new Renderer{ map_to_renderer_config(config), &get_window() })
   , camera(new EditorCamera{ 45.0F,
                              static_cast<f32>(config.size.width),
                              static_cast<f32>(config.size.height),
                              0.1F,
-                             1000.0F }){
+                             1000.0F })
+  , scene(std::make_shared<Scene>(config.scene_name)){
 
   };
 
@@ -76,20 +76,24 @@ AstuteApplication::interface() -> void
   ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
 
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0F, 0.0F));
-  scope("Output", [&](f32 w, f32 h) {
+  scope("Output Position", [&](f32 w, f32 h) {
     image<f32>(*renderer->get_output_image(), { .extent = { w, h } });
   });
 
-  scope("Output 1", [&](f32 w, f32 h) {
+  scope("Output Normals", [&](f32 w, f32 h) {
     image<f32>(*renderer->get_output_image(1), { .extent = { w, h } });
   });
 
-  scope("Output 2", [&](f32 w, f32 h) {
+  scope("Output Albedo + Spec", [&](f32 w, f32 h) {
     image<f32>(*renderer->get_output_image(2), { .extent = { w, h } });
   });
 
   scope("Output Depth", [&](f32 w, f32 h) {
     image<f32>(*renderer->get_shadow_output_image(), { .extent = { w, h } });
+  });
+
+  scope("Final Output", [&](f32 w, f32 h) {
+    image<f32>(*renderer->get_final_output(), { .extent = { w, h } });
   });
 
   ImGui::PopStyleVar();

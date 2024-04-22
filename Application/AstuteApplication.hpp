@@ -28,9 +28,9 @@ private:
     Pause = 2,
     Simulate = 3
   };
-  SceneState scene_state{ SceneState::Edit };
-  Ref<Scene> scene{ nullptr };
-
   Scope<Renderer> renderer;
   Scope<Camera> camera;
+
+  SceneState scene_state{ SceneState::Edit };
+  Ref<Scene> scene{ nullptr };
 };

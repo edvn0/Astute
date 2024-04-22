@@ -90,7 +90,7 @@ GraphicsPipeline::create_pipeline() -> void
   binding_descriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
   binding_descriptions[1].binding = 1;
-  binding_descriptions[1].stride = sizeof(glm::mat4);
+  binding_descriptions[1].stride = 3 * sizeof(glm::vec4);
   binding_descriptions[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
 
   vertex_input_info.vertexBindingDescriptionCount =
@@ -128,7 +128,8 @@ GraphicsPipeline::create_pipeline() -> void
   VkPipelineMultisampleStateCreateInfo multisample_info{};
   multisample_info.sType =
     VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-  multisample_info.sampleShadingEnable = VK_FALSE;
+  multisample_info.sampleShadingEnable =
+    sample_count == VK_SAMPLE_COUNT_1_BIT ? VK_TRUE : VK_FALSE;
   multisample_info.rasterizationSamples = sample_count;
 
   pipeline_info.pMultisampleState = &multisample_info;

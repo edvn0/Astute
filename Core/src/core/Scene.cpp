@@ -1,6 +1,8 @@
 #include "pch/CorePCH.hpp"
 
+#include "core/Random.hpp"
 #include "core/Scene.hpp"
+#include "graphics/Material.hpp"
 #include "graphics/Vertex.hpp"
 
 #include "graphics/Renderer.hpp"
@@ -77,7 +79,6 @@ Scene::Scene(const std::string_view name_view)
     vertex.normals = normals[two - 1];
     vertex.tangent = glm::vec3(0.0, 0.0, 0.0);
     vertex.bitangent = glm::vec3(0.0, 0.0, 0.0);
-    vertex.colour = glm::vec4(1.0, 1.0, 1.0, 1.0);
 
     if (!uniqueVertices.contains(vertex)) {
       uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
@@ -102,20 +103,52 @@ Scene::Scene(const std::string_view name_view)
   }
 
   auto entity = registry.create();
-  auto& [vertex, index] = registry.emplace<SimpleMeshComponent>(entity);
+  auto& [vertex, index, material, shader] =
+    registry.emplace<SimpleMeshComponent>(entity);
+  shader = Graphics::Shader::compile_graphics(
+    "Assets/shaders/main_geometry.vert", "Assets/shaders/main_geometry.frag");
   vertex = Core::make_ref<Graphics::VertexBuffer>(std::span{ vertices });
   index = Core::make_ref<Graphics::IndexBuffer>(std::span{ indices });
+  material = Core::make_ref<Graphics::Material>(
+    Graphics::Material::Configuration{ shader.get() });
+  material->set("normal_map",
+                Graphics::TextureType::Normal,
+                Graphics::Renderer::get_white_texture());
+
   auto& transform = registry.emplace<TransformComponent>(entity);
   transform.translation = { 0, 0, 0 };
 
   auto entity2 = registry.create();
-  auto& [vertex2, index2] = registry.emplace<SimpleMeshComponent>(entity2);
-  vertex2 = vertex;
-  index2 = index;
+  registry.emplace<SimpleMeshComponent>(
+    entity2, vertex, index, material, shader);
   auto& transform2 = registry.emplace<TransformComponent>(entity2);
   transform2.translation = { 0, 5, 0 };
   // Floor is big!
   transform2.scale = { 10, 1, 10 };
+
+  for (auto i = 0; i < 3; i++) {
+    auto light = registry.create();
+    registry.emplace<SimpleMeshComponent>(
+      light, vertex, index, material, shader);
+    auto& transform = registry.emplace<TransformComponent>(light);
+    auto& light_data = registry.emplace<PointLightComponent>(light);
+    transform.scale *= 0.1;
+    transform.translation = Random::random_in_rectangle(-30, 30);
+    light_data.radiance = Random::random_colour();
+  }
+
+  for (auto i = 0; i < 3; i++) {
+    auto light = registry.create();
+    auto& transform = registry.emplace<TransformComponent>(light);
+    registry.emplace<SimpleMeshComponent>(
+      light, vertex, index, material, shader);
+    transform.scale *= 0.1;
+
+    transform.translation = Random::random_in_rectangle(-5, 5);
+
+    auto& light_data = registry.emplace<SpotLightComponent>(light);
+    light_data.radiance = Random::random_colour();
+  }
 }
 
 auto
@@ -130,8 +163,73 @@ Scene::on_update_editor(f64 ts) -> void
 
   light_environment.sun_position = begin;
 
-  light_environment.colour_and_intensity = { 1, 1, 1, 1 };
-  light_environment.specular_colour_and_intensity = { 1, 1, 1, 1 };
+  light_environment.colour_and_intensity = { 0.6, 0.1, 0.7, 1 };
+  light_environment.specular_colour_and_intensity = { 0.2, 0.9, 0, 1 };
+
+  light_environment.spot_lights.clear();
+  light_environment.point_lights.clear();
+
+  static f32 time = 0;
+  time += ts;
+
+  [&]() {
+    auto count = 0U;
+
+    for (auto&& [entity, transform, point_light] :
+         registry.view<TransformComponent, PointLightComponent>().each()) {
+      auto& light = light_environment.point_lights.emplace_back();
+
+      f32 radius = 5.0f;
+      f32 speed = 1.0f;
+      f32 phaseOffset = 0.5f;
+
+      f32 angle = time * speed + phaseOffset * count;
+
+      // Update position to move in a circle
+      transform.translation.x = radius * cos(angle);
+      transform.translation.z =
+        radius * sin(angle); // Assuming circular motion in x-z plane
+
+      light.pos = transform.translation;
+      light.casts_shadows = point_light.casts_shadows;
+      light.falloff = point_light.falloff;
+      light.intensity = point_light.intensity;
+      light.light_size = point_light.light_size;
+      light.min_radius = point_light.min_radius;
+      light.radiance = point_light.radiance;
+      light.radius = point_light.radius;
+      count++;
+    }
+  }();
+
+  [&]() {
+    auto count = 0;
+    for (auto&& [entity, transform, spot_light] :
+         registry.view<TransformComponent, SpotLightComponent>().each()) {
+      auto& light = light_environment.spot_lights.emplace_back();
+      f32 radius = 5.0f;
+      f32 speed = 1.0f;
+      f32 phaseOffset = 0.5f;
+
+      f32 angle = time * speed + phaseOffset * count;
+
+      // Update position to move in a circle
+      transform.translation.x = radius * cos(angle);
+      transform.translation.y =
+        radius * sin(angle); // Assuming circular motion in x-z plane
+
+      light.pos = transform.translation;
+      light.radiance = spot_light.radiance;
+      light.intensity = spot_light.intensity;
+      light.range = spot_light.range;
+      light.angle = spot_light.angle;
+      light.angle_attenuation = spot_light.angle_attenuation;
+      light.casts_shadows = spot_light.casts_shadows;
+      light.soft_shadows = spot_light.soft_shadows;
+      light.falloff = spot_light.falloff;
+      count++;
+    }
+  }();
 }
 
 auto
@@ -149,14 +247,17 @@ Scene::on_render_editor(Graphics::Renderer& renderer, const Camera& camera)
   bool submitted_sun = false;
   for (auto&& [entity, mesh, transform] :
        registry.view<SimpleMeshComponent, TransformComponent>().each()) {
-    renderer.submit_static_mesh(
-      *mesh.vertex_buffer, *mesh.index_buffer, transform.compute());
+    renderer.submit_static_mesh(*mesh.vertex_buffer,
+                                *mesh.index_buffer,
+                                *mesh.material,
+                                transform.compute());
 
     if (!submitted_sun) {
       submitted_sun = true;
       renderer.submit_static_mesh(
         *mesh.vertex_buffer,
         *mesh.index_buffer,
+        *mesh.material,
         glm::translate(glm::mat4{ 1 }, light_environment.sun_position));
     }
   }

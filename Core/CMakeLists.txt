@@ -27,6 +27,8 @@ add_library(Core STATIC
     include/graphics/Swapchain.hpp
     include/graphics/DescriptorResource.hpp
     include/graphics/Window.hpp
+    include/graphics/Material.hpp
+    include/core/Random.hpp
     include/graphics/Vertex.hpp
     include/ui/UI.hpp
     src/core/Application.cpp
@@ -50,16 +52,19 @@ add_library(Core STATIC
     src/graphics/RendererExtensions.cpp
     src/graphics/Shader.cpp
     src/graphics/Swapchain.cpp
+    src/graphics/Material.cpp
     src/graphics/Window.cpp
     src/graphics/Vertex.cpp
+    src/core/Random.cpp
     src/graphics/DescriptorResource.cpp
     src/ui/UI.cpp
 
     src/graphics/render_passes/Predepth.cpp
     src/graphics/render_passes/MainGeometry.cpp
     src/graphics/render_passes/Shadow.cpp
+    src/graphics/render_passes/Deferred.cpp
 )
 target_include_directories(Core PUBLIC include ${CMAKE_SOURCE_DIR}/Library/imgui ${CMAKE_SOURCE_DIR}/Library/glm ${CMAKE_SOURCE_DIR}/Library/src PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(Core PUBLIC ShaderCompilation glfw Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator PRIVATE imgui glm EnTT::EnTT)
+target_link_libraries(Core PUBLIC ShaderCompilation glfw Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator PRIVATE imgui glm EnTT::EnTT stbimage::stbimage)
 
 target_precompile_headers(Core PRIVATE include/pch/CorePCH.hpp)

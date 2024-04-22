@@ -4,6 +4,8 @@
 
 #include "core/Camera.hpp"
 #include "core/Types.hpp"
+#include "graphics/Material.hpp"
+#include "graphics/ShaderBuffers.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -16,6 +18,8 @@ struct SimpleMeshComponent
 {
   Ref<Graphics::VertexBuffer> vertex_buffer{ nullptr };
   Ref<Graphics::IndexBuffer> index_buffer{ nullptr };
+  Ref<Graphics::Material> material{ nullptr };
+  Ref<Graphics::Shader> shader{ nullptr };
 };
 
 struct TransformComponent
@@ -31,11 +35,38 @@ struct TransformComponent
   }
 };
 
+struct PointLightComponent
+{
+  glm::vec3 radiance{ 1.0f, 1.0f, 1.0f };
+  float intensity{ 1.0f };
+  float light_size{ 0.5f };
+  float min_radius{ 1.f };
+  float radius{ 10.0f };
+  bool casts_shadows{ true };
+  bool soft_shadows{ true };
+  float falloff{ 1.0f };
+};
+
+struct SpotLightComponent
+{
+  glm::vec3 radiance{ 1.0f };
+  float intensity{ 1.0f };
+  float range{ 10.0f };
+  float angle{ 60.0f };
+  float angle_attenuation{ 5.0f };
+  bool casts_shadows{ false };
+  bool soft_shadows{ false };
+  float falloff{ 1.0f };
+};
+
 struct LightEnvironment
 {
   glm::vec3 sun_position{ 0 };
   glm::vec4 colour_and_intensity{ 0 };
   glm::vec4 specular_colour_and_intensity{ 0 };
+
+  std::vector<Graphics::PointLight> point_lights;
+  std::vector<Graphics::SpotLight> spot_lights;
 };
 
 class Scene
@@ -66,5 +97,4 @@ private:
 
   LightEnvironment light_environment;
 };
-
 }

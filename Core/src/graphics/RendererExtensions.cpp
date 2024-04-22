@@ -103,8 +103,8 @@ explicitly_clear_framebuffer(const CommandBuffer& command_buffer,
 auto
 bind_vertex_buffer(const CommandBuffer& command,
                    const VertexBuffer& buffer,
-                   VertexBufferBinding binding,
-                   VertexBufferOffset offset) -> void
+                   BufferBinding binding,
+                   BufferOffset offset) -> void
 {
   std::array<VkDeviceSize, 1> offsets{ offset };
   auto cmd_buffer = command.get_command_buffer();
@@ -113,6 +113,19 @@ bind_vertex_buffer(const CommandBuffer& command,
 
   vkCmdBindVertexBuffers(
     cmd_buffer, binding, 1, vk_buffers.data(), offsets.data());
+}
+
+auto
+bind_index_buffer(const CommandBuffer& command,
+                  const IndexBuffer& buffer,
+                  BufferBinding binding,
+                  BufferOffset offset) -> void
+{
+  auto cmd_buffer = command.get_command_buffer();
+  vkCmdBindIndexBuffer(command.get_command_buffer(),
+                       buffer.get_buffer(),
+                       offset,
+                       VK_INDEX_TYPE_UINT32);
 }
 
 } // namespace Engine::Graphics

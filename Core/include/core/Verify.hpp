@@ -234,7 +234,6 @@ check_result(VkResult result)
           __LINE__);
     if (result == VK_ERROR_DEVICE_LOST) {
       using namespace std::chrono_literals;
-      std::this_thread::sleep_for(3s);
       info("Device lost, exiting...");
     }
     assert(result == VK_SUCCESS);

@@ -48,6 +48,7 @@ public:
   static auto the() -> Application&;
 
   auto current_frame_index() const -> u32;
+  auto get_image_count() const -> u32;
   auto get_swapchain() const -> const Graphics::Swapchain&;
   auto get_swapchain() -> Graphics::Swapchain&;
 

@@ -77,8 +77,11 @@ Renderer::shadow_pass() -> void
                           nullptr);
 
   for (const auto& [key, command] : shadow_draw_commands) {
-    const auto& [vertex_buffer, index_buffer, submesh_index, instance_count] =
-      command;
+    const auto& [vertex_buffer,
+                 index_buffer,
+                 material,
+                 submesh_index,
+                 instance_count] = command;
 
     auto vertex_buffers = std::array{ vertex_buffer->get_buffer() };
     auto offsets = std::array<VkDeviceSize, 1>{ 0 };

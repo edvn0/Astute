@@ -14,8 +14,8 @@ public:
     const Framebuffer* framebuffer;
     const Shader* shader;
     const VkSampleCountFlagBits sample_count{ VK_SAMPLE_COUNT_1_BIT };
-    const VkCullModeFlags cull_mode{ VK_CULL_MODE_NONE };
-    const VkFrontFace face_mode{ VK_FRONT_FACE_CLOCKWISE };
+    const VkCullModeFlags cull_mode{ VK_CULL_MODE_BACK_BIT };
+    const VkFrontFace face_mode{ VK_FRONT_FACE_COUNTER_CLOCKWISE };
   };
 
   explicit GraphicsPipeline(Configuration);

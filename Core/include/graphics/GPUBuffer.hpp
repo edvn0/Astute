@@ -207,8 +207,8 @@ public:
     };
   }
 
-  explicit UniformBufferObject(const std::string_view input_identifier)
-    : identifier(input_identifier)
+  UniformBufferObject()
+    : identifier(T::name)
   {
     buffer = Core::make_scope<GPUBuffer>(BufferType, sizeof(T));
     buffer->write(&pod_data, sizeof(T));

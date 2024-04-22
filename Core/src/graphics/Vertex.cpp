@@ -11,7 +11,7 @@ namespace Engine::Graphics {
 auto
 generate_attributes() -> std::vector<VkVertexInputAttributeDescription>
 {
-  std::vector<VkVertexInputAttributeDescription> attributes(10);
+  std::vector<VkVertexInputAttributeDescription> attributes(8);
   attributes[0].binding = 0;
   attributes[0].location = 0;
   attributes[0].format = VK_FORMAT_R32G32B32_SFLOAT;
@@ -37,33 +37,20 @@ generate_attributes() -> std::vector<VkVertexInputAttributeDescription>
   attributes[4].format = VK_FORMAT_R32G32B32_SFLOAT;
   attributes[4].offset = offsetof(Vertex, bitangent);
 
-  attributes[5].binding = 0;
+  attributes[5].binding = 1;
   attributes[5].location = 5;
   attributes[5].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-  attributes[5].offset = offsetof(Vertex, colour);
-
-  // 6, 7, 8, 9 are for row_zero, row_one, row_two and instance_colour
-  // respectively
+  attributes[5].offset = 0;
 
   attributes[6].binding = 1;
   attributes[6].location = 6;
   attributes[6].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-  attributes[6].offset = 0;
+  attributes[6].offset = sizeof(glm::vec4);
 
   attributes[7].binding = 1;
   attributes[7].location = 7;
   attributes[7].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-  attributes[7].offset = sizeof(glm::vec4);
-
-  attributes[8].binding = 1;
-  attributes[8].location = 8;
-  attributes[8].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-  attributes[8].offset = 2 * sizeof(glm::vec4);
-
-  attributes[9].binding = 1;
-  attributes[9].location = 9;
-  attributes[9].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-  attributes[9].offset = 3 * sizeof(glm::vec4);
+  attributes[7].offset = 2 * sizeof(glm::vec4);
 
   return attributes;
 }
@@ -79,6 +66,5 @@ std::hash<Engine::Graphics::Vertex>::operator()(
   hash = hash * 37 + std::hash<glm::vec3>{}(k.normals);
   hash = hash * 37 + std::hash<glm::vec3>{}(k.tangent);
   hash = hash * 37 + std::hash<glm::vec3>{}(k.bitangent);
-  hash = hash * 37 + std::hash<glm::vec4>{}(k.colour);
   return hash;
 }

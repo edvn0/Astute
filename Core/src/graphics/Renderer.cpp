@@ -22,9 +22,11 @@ auto
 Renderer::generate_and_update_descriptor_write_sets(const Shader* shader)
   -> VkDescriptorSet
 {
-  static std::array<IShaderBindable*, 2> structure_identifiers = {
+  static std::array<IShaderBindable*, 4> structure_identifiers = {
     &renderer_ubo,
     &shadow_ubo,
+    &point_light_ubo,
+    &spot_light_ubo,
   };
 
   VkDescriptorSetAllocateInfo alloc_info{};
@@ -73,12 +75,73 @@ Renderer::generate_and_update_descriptor_write_sets(const Shader* shader)
   return allocated;
 }
 
+auto
+Renderer::generate_and_update_descriptor_write_sets(Material& material)
+  -> VkDescriptorSet
+{
+  static std::array<IShaderBindable*, 4> structure_identifiers = {
+    &renderer_ubo,
+    &shadow_ubo,
+    &point_light_ubo,
+    &spot_light_ubo,
+  };
+  const auto& shader = material.get_shader();
+
+  VkDescriptorSetAllocateInfo alloc_info{};
+  alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  const auto& layouts = shader->get_descriptor_set_layouts();
+  alloc_info.descriptorSetCount = static_cast<Core::u32>(layouts.size());
+  alloc_info.pSetLayouts = layouts.data();
+  auto allocated =
+    DescriptorResource::the().allocate_descriptor_set(alloc_info);
+
+  std::vector<VkWriteDescriptorSet> write_descriptor_sets;
+  write_descriptor_sets.reserve(structure_identifiers.size());
+  for (const auto& identifier : structure_identifiers) {
+    auto write = shader->get_descriptor_set(identifier->get_name(), 0);
+    if (!write) {
+      error("Failed to find descriptor set for identifier: {}",
+            identifier->get_name());
+      continue;
+    }
+
+    auto* buffer_info = &identifier->get_descriptor_info();
+    if (!buffer_info) {
+      error("Failed to find buffer info for identifier: {}",
+            identifier->get_name());
+      continue;
+    }
+
+    write_descriptor_sets.emplace_back(VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                                       nullptr,
+                                       allocated,
+                                       write->dstBinding,
+                                       0,
+                                       write->descriptorCount,
+                                       write->descriptorType,
+                                       nullptr,
+                                       buffer_info,
+                                       nullptr);
+  }
+
+  vkUpdateDescriptorSets(Device::the().device(),
+                         static_cast<Core::u32>(write_descriptor_sets.size()),
+                         write_descriptor_sets.data(),
+                         0,
+                         nullptr);
+
+  // Material specific writes now.
+  material.generate_and_update_descriptor_write_sets(allocated);
+
+  return allocated;
+}
+
 Renderer::Renderer(Configuration config, const Window* window)
   : size(window->get_swapchain().get_size())
 {
   Shader::initialise_compiler(Compilation::ShaderCompilerConfiguration{
-    .optimisation_level = 0,
-    .debug_information_level = Compilation::DebugInformationLevel::None,
+    .optimisation_level = 2,
+    .debug_information_level = Compilation::DebugInformationLevel::Full,
     .warnings_as_errors = false,
     .include_directories = { std::filesystem::path{ "shaders" } },
     .macro_definitions = {},
@@ -94,6 +157,7 @@ Renderer::Renderer(Configuration config, const Window* window)
   construct_main_geometry_pass(
     window, predepth_render_pass.framebuffer->get_depth_attachment());
   construct_shadow_pass(window, config.shadow_pass_size);
+  construct_deferred_pass(window, *main_geometry_render_pass.framebuffer);
 
   transform_buffers.resize(3);
   static constexpr auto total_size = 100 * 1000 * sizeof(TransformVertexData);
@@ -102,6 +166,16 @@ Renderer::Renderer(Configuration config, const Window* window)
     transform_buffer = Core::make_scope<Core::DataBuffer>(total_size);
     transform_buffer->fill_zero();
   }
+
+  Core::DataBuffer data_buffer{ sizeof(Core::u32) };
+  Core::u32 white_data{ 0x11111111 };
+  data_buffer.write(&white_data, sizeof(Core::u32), 0U);
+
+  white_texture = Image::load_from_memory(1, 1, data_buffer);
+
+  Core::u32 black_data{ 0 };
+  data_buffer.write(&black_data, sizeof(Core::u32), 0U);
+  black_texture = Image::load_from_memory(1, 1, data_buffer);
 }
 
 Renderer::~Renderer() = default;
@@ -109,9 +183,13 @@ Renderer::~Renderer() = default;
 auto
 Renderer::destruct() -> void
 {
+  white_texture->destroy();
+  black_texture->destroy();
+
   predepth_render_pass.destruct();
   main_geometry_render_pass.destruct();
   shadow_render_pass.destruct();
+  deferred_render_pass.destruct();
 
   command_buffer.reset();
 }
@@ -137,7 +215,7 @@ Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
 
   auto& [light_view, light_proj, light_view_proj, light_pos] =
     shadow_ubo.get_data();
-  auto projection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 0.1f, 20.0f);
+  auto projection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 0.1F, 20.0F);
   auto view_matrix = glm::lookAt(light_environment.sun_position,
                                  glm::vec3(0.0f),
                                  glm::vec3(0.0f, 1.0f, 0.0f));
@@ -146,15 +224,34 @@ Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
   light_view_proj = projection * view_matrix;
   light_pos = light_environment.sun_position;
   shadow_ubo.update();
+
+  [&, i = 0]() mutable {
+    auto& [count, lights] = point_light_ubo.get_data();
+    count = light_environment.point_lights.size();
+    for (const auto& light : light_environment.point_lights) {
+      lights[i++] = light;
+    }
+    point_light_ubo.update();
+  }();
+
+  [&, i = 0]() mutable {
+    auto& [count, lights] = spot_light_ubo.get_data();
+    count = light_environment.spot_lights.size();
+    for (const auto& light : light_environment.spot_lights) {
+      lights[i++] = light;
+    }
+    spot_light_ubo.update();
+  }();
 }
 
 auto
 Renderer::submit_static_mesh(const Graphics::VertexBuffer& vertex_buffer,
                              const Graphics::IndexBuffer& index_buffer,
+                             Graphics::Material& material,
                              const glm::mat4& transform,
                              const glm::vec4& tint) -> void
 {
-  CommandKey key{ &vertex_buffer, &index_buffer, 0 };
+  CommandKey key{ &vertex_buffer, &index_buffer, &material, 0 };
 
   auto& mesh_transform = mesh_transform_map[key].transforms.emplace_back();
   mesh_transform.transform_rows[0] = {
@@ -175,15 +272,13 @@ Renderer::submit_static_mesh(const Graphics::VertexBuffer& vertex_buffer,
     transform[2][2],
     transform[3][2],
   };
-  // We also instance the colour :)
-  mesh_transform.transform_rows[3] = tint;
 
   auto& command = draw_commands[key];
   command.vertex_buffer = &vertex_buffer;
   command.index_buffer = &index_buffer;
+  command.material = &material;
   command.submesh_index = 0;
   command.instance_count++;
-  // command.material = mesh->get_material(submesh);
 
   if (true /*mesh->casts_shadows()*/) {
     auto& shadow_command = shadow_draw_commands[key];
@@ -238,6 +333,8 @@ Renderer::flush_draw_lists() -> void
   shadow_pass();
   // Geometry pass
   main_geometry_pass();
+  // Deferred
+  deferred_pass();
 
   command_buffer->end();
   command_buffer->submit();

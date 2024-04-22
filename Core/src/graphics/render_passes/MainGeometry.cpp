@@ -28,9 +28,10 @@ Renderer::construct_main_geometry_pass(const Window* window,
   main_geometry_framebuffer =
     Core::make_scope<Framebuffer>(Framebuffer::Configuration{
       .size = window->get_swapchain().get_size(),
-      .colour_attachment_formats = { VK_FORMAT_R32G32B32A32_SFLOAT,
-                                     VK_FORMAT_R32G32B32A32_SFLOAT,
-                                     VK_FORMAT_R32G32B32A32_SFLOAT, },
+      .colour_attachment_formats = { VK_FORMAT_R32G32B32A32_SFLOAT, // position
+                                     VK_FORMAT_R32G32B32A32_SFLOAT, // normals
+                                     VK_FORMAT_R32G32B32A32_SFLOAT, // albedo + spec
+                                     },
       .sample_count = VK_SAMPLE_COUNT_4_BIT,
       .dependent_attachments = {predepth_attachment},
       .name = "MainGeometry",
@@ -42,9 +43,13 @@ Renderer::construct_main_geometry_pass(const Window* window,
       .framebuffer = main_geometry_framebuffer.get(),
       .shader = main_geometry_shader.get(),
       .sample_count = VK_SAMPLE_COUNT_4_BIT,
-      .cull_mode = VK_CULL_MODE_BACK_BIT,
-      .face_mode = VK_FRONT_FACE_COUNTER_CLOCKWISE,
     });
+  main_geometry_material = Core::make_scope<Material>(Material::Configuration{
+    .shader = main_geometry_shader.get(),
+  });
+
+  main_geometry_material->set(
+    "shadow_map", TextureType::Shadow, predepth_attachment);
 }
 
 auto
@@ -72,55 +77,40 @@ Renderer::main_geometry_pass() -> void
                     VK_PIPELINE_BIND_POINT_GRAPHICS,
                     main_geometry_pipeline->get_pipeline());
   auto descriptor_set =
-    generate_and_update_descriptor_write_sets(main_geometry_shader.get());
-
-  VkWriteDescriptorSet write_descriptor_set_image{};
-  write_descriptor_set_image.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  write_descriptor_set_image.dstSet = descriptor_set;
-  write_descriptor_set_image.dstBinding = 10;
-  write_descriptor_set_image.dstArrayElement = 0;
-  write_descriptor_set_image.descriptorType =
-    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  write_descriptor_set_image.descriptorCount = 1;
-  write_descriptor_set_image.pImageInfo =
-    &shadow_render_pass.framebuffer->get_depth_attachment()
-       ->get_descriptor_info();
-
-  vkUpdateDescriptorSets(
-    Device::the().device(), 1, &write_descriptor_set_image, 0, nullptr);
-
-  vkCmdBindDescriptorSets(command_buffer->get_command_buffer(),
-                          VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          main_geometry_pipeline->get_layout(),
-                          0,
-                          1,
-                          &descriptor_set,
-                          0,
-                          nullptr);
+    generate_and_update_descriptor_write_sets(*main_geometry_material);
 
   for (const auto& [key, command] : draw_commands) {
-    const auto& [vertex_buffer, index_buffer, submesh_index, instance_count] =
-      command;
-
-    auto vertex_buffers = std::array{ vertex_buffer->get_buffer() };
-    auto offsets = std::array<VkDeviceSize, 1>{ 0 };
-    vkCmdBindVertexBuffers(command_buffer->get_command_buffer(),
-                           0,
-                           1,
-                           vertex_buffers.data(),
-                           offsets.data());
-
+    const auto& [vertex_buffer,
+                 index_buffer,
+                 material,
+                 submesh_index,
+                 instance_count] = command;
     const auto& transform_vertex_buffer =
       transform_buffers.at(Core::Application::the().current_frame_index())
         .transform_buffer;
     auto offset = mesh_transform_map.at(key).offset;
+
+    if (material) {
+      material->set(
+        "normal_map",
+        Graphics::TextureType::Normal,
+        Graphics::Image::load_from_file("Assets/images/cube_normal.png"));
+      material->generate_and_update_descriptor_write_sets(descriptor_set);
+    }
+
+    RendererExtensions::bind_vertex_buffer(*command_buffer, *vertex_buffer, 0);
     RendererExtensions::bind_vertex_buffer(
       *command_buffer, *transform_vertex_buffer, 1, offset);
+    RendererExtensions::bind_index_buffer(*command_buffer, *index_buffer);
 
-    vkCmdBindIndexBuffer(command_buffer->get_command_buffer(),
-                         index_buffer->get_buffer(),
-                         0,
-                         VK_INDEX_TYPE_UINT32);
+    vkCmdBindDescriptorSets(command_buffer->get_command_buffer(),
+                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            main_geometry_pipeline->get_layout(),
+                            0,
+                            1,
+                            &descriptor_set,
+                            0,
+                            nullptr);
     vkCmdDrawIndexed(command_buffer->get_command_buffer(),
                      static_cast<Core::u32>(index_buffer->count()),
                      instance_count,

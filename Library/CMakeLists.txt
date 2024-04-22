@@ -42,3 +42,4 @@ function(add_spirv_cross)
 endfunction()
 
 add_spirv_cross()
+add_subdirectory(stb)

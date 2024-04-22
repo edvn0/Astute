@@ -203,8 +203,8 @@ Framebuffer::create_depth_attachment() -> void
     image->view = create_view(
       image->image, VK_FORMAT_D32_SFLOAT, VK_IMAGE_ASPECT_DEPTH_BIT);
     image->sampler = create_sampler(VK_FILTER_LINEAR,
-                                    VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                                    VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK);
+                                    VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+                                    VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE);
 
     auto& descriptor_info = image->descriptor_info;
     descriptor_info.imageLayout =

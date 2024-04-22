@@ -146,6 +146,12 @@ Application::current_frame_index() const -> u32
 }
 
 auto
+Application::get_image_count() const -> u32
+{
+  return window->get_swapchain().get_image_count();
+}
+
+auto
 Application::get_swapchain() const -> const Graphics::Swapchain&
 {
   return window->get_swapchain();

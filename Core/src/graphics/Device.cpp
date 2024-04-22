@@ -81,12 +81,13 @@ Device::is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface)
   if (!supported_features.samplerAnisotropy) {
     is_suitable = false;
   }
-
   if (!supported_features.logicOp) {
     is_suitable = false;
   }
-
   if (!supported_features.wideLines) {
+    is_suitable = false;
+  }
+  if (!supported_features.sampleRateShading) {
     is_suitable = false;
   }
 
@@ -185,6 +186,7 @@ Device::create_device(VkSurfaceKHR surface) -> void
   device_features.samplerAnisotropy = VK_TRUE;
   device_features.logicOp = VK_TRUE;
   device_features.wideLines = VK_TRUE;
+  device_features.sampleRateShading = VK_TRUE;
 
   VkDeviceCreateInfo create_info{};
   create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -234,8 +236,8 @@ Device::create_device(VkSurfaceKHR surface) -> void
 
 auto
 Device::execute_immediate(QueueType type,
-                          std::function<void(VkCommandBuffer)>&& command)
-  -> void
+                          std::function<void(VkCommandBuffer)>&& command,
+                          VkFence fence) -> void
 {
   vkResetCommandPool(device(),
                      type == QueueType::Compute ? compute_command_pool
@@ -265,20 +267,25 @@ Device::execute_immediate(QueueType type,
   submit_info.commandBufferCount = 1;
   submit_info.pCommandBuffers = &command_buffer;
 
-  VkFenceCreateInfo fence_create_info = {};
-  fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-  fence_create_info.flags = 0;
-  VkFence fence;
-
-  vkCreateFence(device(), &fence_create_info, nullptr, &fence);
+  VkFence to_use = fence;
+  if (!to_use) {
+    VkFenceCreateInfo fence_create_info = {};
+    fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fence_create_info.flags = 0;
+    VkFence fence;
+    vkCreateFence(device(), &fence_create_info, nullptr, &fence);
+    to_use = fence;
+  }
 
   // Submit to queue
   auto queue = get_queue(type);
-  vkQueueSubmit(queue, 1, &submit_info, fence);
+  vkQueueSubmit(queue, 1, &submit_info, to_use);
   static constexpr auto default_fence_timeout = 100000000000;
-  vkWaitForFences(device(), 1, &fence, VK_TRUE, default_fence_timeout);
+  vkWaitForFences(device(), 1, &to_use, VK_TRUE, default_fence_timeout);
 
-  vkDestroyFence(device(), fence, nullptr);
+  if (!to_use) {
+    vkDestroyFence(device(), to_use, nullptr);
+  }
   vkFreeCommandBuffers(
     device(), allocation_info.commandPool, 1, &command_buffer);
 }

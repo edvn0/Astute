@@ -25,7 +25,6 @@ struct Vertex
   glm::vec3 normals;
   glm::vec3 tangent;
   glm::vec3 bitangent;
-  glm::vec4 colour;
 
   constexpr auto operator<=>(const Vertex&) const = default;
 };
