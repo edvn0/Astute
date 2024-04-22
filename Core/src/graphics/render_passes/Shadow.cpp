@@ -42,6 +42,10 @@ Renderer::construct_shadow_pass(const Window* window,
         { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
       } },
     });
+
+  shadow_material = Core::make_scope<Material>(Material::Configuration{
+    .shader = shadow_shader.get(),
+  });
 }
 
 auto
@@ -68,7 +72,7 @@ Renderer::shadow_pass() -> void
                     VK_PIPELINE_BIND_POINT_GRAPHICS,
                     shadow_pipeline->get_pipeline());
   auto descriptor_set =
-    generate_and_update_descriptor_write_sets(shadow_shader.get());
+    generate_and_update_descriptor_write_sets(*shadow_material);
 
   vkCmdBindDescriptorSets(command_buffer->get_command_buffer(),
                           VK_PIPELINE_BIND_POINT_GRAPHICS,

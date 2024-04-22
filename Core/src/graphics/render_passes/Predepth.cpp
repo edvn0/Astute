@@ -41,6 +41,10 @@ Renderer::construct_predepth_pass(const Window* window) -> void
           { { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 } },
         },
     });
+
+  predepth_material = Core::make_scope<Material>(Material::Configuration{
+    .shader = predepth_shader.get(),
+  });
 }
 
 auto
@@ -67,7 +71,7 @@ Renderer::predepth_pass() -> void
                     VK_PIPELINE_BIND_POINT_GRAPHICS,
                     predepth_pipeline->get_pipeline());
   auto descriptor_set =
-    generate_and_update_descriptor_write_sets(predepth_shader.get());
+    generate_and_update_descriptor_write_sets(*predepth_material);
 
   vkCmdBindDescriptorSets(command_buffer->get_command_buffer(),
                           VK_PIPELINE_BIND_POINT_GRAPHICS,

@@ -55,7 +55,7 @@ Material::generate_and_update_descriptor_write_sets(VkDescriptorSet dst) -> void
   }
 
   std::vector<VkWriteDescriptorSet> values{};
-  for (auto& [index, write] : current_writes) {
+  for (const auto& [index, write] : current_writes) {
     values.push_back(write);
   }
 
@@ -64,16 +64,13 @@ Material::generate_and_update_descriptor_write_sets(VkDescriptorSet dst) -> void
                          values.data(),
                          0,
                          nullptr);
-
-  write_descriptors.clear();
 }
 
 auto
 Material::find_resource_by_name(const std::string_view name) const
   -> const Reflection::ShaderResourceDeclaration*
 {
-  const auto& declarations = shader->get_reflection_data().resources;
-  for (const auto& [key, value] : declarations) {
+  for (const auto& [key, value] : shader->get_reflection_data().resources) {
     if (key == name) {
       return &value;
     }

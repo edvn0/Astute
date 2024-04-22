@@ -149,11 +149,7 @@ private:
 
   auto flush_draw_lists() -> void;
 
-  auto generate_and_update_descriptor_write_sets(const Shader*)
-    -> VkDescriptorSet;
   auto generate_and_update_descriptor_write_sets(Material&) -> VkDescriptorSet;
-  auto get_buffer_info(const std::string_view) const
-    -> const VkDescriptorBufferInfo*;
 
   // UBOs
   UniformBufferObject<RendererUBO> renderer_ubo{};

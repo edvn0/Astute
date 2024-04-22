@@ -58,7 +58,7 @@ Renderer::construct_deferred_pass(const Window* window,
   deferred_material->set(
     "gNormalMap", TextureType::Normal, framebuffer.get_colour_attachment(1));
   deferred_material->set("gAlbedoSpecMap",
-                         TextureType::Position,
+                         TextureType::Albedo,
                          framebuffer.get_colour_attachment(2));
 
   fb = &framebuffer;
@@ -89,52 +89,7 @@ Renderer::deferred_pass() -> void
                     deferred_pipeline->get_pipeline());
 
   auto descriptor_set =
-    generate_and_update_descriptor_write_sets(deferred_shader.get());
-
-  VkWriteDescriptorSet write_descriptor_set_position{};
-  write_descriptor_set_position.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  write_descriptor_set_position.dstSet = descriptor_set;
-  write_descriptor_set_position.dstBinding = 10;
-  write_descriptor_set_position.dstArrayElement = 0;
-  write_descriptor_set_position.descriptorType =
-    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  write_descriptor_set_position.descriptorCount = 1;
-  write_descriptor_set_position.pImageInfo =
-    &fb->get_colour_attachment(0)->get_descriptor_info();
-
-  VkWriteDescriptorSet write_descriptor_set_normals{};
-  write_descriptor_set_normals.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  write_descriptor_set_normals.dstSet = descriptor_set;
-  write_descriptor_set_normals.dstBinding = 11;
-  write_descriptor_set_normals.dstArrayElement = 0;
-  write_descriptor_set_normals.descriptorType =
-    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  write_descriptor_set_normals.descriptorCount = 1;
-  write_descriptor_set_normals.pImageInfo =
-    &fb->get_colour_attachment(1)->get_descriptor_info();
-
-  VkWriteDescriptorSet write_descriptor_set_colour{};
-  write_descriptor_set_colour.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  write_descriptor_set_colour.dstSet = descriptor_set;
-  write_descriptor_set_colour.dstBinding = 12;
-  write_descriptor_set_colour.dstArrayElement = 0;
-  write_descriptor_set_colour.descriptorType =
-    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  write_descriptor_set_colour.descriptorCount = 1;
-  write_descriptor_set_colour.pImageInfo =
-    &fb->get_colour_attachment(2)->get_descriptor_info();
-
-  std::array write_sets = {
-    write_descriptor_set_position,
-    write_descriptor_set_normals,
-    write_descriptor_set_colour,
-  };
-
-  vkUpdateDescriptorSets(Device::the().device(),
-                         static_cast<Core::u32>(write_sets.size()),
-                         write_sets.data(),
-                         0,
-                         nullptr);
+    generate_and_update_descriptor_write_sets(*deferred_material);
 
   vkCmdBindDescriptorSets(command_buffer->get_command_buffer(),
                           VK_PIPELINE_BIND_POINT_GRAPHICS,

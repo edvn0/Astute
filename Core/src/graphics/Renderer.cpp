@@ -19,63 +19,6 @@
 namespace Engine::Graphics {
 
 auto
-Renderer::generate_and_update_descriptor_write_sets(const Shader* shader)
-  -> VkDescriptorSet
-{
-  static std::array<IShaderBindable*, 4> structure_identifiers = {
-    &renderer_ubo,
-    &shadow_ubo,
-    &point_light_ubo,
-    &spot_light_ubo,
-  };
-
-  VkDescriptorSetAllocateInfo alloc_info{};
-  alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-  const auto& layouts = shader->get_descriptor_set_layouts();
-  alloc_info.descriptorSetCount = static_cast<Core::u32>(layouts.size());
-  alloc_info.pSetLayouts = layouts.data();
-  auto allocated =
-    DescriptorResource::the().allocate_descriptor_set(alloc_info);
-
-  std::vector<VkWriteDescriptorSet> write_descriptor_sets;
-  write_descriptor_sets.reserve(structure_identifiers.size());
-  for (const auto& identifier : structure_identifiers) {
-    auto write = shader->get_descriptor_set(identifier->get_name(), 0);
-    if (!write) {
-      error("Failed to find descriptor set for identifier: {}",
-            identifier->get_name());
-      continue;
-    }
-
-    auto* buffer_info = &identifier->get_descriptor_info();
-    if (!buffer_info) {
-      error("Failed to find buffer info for identifier: {}",
-            identifier->get_name());
-      continue;
-    }
-
-    write_descriptor_sets.emplace_back(VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                                       nullptr,
-                                       allocated,
-                                       write->dstBinding,
-                                       0,
-                                       write->descriptorCount,
-                                       write->descriptorType,
-                                       nullptr,
-                                       buffer_info,
-                                       nullptr);
-  }
-
-  vkUpdateDescriptorSets(Device::the().device(),
-                         static_cast<Core::u32>(write_descriptor_sets.size()),
-                         write_descriptor_sets.data(),
-                         0,
-                         nullptr);
-
-  return allocated;
-}
-
-auto
 Renderer::generate_and_update_descriptor_write_sets(Material& material)
   -> VkDescriptorSet
 {
@@ -87,6 +30,39 @@ Renderer::generate_and_update_descriptor_write_sets(Material& material)
   };
   const auto& shader = material.get_shader();
 
+  static std::unordered_map<Core::usize, std::vector<VkWriteDescriptorSet>>
+    shader_write_cache{};
+
+  std::vector<VkWriteDescriptorSet>& write_descriptor_sets =
+    shader_write_cache[shader->hash()];
+  if (write_descriptor_sets.empty()) {
+    write_descriptor_sets.reserve(structure_identifiers.size());
+    for (const auto& identifier : structure_identifiers) {
+      auto write = shader->get_descriptor_set(identifier->get_name(), 0);
+      if (!write) {
+        error("Failed to find descriptor set for identifier: {}",
+              identifier->get_name());
+        continue;
+      }
+
+      auto* buffer_info = &identifier->get_descriptor_info();
+      if (!buffer_info) {
+        error("Failed to find buffer info for identifier: {}",
+              identifier->get_name());
+        continue;
+      }
+
+      VkWriteDescriptorSet descriptor_write{};
+      descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      descriptor_write.dstBinding = write->dstBinding;
+      descriptor_write.dstArrayElement = 0;
+      descriptor_write.descriptorType = write->descriptorType;
+      descriptor_write.descriptorCount = 1;
+      descriptor_write.pBufferInfo = buffer_info;
+      write_descriptor_sets.push_back(descriptor_write);
+    }
+  }
+
   VkDescriptorSetAllocateInfo alloc_info{};
   alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
   const auto& layouts = shader->get_descriptor_set_layouts();
@@ -95,33 +71,8 @@ Renderer::generate_and_update_descriptor_write_sets(Material& material)
   auto allocated =
     DescriptorResource::the().allocate_descriptor_set(alloc_info);
 
-  std::vector<VkWriteDescriptorSet> write_descriptor_sets;
-  write_descriptor_sets.reserve(structure_identifiers.size());
-  for (const auto& identifier : structure_identifiers) {
-    auto write = shader->get_descriptor_set(identifier->get_name(), 0);
-    if (!write) {
-      error("Failed to find descriptor set for identifier: {}",
-            identifier->get_name());
-      continue;
-    }
-
-    auto* buffer_info = &identifier->get_descriptor_info();
-    if (!buffer_info) {
-      error("Failed to find buffer info for identifier: {}",
-            identifier->get_name());
-      continue;
-    }
-
-    write_descriptor_sets.emplace_back(VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                                       nullptr,
-                                       allocated,
-                                       write->dstBinding,
-                                       0,
-                                       write->descriptorCount,
-                                       write->descriptorType,
-                                       nullptr,
-                                       buffer_info,
-                                       nullptr);
+  for (auto& wds : write_descriptor_sets) {
+    wds.dstSet = allocated;
   }
 
   vkUpdateDescriptorSets(Device::the().device(),
