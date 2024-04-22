@@ -38,6 +38,9 @@ Renderer::construct_shadow_pass(const Window* window,
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
       .framebuffer = shadow_framebuffer.get(),
       .shader = shadow_shader.get(),
+      .override_vertex_attributes = { {
+        { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
+      } },
     });
 }
 

@@ -18,6 +18,7 @@ enum class TextureType : Core::u8
   Albedo,
   Roughness,
   Shadow,
+  Position,
 };
 
 class Material

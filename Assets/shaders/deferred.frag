@@ -4,9 +4,9 @@
 
 layout(location = 0) in vec2 input_uvs;
 
-layout(set = 0, binding = 10) uniform sampler2D gPosition;
-layout(set = 0, binding = 11) uniform sampler2D gNormal;
-layout(set = 0, binding = 12) uniform sampler2D gAlbedoSpec;
+layout(set = 0, binding = 10) uniform sampler2D gPositionMap;
+layout(set = 0, binding = 11) uniform sampler2D gNormalMap;
+layout(set = 0, binding = 12) uniform sampler2D gAlbedoSpecMap;
 
 layout(location = 0) out vec4 FragColor;
 
@@ -120,9 +120,9 @@ void
 main()
 {
   // retrieve data from G-buffer
-  vec3 FragPos = texture(gPosition, input_uvs).rgb;
-  vec3 Normal = texture(gNormal, input_uvs).rgb;
-  vec4 AlbedoSpecular = texture(gAlbedoSpec, input_uvs);
+  vec3 FragPos = texture(gPositionMap, input_uvs).rgb;
+  vec3 Normal = texture(gNormalMap, input_uvs).rgb;
+  vec4 AlbedoSpecular = texture(gAlbedoSpecMap, input_uvs);
   vec3 Albedo = AlbedoSpecular.rgb;
   float Specular = AlbedoSpecular.a;
 

@@ -9,9 +9,9 @@
 namespace Engine::Graphics {
 
 auto
-generate_attributes() -> std::vector<VkVertexInputAttributeDescription>
+generate_vertex_attributes() -> std::vector<VkVertexInputAttributeDescription>
 {
-  std::vector<VkVertexInputAttributeDescription> attributes(8);
+  std::vector<VkVertexInputAttributeDescription> attributes(5);
   attributes[0].binding = 0;
   attributes[0].location = 0;
   attributes[0].format = VK_FORMAT_R32G32B32_SFLOAT;
@@ -37,20 +37,28 @@ generate_attributes() -> std::vector<VkVertexInputAttributeDescription>
   attributes[4].format = VK_FORMAT_R32G32B32_SFLOAT;
   attributes[4].offset = offsetof(Vertex, bitangent);
 
-  attributes[5].binding = 1;
-  attributes[5].location = 5;
-  attributes[5].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-  attributes[5].offset = 0;
+  return attributes;
+}
 
-  attributes[6].binding = 1;
-  attributes[6].location = 6;
-  attributes[6].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-  attributes[6].offset = sizeof(glm::vec4);
+auto
+generate_instance_attributes() -> std::vector<VkVertexInputAttributeDescription>
+{
+  std::vector<VkVertexInputAttributeDescription> attributes(3);
 
-  attributes[7].binding = 1;
-  attributes[7].location = 7;
-  attributes[7].format = VK_FORMAT_R32G32B32A32_SFLOAT;
-  attributes[7].offset = 2 * sizeof(glm::vec4);
+  attributes[0].binding = 1;
+  attributes[0].location = 5;
+  attributes[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+  attributes[0].offset = 0;
+
+  attributes[1].binding = 1;
+  attributes[1].location = 6;
+  attributes[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+  attributes[1].offset = sizeof(glm::vec4);
+
+  attributes[2].binding = 1;
+  attributes[2].location = 7;
+  attributes[2].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+  attributes[2].offset = 2 * sizeof(glm::vec4);
 
   return attributes;
 }

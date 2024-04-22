@@ -12,11 +12,15 @@
 
 namespace Engine::Graphics {
 
-GraphicsPipeline::GraphicsPipeline(Configuration config)
+GraphicsPipeline::GraphicsPipeline(const Configuration& config)
   : sample_count(config.sample_count)
+  , override_vertex_attributes(config.override_vertex_attributes)
+  , override_instance_attributes(config.override_instance_attributes)
   , framebuffer(config.framebuffer)
   , shader(config.shader)
 {
+  info("Creating graphics pipeline for framebuffer: {}",
+       framebuffer->get_name());
   create_layout();
   create_pipeline();
 }
@@ -84,24 +88,41 @@ GraphicsPipeline::create_pipeline() -> void
   vertex_input_info.sType =
     VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
-  std::array<VkVertexInputBindingDescription, 2> binding_descriptions = {};
-  binding_descriptions[0].binding = 0;
-  binding_descriptions[0].stride = sizeof(Vertex);
-  binding_descriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+  std::vector<VkVertexInputBindingDescription> binding_descriptions;
+  auto& vertex_binding = binding_descriptions.emplace_back();
+  vertex_binding.binding = 0;
+  vertex_binding.stride = sizeof(Vertex);
+  vertex_binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-  binding_descriptions[1].binding = 1;
-  binding_descriptions[1].stride = 3 * sizeof(glm::vec4);
-  binding_descriptions[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+  auto attributes = generate_vertex_attributes();
+  if (override_vertex_attributes.has_value()) {
+    attributes = override_vertex_attributes.value();
+  }
 
+  auto instance_attributes = generate_instance_attributes();
+  if (override_instance_attributes.has_value()) {
+    instance_attributes = override_instance_attributes.value();
+  } else {
+    auto& instance_binding = binding_descriptions.emplace_back();
+    instance_binding.binding = 1;
+    instance_binding.stride = 3 * sizeof(glm::vec4);
+    instance_binding.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+  }
+
+  std::vector<VkVertexInputAttributeDescription> all_attributes;
+  all_attributes.insert(
+    all_attributes.end(), attributes.begin(), attributes.end());
+  all_attributes.insert(all_attributes.end(),
+                        instance_attributes.begin(),
+                        instance_attributes.end());
+
+  vertex_input_info.vertexAttributeDescriptionCount =
+    static_cast<Core::u32>(all_attributes.size());
+  vertex_input_info.pVertexAttributeDescriptions = all_attributes.data();
+  pipeline_info.pVertexInputState = &vertex_input_info;
   vertex_input_info.vertexBindingDescriptionCount =
     static_cast<Core::u32>(binding_descriptions.size());
   vertex_input_info.pVertexBindingDescriptions = binding_descriptions.data();
-
-  auto attributes = generate_attributes();
-  vertex_input_info.vertexAttributeDescriptionCount =
-    static_cast<Core::u32>(attributes.size());
-  vertex_input_info.pVertexAttributeDescriptions = attributes.data();
-  pipeline_info.pVertexInputState = &vertex_input_info;
 
   VkPipelineInputAssemblyStateCreateInfo input_assembly_info{};
   input_assembly_info.sType =

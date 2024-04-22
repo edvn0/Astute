@@ -36,6 +36,10 @@ Renderer::construct_predepth_pass(const Window* window) -> void
       .framebuffer = predepth_framebuffer.get(),
       .shader = predepth_shader.get(),
       .sample_count = VK_SAMPLE_COUNT_4_BIT,
+      .override_vertex_attributes =
+        {
+          { { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 } },
+        },
     });
 }
 

@@ -942,7 +942,7 @@ Image::load_from_memory(Core::u32 width,
   vkCreateFence(Device::the().device(), &fence_info, nullptr, &fence);
 
   Device::the().execute_immediate(
-    [&](auto* cmd_buffer) {
+    [width, height, &staging_buffer, &image](auto* cmd_buffer) {
       transition_image_layout(cmd_buffer,
                               image->image,
                               VK_IMAGE_LAYOUT_UNDEFINED,
@@ -961,8 +961,8 @@ Image::load_from_memory(Core::u32 width,
         0,
       };
       region.imageExtent = {
-        static_cast<Core::u32>(width),
-        static_cast<Core::u32>(height),
+        width,
+        height,
         1,
       };
 

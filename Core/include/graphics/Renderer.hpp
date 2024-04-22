@@ -102,8 +102,9 @@ public:
 
   auto get_output_image(Core::u32 attachment = 0) const -> const Image*
   {
-    return main_geometry_render_pass.framebuffer->get_colour_attachment(
-      attachment);
+    return main_geometry_render_pass.framebuffer
+      ->get_colour_attachment(attachment)
+      .get();
   }
   auto get_shadow_output_image() const -> const Image*
   {
@@ -111,7 +112,7 @@ public:
   }
   auto get_final_output() const -> const Image*
   {
-    return deferred_render_pass.framebuffer->get_colour_attachment(0);
+    return deferred_render_pass.framebuffer->get_colour_attachment(0).get();
   }
 
   auto on_resize(const Core::Extent&) -> void;

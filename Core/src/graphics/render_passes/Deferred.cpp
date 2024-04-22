@@ -41,7 +41,25 @@ Renderer::construct_deferred_pass(const Window* window,
       .framebuffer = deferred_framebuffer.get(),
       .shader = deferred_shader.get(),
       .sample_count = VK_SAMPLE_COUNT_4_BIT,
+      .override_vertex_attributes = {
+          {  },
+        },
+      .override_instance_attributes = {
+          {  },
+        },
     });
+
+  deferred_material = Core::make_scope<Material>(Material::Configuration{
+    .shader = deferred_shader.get(),
+  });
+  deferred_material->set("gPositionMap",
+                         TextureType::Position,
+                         framebuffer.get_colour_attachment(0));
+  deferred_material->set(
+    "gNormalMap", TextureType::Normal, framebuffer.get_colour_attachment(1));
+  deferred_material->set("gAlbedoSpecMap",
+                         TextureType::Position,
+                         framebuffer.get_colour_attachment(2));
 
   fb = &framebuffer;
 }

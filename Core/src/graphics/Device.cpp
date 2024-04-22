@@ -239,10 +239,6 @@ Device::execute_immediate(QueueType type,
                           std::function<void(VkCommandBuffer)>&& command,
                           VkFence fence) -> void
 {
-  vkResetCommandPool(device(),
-                     type == QueueType::Compute ? compute_command_pool
-                                                : graphics_command_pool,
-                     0);
   VkCommandBuffer command_buffer;
 
   VkCommandBufferAllocateInfo allocation_info = {};
@@ -268,13 +264,13 @@ Device::execute_immediate(QueueType type,
   submit_info.pCommandBuffers = &command_buffer;
 
   VkFence to_use = fence;
-  if (!to_use) {
+  if (to_use == nullptr) {
     VkFenceCreateInfo fence_create_info = {};
     fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fence_create_info.flags = 0;
-    VkFence fence;
-    vkCreateFence(device(), &fence_create_info, nullptr, &fence);
-    to_use = fence;
+    VkFence temp;
+    vkCreateFence(device(), &fence_create_info, nullptr, &temp);
+    to_use = temp;
   }
 
   // Submit to queue
@@ -288,6 +284,11 @@ Device::execute_immediate(QueueType type,
   }
   vkFreeCommandBuffers(
     device(), allocation_info.commandPool, 1, &command_buffer);
+
+  vkResetCommandPool(device(),
+                     type == QueueType::Compute ? compute_command_pool
+                                                : graphics_command_pool,
+                     0);
 }
 
 auto

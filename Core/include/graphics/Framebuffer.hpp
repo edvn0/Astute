@@ -24,13 +24,13 @@ public:
 
   ~Framebuffer();
 
-  auto get_colour_attachment(Core::u32 index) const -> const Image*
+  auto get_colour_attachment(Core::u32 index) const -> const Core::Ref<Image>&
   {
     if (is_msaa()) {
       auto actual = 2 * index + 1;
-      return colour_attachments[actual].get();
+      return colour_attachments[actual];
     }
-    return colour_attachments[index].get();
+    return colour_attachments[index];
   }
   auto get_colour_attachment_count() const -> Core::u32
   {
@@ -59,6 +59,8 @@ public:
     -> std::vector<VkPipelineColorBlendAttachmentState>;
 
   auto on_resize(const Core::Extent&) -> void;
+
+  auto get_name() const -> const std::string& { return name; }
 
 private:
   Core::Extent size;

@@ -225,23 +225,20 @@ Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
   light_pos = light_environment.sun_position;
   shadow_ubo.update();
 
-  [&, i = 0]() mutable {
-    auto& [count, lights] = point_light_ubo.get_data();
-    count = light_environment.point_lights.size();
-    for (const auto& light : light_environment.point_lights) {
-      lights[i++] = light;
+  static constexpr auto update_lights = []<class Light>(Light& light_ubo,
+                                                        auto& env_lights) {
+    auto i = 0ULL;
+    auto& [count, lights] = light_ubo.get_data();
+    count = static_cast<Core::i32>(env_lights.size());
+    for (const auto& light : env_lights) {
+      lights.at(i) = light;
+      i++;
     }
-    point_light_ubo.update();
-  }();
+    light_ubo.update();
+  };
 
-  [&, i = 0]() mutable {
-    auto& [count, lights] = spot_light_ubo.get_data();
-    count = light_environment.spot_lights.size();
-    for (const auto& light : light_environment.spot_lights) {
-      lights[i++] = light;
-    }
-    spot_light_ubo.update();
-  }();
+  update_lights(point_light_ubo, light_environment.point_lights);
+  update_lights(spot_light_ubo, light_environment.spot_lights);
 }
 
 auto

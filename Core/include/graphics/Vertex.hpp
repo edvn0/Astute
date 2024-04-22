@@ -16,7 +16,10 @@ struct std::hash<Engine::Graphics::Vertex>
 namespace Engine::Graphics {
 
 auto
-generate_attributes() -> std::vector<VkVertexInputAttributeDescription>;
+generate_vertex_attributes() -> std::vector<VkVertexInputAttributeDescription>;
+auto
+generate_instance_attributes()
+  -> std::vector<VkVertexInputAttributeDescription>;
 
 struct Vertex
 {
