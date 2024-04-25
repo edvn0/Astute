@@ -9,6 +9,7 @@
 #include "graphics/GPUBuffer.hpp"
 #include "graphics/GraphicsPipeline.hpp"
 #include "graphics/Material.hpp"
+#include "graphics/RenderPass.hpp"
 #include "graphics/Shader.hpp"
 
 #include "graphics/ShaderBuffers.hpp"
@@ -135,7 +136,7 @@ public:
   }
 
   auto get_size() const -> const Core::Extent& { return size; }
-  auto get_render_pass(std::string_view name) -> RenderPass&
+  auto get_render_pass(const std::string& name) -> RenderPass&
   {
     return *render_passes.at(name);
   }
@@ -178,6 +179,12 @@ private:
 
   static inline Core::Ref<Image> white_texture;
   static inline Core::Ref<Image> black_texture;
+
+  friend class RenderPass;
+  friend class DeferredRenderPass;
+  friend class MainGeometryRenderPass;
+  friend class PreDepthRenderPass;
+  friend class ShadowRenderPass;
 };
 
 }

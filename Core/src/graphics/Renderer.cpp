@@ -13,10 +13,22 @@
 
 #include "graphics/RendererExtensions.hpp"
 
+#include "graphics/render_passes/Deferred.hpp"
+#include "graphics/render_passes/MainGeometry.hpp"
+#include "graphics/render_passes/PreDepth.hpp"
+#include "graphics/render_passes/Shadow.hpp"
+
 #include <ranges>
 #include <span>
 
 namespace Engine::Graphics {
+
+static const std::array<std::string, 4> render_pass_order{
+  "PreDepth",
+  "Shadow",
+  "MainGeometry",
+  "Deferred",
+};
 
 auto
 Renderer::generate_and_update_descriptor_write_sets(Material& material)
@@ -105,11 +117,15 @@ Renderer::Renderer(Configuration config, const Window* window)
     .primary = true,
   });
 
-  construct_predepth_pass(window);
-  construct_main_geometry_pass(
-    window, predepth_render_pass.framebuffer->get_depth_attachment());
-  construct_shadow_pass(window, config.shadow_pass_size);
-  construct_deferred_pass(window, *main_geometry_render_pass.framebuffer);
+  render_passes["MainGeometry"] = Core::make_scope<MainGeometryRenderPass>();
+  render_passes["Shadow"] =
+    Core::make_scope<ShadowRenderPass>(config.shadow_pass_size);
+  render_passes["Deferred"] = Core::make_scope<DeferredRenderPass>();
+  render_passes["PreDepth"] = Core::make_scope<PreDepthRenderPass>();
+
+  for (const auto& k : render_pass_order) {
+    render_passes.at(k)->construct(*this);
+  }
 
   transform_buffers.resize(3);
   static constexpr auto total_size = 100 * 1000 * sizeof(TransformVertexData);
@@ -138,10 +154,9 @@ Renderer::destruct() -> void
   white_texture->destroy();
   black_texture->destroy();
 
-  predepth_render_pass.destruct();
-  main_geometry_render_pass.destruct();
-  shadow_render_pass.destruct();
-  deferred_render_pass.destruct();
+  for (auto& [k, v] : render_passes) {
+    v->destruct();
+  }
 
   command_buffer.reset();
 }
@@ -151,32 +166,9 @@ Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
   -> void
 {
   if (old_size != size) {
+    auto& shadow_render_pass = get_render_pass("Shadow");
     // We've been resized.
-    shadow_render_pass.on_resize(size);
-    /*  predepth_render_pass.on_resize(size);
-
-      main_geometry_render_pass.on_resize(size);
-      main_geometry_render_pass.update_dependent_attachment(
-        0, predepth_render_pass.framebuffer->get_depth_attachment());
-      main_geometry_render_pass.material->set(
-        "shadow_map",
-        TextureType::Shadow,
-        shadow_render_pass.framebuffer->get_depth_attachment());
-
-      deferred_render_pass.on_resize(size);
-      deferred_render_pass.material->set(
-        "gPositionMap",
-        TextureType::Position,
-        main_geometry_render_pass.framebuffer->get_colour_attachment(0));
-      deferred_render_pass.material->set(
-        "gNormalMap",
-        TextureType::Normal,
-        main_geometry_render_pass.framebuffer->get_colour_attachment(1));
-      deferred_render_pass.material->set(
-        "gAlbedoSpecMap",
-        TextureType::Albedo,
-        main_geometry_render_pass.framebuffer->get_colour_attachment(2));
-  */
+    shadow_render_pass.on_resize(*this, size);
     old_size = size;
   }
 
@@ -305,13 +297,13 @@ Renderer::flush_draw_lists() -> void
   command_buffer->begin();
 
   // Predepth pass
-  predepth_pass();
+  render_passes.at("PreDepth")->execute(*this, *command_buffer);
   // Shadow pass
-  shadow_pass();
+  render_passes.at("Shadow")->execute(*this, *command_buffer);
   // Geometry pass
-  main_geometry_pass();
+  render_passes.at("MainGeometry")->execute(*this, *command_buffer);
   // Deferred
-  deferred_pass();
+  render_passes.at("Deferred")->execute(*this, *command_buffer);
 
   command_buffer->end();
   command_buffer->submit();

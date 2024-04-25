@@ -4,10 +4,10 @@
 
 namespace Engine::Graphics {
 
-class DeferredRenderPass final : public RenderPass
+class MainGeometryRenderPass final : public RenderPass
 {
 public:
-  ~DeferredRenderPass() override = default;
+  ~MainGeometryRenderPass() override = default;
   auto construct(Renderer&) -> void override;
   auto on_resize(Renderer&, const Core::Extent&) -> void override {}
 

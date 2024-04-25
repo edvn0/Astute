@@ -14,28 +14,30 @@
 
 #include "graphics/RendererExtensions.hpp"
 
+#include "graphics/render_passes/MainGeometry.hpp"
+
 namespace Engine::Graphics {
 
 static Core::Ref<Image> normal_map;
 
 auto
-Renderer::construct_main_geometry_pass(const Window* window,
-                                       Core::Ref<Image> predepth_attachment)
-  -> void
+MainGeometryRenderPass::construct(Renderer& renderer) -> void
 {
-  auto& [main_geometry_framebuffer,
-         main_geometry_shader,
-         main_geometry_pipeline,
-         main_geometry_material] = main_geometry_render_pass;
+  auto&& [main_geometry_framebuffer,
+          main_geometry_shader,
+          main_geometry_pipeline,
+          main_geometry_material] = get_data();
   main_geometry_framebuffer =
     Core::make_scope<Framebuffer>(Framebuffer::Configuration{
-      .size = window->get_swapchain().get_size(),
+      .size = renderer.get_size(),
       .colour_attachment_formats = { VK_FORMAT_R32G32B32A32_SFLOAT, // position
                                      VK_FORMAT_R32G32B32A32_SFLOAT, // normals
                                      VK_FORMAT_R32G32B32A32_SFLOAT, // albedo + spec
                                      },
       .sample_count = VK_SAMPLE_COUNT_4_BIT,
-      .dependent_attachments = {predepth_attachment},
+      .dependent_attachments = {
+        renderer.get_render_pass("PreDepth").get_depth_attachment(),
+      },
       .name = "MainGeometry",
     });
   main_geometry_shader = Shader::compile_graphics_scoped(
@@ -51,60 +53,48 @@ Renderer::construct_main_geometry_pass(const Window* window,
   });
 
   main_geometry_material->set(
-    "shadow_map", TextureType::Shadow, predepth_attachment);
+    "shadow_map",
+    TextureType::Shadow,
+    renderer.get_render_pass("Shadow").get_depth_attachment());
 
   normal_map = Graphics::Image::load_from_file("Assets/images/cube_normal.png");
 }
 
 auto
-Renderer::main_geometry_pass() -> void
+MainGeometryRenderPass::execute_impl(Renderer& renderer,
+                                     CommandBuffer& command_buffer) -> void
 {
-  const auto& [main_geometry_framebuffer,
-               main_geometry_shader,
-               main_geometry_pipeline,
-               main_geometry_material] = main_geometry_render_pass;
-  VkRenderPassBeginInfo render_pass_info{};
-  render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-  render_pass_info.renderPass = main_geometry_framebuffer->get_renderpass();
-  render_pass_info.framebuffer = main_geometry_framebuffer->get_framebuffer();
-  render_pass_info.renderArea.offset = { 0, 0 };
-  render_pass_info.renderArea.extent = main_geometry_framebuffer->get_extent();
-  const auto& clear_values = main_geometry_framebuffer->get_clear_values();
-  render_pass_info.clearValueCount =
-    static_cast<Core::u32>(clear_values.size());
-  render_pass_info.pClearValues = clear_values.data();
+  const auto&& [main_geometry_framebuffer,
+                main_geometry_shader,
+                main_geometry_pipeline,
+                main_geometry_material] = get_data();
 
-  RendererExtensions::begin_renderpass(*command_buffer,
-                                       *main_geometry_framebuffer);
+  auto descriptor_set = generate_and_update_descriptor_write_sets(
+    renderer, *main_geometry_material);
 
-  vkCmdBindPipeline(command_buffer->get_command_buffer(),
-                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    main_geometry_pipeline->get_pipeline());
-  auto descriptor_set =
-    generate_and_update_descriptor_write_sets(*main_geometry_material);
-
-  for (const auto& [key, command] : draw_commands) {
+  for (const auto& [key, command] : renderer.draw_commands) {
     const auto& [vertex_buffer,
                  index_buffer,
                  material,
                  submesh_index,
                  instance_count] = command;
     const auto& transform_vertex_buffer =
-      transform_buffers.at(Core::Application::the().current_frame_index())
+      renderer.transform_buffers
+        .at(Core::Application::the().current_frame_index())
         .transform_buffer;
-    auto offset = mesh_transform_map.at(key).offset;
+    auto offset = renderer.mesh_transform_map.at(key).offset;
 
     if (material) {
       material->set("normal_map", Graphics::TextureType::Normal, normal_map);
       material->generate_and_update_descriptor_write_sets(descriptor_set);
     }
 
-    RendererExtensions::bind_vertex_buffer(*command_buffer, *vertex_buffer, 0);
+    RendererExtensions::bind_vertex_buffer(command_buffer, *vertex_buffer, 0);
     RendererExtensions::bind_vertex_buffer(
-      *command_buffer, *transform_vertex_buffer, 1, offset);
-    RendererExtensions::bind_index_buffer(*command_buffer, *index_buffer);
+      command_buffer, *transform_vertex_buffer, 1, offset);
+    RendererExtensions::bind_index_buffer(command_buffer, *index_buffer);
 
-    vkCmdBindDescriptorSets(command_buffer->get_command_buffer(),
+    vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
                             VK_PIPELINE_BIND_POINT_GRAPHICS,
                             main_geometry_pipeline->get_layout(),
                             0,
@@ -112,15 +102,19 @@ Renderer::main_geometry_pass() -> void
                             &descriptor_set,
                             0,
                             nullptr);
-    vkCmdDrawIndexed(command_buffer->get_command_buffer(),
+    vkCmdDrawIndexed(command_buffer.get_command_buffer(),
                      static_cast<Core::u32>(index_buffer->count()),
                      instance_count,
                      0,
                      0,
                      0);
   }
+}
 
-  RendererExtensions::end_renderpass(*command_buffer);
+auto
+MainGeometryRenderPass::destruct_impl() -> void
+{
+  normal_map.reset();
 }
 
 } // namespace Engine::Graphics

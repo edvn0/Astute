@@ -55,45 +55,31 @@ DeferredRenderPass::construct(Renderer& renderer) -> void
     .shader = deferred_shader.get(),
   });
 
-  auto& input_framebuffer = renderer.get_framebuffer("MainGeometry");
+  auto& input_render_pass = renderer.get_render_pass("MainGeometry");
   deferred_material->set("gPositionMap",
                          TextureType::Position,
-                         input_framebuffer.get_colour_attachment(0));
-  deferred_material->set(
-    "gNormalMap", TextureType::Normal, input_framebuffer.get_colour_attachment(1));
+                         input_render_pass.get_colour_attachment(0));
+  deferred_material->set("gNormalMap",
+                         TextureType::Normal,
+                         input_render_pass.get_colour_attachment(1));
   deferred_material->set("gAlbedoSpecMap",
                          TextureType::Albedo,
-                         input_framebuffer.get_colour_attachment(2));
+                         input_render_pass.get_colour_attachment(2));
 }
 
 auto
-Renderer::deferred_pass() -> void
+DeferredRenderPass::execute_impl(Renderer& renderer,
+                                 CommandBuffer& command_buffer) -> void
 {
-  const auto& [deferred_framebuffer,
-               deferred_shader,
-               deferred_pipeline,
-               deferred_material] = deferred_render_pass;
-  VkRenderPassBeginInfo render_pass_info{};
-  render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-  render_pass_info.renderPass = deferred_framebuffer->get_renderpass();
-  render_pass_info.framebuffer = deferred_framebuffer->get_framebuffer();
-  render_pass_info.renderArea.offset = { 0, 0 };
-  render_pass_info.renderArea.extent = deferred_framebuffer->get_extent();
-  const auto& clear_values = deferred_framebuffer->get_clear_values();
-  render_pass_info.clearValueCount =
-    static_cast<Core::u32>(clear_values.size());
-  render_pass_info.pClearValues = clear_values.data();
-
-  RendererExtensions::begin_renderpass(*command_buffer, *deferred_framebuffer);
-
-  vkCmdBindPipeline(command_buffer->get_command_buffer(),
-                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    deferred_pipeline->get_pipeline());
+  const auto&& [deferred_framebuffer,
+                deferred_shader,
+                deferred_pipeline,
+                deferred_material] = get_data();
 
   auto descriptor_set =
-    generate_and_update_descriptor_write_sets(*deferred_material);
+    generate_and_update_descriptor_write_sets(renderer, *deferred_material);
 
-  vkCmdBindDescriptorSets(command_buffer->get_command_buffer(),
+  vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
                           VK_PIPELINE_BIND_POINT_GRAPHICS,
                           deferred_pipeline->get_layout(),
                           0,
@@ -102,9 +88,12 @@ Renderer::deferred_pass() -> void
                           0,
                           nullptr);
 
-  vkCmdDraw(command_buffer->get_command_buffer(), 3, 1, 0, 0);
+  vkCmdDraw(command_buffer.get_command_buffer(), 3, 1, 0, 0);
+}
 
-  RendererExtensions::end_renderpass(*command_buffer);
+auto
+DeferredRenderPass::destruct_impl() -> void
+{
 }
 
 } // namespace Engine::Graphics
