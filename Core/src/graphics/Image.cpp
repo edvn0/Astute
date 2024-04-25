@@ -911,7 +911,7 @@ Image::load_from_memory(Core::u32 width,
   image->view = create_view(
     image->image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
   image->sampler = create_sampler(VK_FILTER_LINEAR,
-                                  VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                                  VK_SAMPLER_ADDRESS_MODE_REPEAT,
                                   VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK);
 
   auto& descriptor_info = image->descriptor_info;

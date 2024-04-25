@@ -15,6 +15,8 @@ layout(location = 2) out vec4 fragment_albedo_spec;
 
 layout(set = 0, binding = 10) uniform sampler2DShadow shadow_map;
 layout(set = 0, binding = 5) uniform sampler2D normal_map;
+layout(set = 0, binding = 6) uniform sampler2D albedo_map;
+layout(set = 0, binding = 7) uniform sampler2D specular_map;
 
 void
 main()
@@ -30,6 +32,7 @@ main()
   vec3 tnorm =
     normalize(TBN * texture(normal_map, fragment_uvs).xyz * 2.0 - vec3(1.0));
   fragment_normals = vec4(tnorm, 1.0);
-  fragment_albedo_spec = vec4(ambient, 1.0);
+  fragment_albedo_spec.rgb = texture(albedo_map, fragment_uvs).xyz;
+  fragment_albedo_spec.a = texture(specular_map, fragment_uvs).r;
   fragment_position = vec4(world_space_fragment_position, 1.0);
 }

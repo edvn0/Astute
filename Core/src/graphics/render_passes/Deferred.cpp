@@ -32,7 +32,6 @@ DeferredRenderPass::construct(Renderer& renderer) -> void
     Core::make_scope<Framebuffer>(Framebuffer::Configuration{
       .size = renderer.get_size(),
       .colour_attachment_formats = { VK_FORMAT_R32G32B32A32_SFLOAT },
-      .depth_attachment_format = VK_FORMAT_D32_SFLOAT,
       .sample_count = VK_SAMPLE_COUNT_4_BIT,
       .name = "Deferred",
     });

@@ -84,10 +84,7 @@ MainGeometryRenderPass::execute_impl(Renderer& renderer,
         .transform_buffer;
     auto offset = renderer.mesh_transform_map.at(key).offset;
 
-    if (material) {
-      material->set("normal_map", Graphics::TextureType::Normal, normal_map);
-      material->generate_and_update_descriptor_write_sets(descriptor_set);
-    }
+    material->generate_and_update_descriptor_write_sets(descriptor_set);
 
     RendererExtensions::bind_vertex_buffer(command_buffer, *vertex_buffer, 0);
     RendererExtensions::bind_vertex_buffer(

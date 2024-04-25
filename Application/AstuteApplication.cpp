@@ -77,23 +77,43 @@ AstuteApplication::interface() -> void
 
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0F, 0.0F));
   scope("Output Position", [&](f32 w, f32 h) {
-    image<f32>(*renderer->get_output_image(), { .extent = { w, h } });
+    image<f32>(*renderer->get_output_image(),
+               {
+                 .extent = { w, h },
+                 .flipped = true,
+               });
   });
 
   scope("Output Normals", [&](f32 w, f32 h) {
-    image<f32>(*renderer->get_output_image(1), { .extent = { w, h } });
+    image<f32>(*renderer->get_output_image(1),
+               {
+                 .extent = { w, h },
+                 .flipped = true,
+               });
   });
 
   scope("Output Albedo + Spec", [&](f32 w, f32 h) {
-    image<f32>(*renderer->get_output_image(2), { .extent = { w, h } });
+    image<f32>(*renderer->get_output_image(2),
+               {
+                 .extent = { w, h },
+                 .flipped = true,
+               });
   });
 
   scope("Output Depth", [&](f32 w, f32 h) {
-    image<f32>(*renderer->get_shadow_output_image(), { .extent = { w, h } });
+    image<f32>(*renderer->get_shadow_output_image(),
+               {
+                 .extent = { w, h },
+                 .flipped = true,
+               });
   });
 
   scope("Final Output", [&](f32 w, f32 h) {
-    image<f32>(*renderer->get_final_output(), { .extent = { w, h } });
+    image<f32>(*renderer->get_final_output(),
+               {
+                 .extent = { w, h },
+                 .flipped = true,
+               });
   });
 
   ImGui::PopStyleVar();

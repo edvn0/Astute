@@ -27,7 +27,7 @@ PreDepthRenderPass::construct(Renderer& renderer) -> void
   predepth_framebuffer =
     Core::make_scope<Framebuffer>(Framebuffer::Configuration{
       .size = renderer.get_size(),
-      .depth_attachment_format = VK_FORMAT_D32_SFLOAT,
+      .depth_attachment_format = VK_FORMAT_D24_UNORM_S8_UINT,
       .sample_count = VK_SAMPLE_COUNT_4_BIT,
       .name = "Predepth",
     });

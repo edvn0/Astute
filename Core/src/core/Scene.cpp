@@ -114,6 +114,13 @@ Scene::Scene(const std::string_view name_view)
   material->set("normal_map",
                 Graphics::TextureType::Normal,
                 Graphics::Renderer::get_white_texture());
+  material->set(
+    "albedo_map",
+    Graphics::TextureType::Albedo,
+    Graphics::Image::load_from_file("Assets/images/Disarray_Logo.png"));
+  material->set("specular_map",
+                Graphics::TextureType::Specular,
+                Graphics::Renderer::get_white_texture());
 
   auto& transform = registry.emplace<TransformComponent>(entity);
   transform.translation = { 0, 0, 0 };

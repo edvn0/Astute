@@ -7,6 +7,39 @@
 
 #include <ranges>
 
+template<>
+struct std::formatter<Engine::Graphics::TextureType>
+{
+  // for debugging only
+
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const Engine::Graphics::TextureType& type,
+              std::format_context& ctx) const
+  {
+    return std::format_to(ctx.out(), "{}", to_string_view(type));
+  }
+
+private:
+  static constexpr auto to_string_view = [](const auto type) {
+    switch (type) {
+      case Engine::Graphics::TextureType::Albedo:
+        return "Albedo";
+      case Engine::Graphics::TextureType::Normal:
+        return "Normal";
+      case Engine::Graphics::TextureType::Shadow:
+        return "Shadow";
+      case Engine::Graphics::TextureType::Roughness:
+        return "Roughness";
+      case Engine::Graphics::TextureType::Position:
+        return "Position";
+      default:
+        return "Missing";
+    }
+    return "Missing";
+  };
+};
+
 namespace Engine::Graphics {
 
 Material::~Material() = default;
@@ -26,6 +59,11 @@ Material::set(const std::string_view name,
   }
   const auto* resource = find_resource_by_name(name);
   if (!resource) {
+    return false;
+  }
+
+  if (images.contains(type)) {
+    error("Could not map new image into type '{}'", type);
     return false;
   }
 

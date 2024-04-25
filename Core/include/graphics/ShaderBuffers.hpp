@@ -7,11 +7,11 @@
 namespace Engine::Graphics {
 
 namespace Detail {
-template<class T, class PadType>
+template<class T, Core::usize PadBytes>
 struct Padded
 {
   T value;
-  PadType padding{};
+  std::array<Core::u8, PadBytes> padding{};
   explicit(false) Padded(T v = T{})
     : value(v)
   {
@@ -23,8 +23,8 @@ struct Padded
   explicit(false) operator T() const { return value; }
 };
 
-using PaddedBool = Padded<bool, std::array<Core::u8, 3>>;
-using PaddedU32 = Padded<Core::u32, glm::vec3>;
+using PaddedBool = Padded<bool, 3>;
+using PaddedU32 = Padded<Core::u32, 12>;
 }
 
 static constexpr auto max_light_count = 1000;

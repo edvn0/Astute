@@ -19,6 +19,7 @@ enum class TextureType : Core::u8
   Roughness,
   Shadow,
   Position,
+  Specular,
 };
 
 class Material
