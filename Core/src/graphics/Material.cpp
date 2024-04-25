@@ -9,7 +9,7 @@
 
 namespace Engine::Graphics {
 
-Material::~Material() {}
+Material::~Material() = default;
 
 Material::Material(Configuration config)
   : shader(config.shader)
@@ -55,6 +55,7 @@ Material::generate_and_update_descriptor_write_sets(VkDescriptorSet dst) -> void
   }
 
   std::vector<VkWriteDescriptorSet> values{};
+  values.reserve(current_writes.size());
   for (const auto& [index, write] : current_writes) {
     values.push_back(write);
   }

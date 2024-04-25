@@ -4,6 +4,7 @@
 
 #include "core/Types.hpp"
 #include <mutex>
+#include <vector>
 
 namespace Engine::Graphics {
 
@@ -28,8 +29,12 @@ public:
 
   static auto the() -> DescriptorResource&
   {
-    static DescriptorResource instance;
-    return instance;
+    if (!instance) {
+      std::scoped_lock lock{ mutex };
+      instance = Core::Scope<DescriptorResource>{ new DescriptorResource() };
+    }
+    std::scoped_lock lock{ mutex };
+    return *instance;
   }
 
 private:
@@ -40,8 +45,10 @@ private:
   void handle_out_of_memory() const;
 
   Core::u32 current_frame{ 0 };
-  std::array<VkDescriptorPool, 3> descriptor_pools;
+  std::vector<VkDescriptorPool> descriptor_pools;
   std::array<VkDescriptorPoolSize, 11> pool_sizes;
+  static inline std::mutex mutex{};
+  static inline Core::Scope<DescriptorResource> instance{};
 };
 
 } // namespace Engine::Graphics

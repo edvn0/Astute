@@ -1,14 +1,19 @@
 #include "pch/CorePCH.hpp"
 
-#include "graphics/Renderer.hpp"
+#include "graphics/render_passes/Deferred.hpp"
 
 #include "core/Logger.hpp"
 #include "core/Scene.hpp"
 
 #include "core/Application.hpp"
 #include "graphics/DescriptorResource.hpp"
+#include "graphics/Framebuffer.hpp"
 #include "graphics/GPUBuffer.hpp"
+#include "graphics/GraphicsPipeline.hpp"
 #include "graphics/Image.hpp"
+#include "graphics/Material.hpp"
+#include "graphics/Renderer.hpp"
+#include "graphics/Shader.hpp"
 #include "graphics/Swapchain.hpp"
 #include "graphics/Window.hpp"
 
@@ -16,19 +21,16 @@
 
 namespace Engine::Graphics {
 
-static const Framebuffer* fb;
-
 auto
-Renderer::construct_deferred_pass(const Window* window,
-                                  const Framebuffer& framebuffer) -> void
+DeferredRenderPass::construct(Renderer& renderer) -> void
 {
-  auto& [deferred_framebuffer,
-         deferred_shader,
-         deferred_pipeline,
-         deferred_material] = deferred_render_pass;
+  auto&& [deferred_framebuffer,
+          deferred_shader,
+          deferred_pipeline,
+          deferred_material] = get_data();
   deferred_framebuffer =
     Core::make_scope<Framebuffer>(Framebuffer::Configuration{
-      .size = window->get_swapchain().get_size(),
+      .size = renderer.get_size(),
       .colour_attachment_formats = { VK_FORMAT_R32G32B32A32_SFLOAT },
       .depth_attachment_format = VK_FORMAT_D32_SFLOAT,
       .sample_count = VK_SAMPLE_COUNT_4_BIT,
@@ -52,16 +54,16 @@ Renderer::construct_deferred_pass(const Window* window,
   deferred_material = Core::make_scope<Material>(Material::Configuration{
     .shader = deferred_shader.get(),
   });
+
+  auto& input_framebuffer = renderer.get_framebuffer("MainGeometry");
   deferred_material->set("gPositionMap",
                          TextureType::Position,
-                         framebuffer.get_colour_attachment(0));
+                         input_framebuffer.get_colour_attachment(0));
   deferred_material->set(
-    "gNormalMap", TextureType::Normal, framebuffer.get_colour_attachment(1));
+    "gNormalMap", TextureType::Normal, input_framebuffer.get_colour_attachment(1));
   deferred_material->set("gAlbedoSpecMap",
                          TextureType::Albedo,
-                         framebuffer.get_colour_attachment(2));
-
-  fb = &framebuffer;
+                         input_framebuffer.get_colour_attachment(2));
 }
 
 auto

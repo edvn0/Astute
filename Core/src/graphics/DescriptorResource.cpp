@@ -8,13 +8,14 @@
 
 namespace Engine::Graphics {
 
-static constexpr Core::u32 frame_count = 3;
-
 DescriptorResource::~DescriptorResource() = default;
 
 auto
 DescriptorResource::destroy() -> void
 {
+  if (descriptor_pools.empty())
+    return;
+
   for (auto& descriptor_pool : descriptor_pools) {
     vkDestroyDescriptorPool(Device::the().device(), descriptor_pool, nullptr);
   }
@@ -83,6 +84,9 @@ DescriptorResource::end_frame()
 void
 DescriptorResource::create_pool()
 {
+
+  auto frame_count = Core::Application::the().get_image_count();
+
   pool_sizes = {
     VkDescriptorPoolSize{
       .type = VK_DESCRIPTOR_TYPE_SAMPLER,
@@ -137,6 +141,8 @@ DescriptorResource::create_pool()
 
   // We only use two descriptor sets for now
   pool_info.maxSets = 10000 * frame_count;
+
+  descriptor_pools.resize(frame_count);
 
   for (auto& descriptor_pool : descriptor_pools) {
     VK_CHECK(vkCreateDescriptorPool(

@@ -20,7 +20,7 @@ public:
     const std::vector<Core::Ref<Image>> dependent_attachments{};
     const std::string name;
   };
-  explicit Framebuffer(Configuration);
+  explicit Framebuffer(const Configuration&);
 
   ~Framebuffer();
 
@@ -59,6 +59,10 @@ public:
     -> std::vector<VkPipelineColorBlendAttachmentState>;
 
   auto on_resize(const Core::Extent&) -> void;
+  auto update_attachment(Core::u32 index, const Core::Ref<Image>& image) -> void
+  {
+    dependent_attachments[index] = image;
+  }
 
   auto get_name() const -> const std::string& { return name; }
 
@@ -68,7 +72,8 @@ private:
   VkFormat depth_attachment_format;
   const VkSampleCountFlagBits sample_count{ VK_SAMPLE_COUNT_1_BIT };
   const bool resizable;
-  const std::vector<Core::Ref<Image>> dependent_attachments{};
+  // Not const because we might need to update the pointers on resize
+  std::vector<Core::Ref<Image>> dependent_attachments{};
   const std::string name;
 
   auto search_dependents_for_depth_format() -> const Image*;

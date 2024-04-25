@@ -16,6 +16,8 @@
 
 namespace Engine::Graphics {
 
+static Core::Ref<Image> normal_map;
+
 auto
 Renderer::construct_main_geometry_pass(const Window* window,
                                        Core::Ref<Image> predepth_attachment)
@@ -50,6 +52,8 @@ Renderer::construct_main_geometry_pass(const Window* window,
 
   main_geometry_material->set(
     "shadow_map", TextureType::Shadow, predepth_attachment);
+
+  normal_map = Graphics::Image::load_from_file("Assets/images/cube_normal.png");
 }
 
 auto
@@ -91,10 +95,7 @@ Renderer::main_geometry_pass() -> void
     auto offset = mesh_transform_map.at(key).offset;
 
     if (material) {
-      material->set(
-        "normal_map",
-        Graphics::TextureType::Normal,
-        Graphics::Image::load_from_file("Assets/images/cube_normal.png"));
+      material->set("normal_map", Graphics::TextureType::Normal, normal_map);
       material->generate_and_update_descriptor_write_sets(descriptor_set);
     }
 

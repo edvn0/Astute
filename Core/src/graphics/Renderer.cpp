@@ -89,6 +89,7 @@ Renderer::generate_and_update_descriptor_write_sets(Material& material)
 
 Renderer::Renderer(Configuration config, const Window* window)
   : size(window->get_swapchain().get_size())
+  , old_size(size)
 {
   Shader::initialise_compiler(Compilation::ShaderCompilerConfiguration{
     .optimisation_level = 2,
@@ -119,7 +120,7 @@ Renderer::Renderer(Configuration config, const Window* window)
   }
 
   Core::DataBuffer data_buffer{ sizeof(Core::u32) };
-  Core::u32 white_data{ 0x11111111 };
+  static constexpr auto white_data = 0xFFFFFFFF;
   data_buffer.write(&white_data, sizeof(Core::u32), 0U);
 
   white_texture = Image::load_from_memory(1, 1, data_buffer);
@@ -149,6 +150,36 @@ auto
 Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
   -> void
 {
+  if (old_size != size) {
+    // We've been resized.
+    shadow_render_pass.on_resize(size);
+    /*  predepth_render_pass.on_resize(size);
+
+      main_geometry_render_pass.on_resize(size);
+      main_geometry_render_pass.update_dependent_attachment(
+        0, predepth_render_pass.framebuffer->get_depth_attachment());
+      main_geometry_render_pass.material->set(
+        "shadow_map",
+        TextureType::Shadow,
+        shadow_render_pass.framebuffer->get_depth_attachment());
+
+      deferred_render_pass.on_resize(size);
+      deferred_render_pass.material->set(
+        "gPositionMap",
+        TextureType::Position,
+        main_geometry_render_pass.framebuffer->get_colour_attachment(0));
+      deferred_render_pass.material->set(
+        "gNormalMap",
+        TextureType::Normal,
+        main_geometry_render_pass.framebuffer->get_colour_attachment(1));
+      deferred_render_pass.material->set(
+        "gAlbedoSpecMap",
+        TextureType::Albedo,
+        main_geometry_render_pass.framebuffer->get_colour_attachment(2));
+  */
+    old_size = size;
+  }
+
   const auto& light_environment = scene.get_light_environment();
   auto& [view,
          proj,
@@ -196,8 +227,7 @@ auto
 Renderer::submit_static_mesh(const Graphics::VertexBuffer& vertex_buffer,
                              const Graphics::IndexBuffer& index_buffer,
                              Graphics::Material& material,
-                             const glm::mat4& transform,
-                             const glm::vec4& tint) -> void
+                             const glm::mat4& transform) -> void
 {
   CommandKey key{ &vertex_buffer, &index_buffer, &material, 0 };
 
@@ -248,7 +278,6 @@ auto
 Renderer::on_resize(const Core::Extent& new_size) -> void
 {
   size = new_size;
-  main_geometry_render_pass.framebuffer->on_resize(new_size);
 }
 
 auto

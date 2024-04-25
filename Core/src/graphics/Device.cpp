@@ -325,6 +325,10 @@ Device::deinitialise() -> void
 auto
 Device::destroy() -> void
 {
+  if (!impl) {
+    return;
+  }
+
   impl->deinitialise();
   impl.reset();
 }

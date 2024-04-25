@@ -16,5 +16,8 @@ class Renderer;
 class Shader;
 class VertexBuffer;
 class IndexBuffer;
+class GraphicsPipeline;
+class Material;
+class RenderPass;
 
 }

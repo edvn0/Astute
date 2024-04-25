@@ -830,10 +830,15 @@ Image::destroy() -> void
   if (destroyed)
     return;
 
-  Allocator allocator{ "destroy_image" };
-  allocator.deallocate_image(allocation, image);
+  if (image == VK_NULL_HANDLE || view == VK_NULL_HANDLE ||
+      sampler == VK_NULL_HANDLE) {
+    return;
+  }
+
   vkDestroyImageView(Device::the().device(), view, nullptr);
   vkDestroySampler(Device::the().device(), sampler, nullptr);
+  Allocator allocator{ "destroy_image" };
+  allocator.deallocate_image(allocation, image);
 
   destroyed = true;
 }
@@ -871,18 +876,19 @@ Image::load_from_file(const std::string_view path) -> Core::Ref<Image>
   Core::DataBuffer data_buffer{ width * height * 4 };
   data_buffer.write(
     std::span{ pixel_data, static_cast<Core::usize>(width * height * 4) });
-
-  image = load_from_memory(
-    static_cast<Core::u32>(width), static_cast<Core::u32>(height), data_buffer);
-
   stbi_image_free(pixel_data);
-  return image;
+
+  return load_from_memory(static_cast<Core::u32>(width),
+                          static_cast<Core::u32>(height),
+                          data_buffer,
+                          path);
 }
 
 auto
 Image::load_from_memory(Core::u32 width,
                         Core::u32 height,
-                        const Core::DataBuffer& data_buffer) -> Core::Ref<Image>
+                        const Core::DataBuffer& data_buffer,
+                        const std::string_view name) -> Core::Ref<Image>
 {
   Core::Ref<Image> image = Core::make_ref<Image>();
 
@@ -898,7 +904,7 @@ Image::load_from_memory(Core::u32 width,
                image->image,
                image->allocation,
                image->allocation_info,
-               "Dunno");
+               name);
   image->format = VK_FORMAT_R8G8B8A8_UNORM;
   image->layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
   image->aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;

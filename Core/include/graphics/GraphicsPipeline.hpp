@@ -25,6 +25,8 @@ public:
   explicit GraphicsPipeline(const Configuration&);
   ~GraphicsPipeline();
 
+  auto on_resize(const Core::Extent&) -> void;
+
   auto get_pipeline() const -> VkPipeline { return pipeline; }
   auto get_layout() const -> VkPipelineLayout { return layout; }
 
@@ -44,6 +46,7 @@ private:
 
   auto create_pipeline() -> void;
   auto create_layout() -> void;
+  auto destroy() -> void;
 };
 
 } // namespace Engine::Graphics

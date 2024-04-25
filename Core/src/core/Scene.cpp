@@ -130,21 +130,21 @@ Scene::Scene(const std::string_view name_view)
     auto light = registry.create();
     registry.emplace<SimpleMeshComponent>(
       light, vertex, index, material, shader);
-    auto& transform = registry.emplace<TransformComponent>(light);
+    auto& t = registry.emplace<TransformComponent>(light);
     auto& light_data = registry.emplace<PointLightComponent>(light);
-    transform.scale *= 0.1;
-    transform.translation = Random::random_in_rectangle(-30, 30);
+    t.scale *= 0.1;
+    t.translation = Random::random_in_rectangle(-30, 30);
     light_data.radiance = Random::random_colour();
   }
 
   for (auto i = 0; i < 3; i++) {
     auto light = registry.create();
-    auto& transform = registry.emplace<TransformComponent>(light);
+    auto& t = registry.emplace<TransformComponent>(light);
     registry.emplace<SimpleMeshComponent>(
       light, vertex, index, material, shader);
-    transform.scale *= 0.1;
+    t.scale *= 0.1;
 
-    transform.translation = Random::random_in_rectangle(-5, 5);
+    t.translation = Random::random_in_rectangle(-5, 5);
 
     auto& light_data = registry.emplace<SpotLightComponent>(light);
     light_data.radiance = Random::random_colour();
@@ -211,7 +211,7 @@ Scene::on_update_editor(f64 ts) -> void
       f32 speed = 1.0f;
       f32 phaseOffset = 0.5f;
 
-      f32 angle = time * speed + phaseOffset * count;
+      f32 angle = time * speed + phaseOffset * static_cast<f32>(count);
 
       // Update position to move in a circle
       transform.translation.x = radius * cos(angle);

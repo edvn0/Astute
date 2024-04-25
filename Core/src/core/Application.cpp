@@ -18,9 +18,9 @@ auto
 Application::forward_incoming_events(Event& event) -> void
 {
   EventDispatcher dispatcher(event);
-  dispatcher.dispatch<WindowResizeEvent>([](const WindowResizeEvent& ev) {
+  dispatcher.dispatch<WindowResizeEvent>([this](const WindowResizeEvent& ev) {
     const BasicExtent extent{ ev.get_width(), ev.get_height() };
-    // on_resize(extent.as<u32>());
+    on_resize(extent.as<u32>());
     return true;
   });
 
@@ -29,7 +29,7 @@ Application::forward_incoming_events(Event& event) -> void
   handle_events(event);
 }
 
-Application::Application(Configuration conf)
+Application::Application(const Configuration& conf)
   : config(conf)
 {
   info("Astute Engine initialisation.");
@@ -126,10 +126,6 @@ Application::run() -> i32
 auto
 Application::on_resize(const Extent& new_size) -> void
 {
-  info("Resizing from Application::on_resize to {} x {}",
-       new_size.width,
-       new_size.height);
-  get_swapchain().on_resize(new_size);
 }
 
 auto

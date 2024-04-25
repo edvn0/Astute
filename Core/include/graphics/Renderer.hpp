@@ -29,6 +29,27 @@ struct std::hash<Engine::Graphics::CommandKey>
 
 namespace Engine::Graphics {
 
+namespace Detail {
+template<typename... Bases>
+struct overload : Bases...
+{
+  using is_transparent = void;
+  using Bases::operator()...;
+};
+
+struct CharPointerHash
+{
+  auto operator()(const char* ptr) const noexcept
+  {
+    return std::hash<std::string_view>{}(ptr);
+  }
+};
+
+using transparent_string_hash = overload<std::hash<std::string>,
+                                         std::hash<std::string_view>,
+                                         CharPointerHash>;
+}
+
 struct TransformVertexData
 {
   std::array<glm::vec4, 3> transform_rows{};
@@ -42,22 +63,6 @@ struct SubmeshTransformBuffer
 {
   Core::Scope<Graphics::VertexBuffer> transform_buffer{ nullptr };
   Core::Scope<Core::DataBuffer> data_buffer{ nullptr };
-};
-
-struct RenderPass
-{
-  Core::Scope<Framebuffer> framebuffer{ nullptr };
-  Core::Scope<Shader> shader{ nullptr };
-  Core::Scope<GraphicsPipeline> pipeline{ nullptr };
-  Core::Scope<Material> material{ nullptr };
-
-  auto destruct() -> void
-  {
-    framebuffer.reset();
-    shader.reset();
-    pipeline.reset();
-    material.reset();
-  }
 };
 
 struct SceneRendererCamera
@@ -97,22 +102,25 @@ public:
   auto submit_static_mesh(const Graphics::VertexBuffer&,
                           const Graphics::IndexBuffer&,
                           Graphics::Material&,
-                          const glm::mat4&,
-                          const glm::vec4& = { 1, 1, 1, 1 }) -> void;
+                          const glm::mat4&) -> void;
 
   auto get_output_image(Core::u32 attachment = 0) const -> const Image*
   {
-    return main_geometry_render_pass.framebuffer
-      ->get_colour_attachment(attachment)
+    return render_passes.at("MainGeometry")
+      ->framebuffer->get_colour_attachment(attachment)
       .get();
   }
   auto get_shadow_output_image() const -> const Image*
   {
-    return shadow_render_pass.framebuffer->get_depth_attachment().get();
+    return render_passes.at("Shadow")
+      ->framebuffer->get_depth_attachment()
+      .get();
   }
   auto get_final_output() const -> const Image*
   {
-    return deferred_render_pass.framebuffer->get_colour_attachment(0).get();
+    return render_passes.at("Deferred")
+      ->framebuffer->get_colour_attachment(0)
+      .get();
   }
 
   auto on_resize(const Core::Extent&) -> void;
@@ -126,26 +134,22 @@ public:
     return black_texture;
   }
 
+  auto get_size() const -> const Core::Extent& { return size; }
+  auto get_render_pass(std::string_view name) -> RenderPass&
+  {
+    return *render_passes.at(name);
+  }
+
 private:
   Core::Extent size{ 0, 0 };
+  Core::Extent old_size{ 0, 0 };
   Core::Scope<CommandBuffer> command_buffer{ nullptr };
 
-  RenderPass predepth_render_pass{};
-  RenderPass main_geometry_render_pass{};
-  RenderPass shadow_render_pass{};
-  RenderPass deferred_render_pass{};
-
-  auto construct_predepth_pass(const Window*) -> void;
-  auto predepth_pass() -> void;
-
-  auto construct_main_geometry_pass(const Window*, Core::Ref<Image>) -> void;
-  auto main_geometry_pass() -> void;
-
-  auto construct_shadow_pass(const Window*, Core::u32) -> void;
-  auto shadow_pass() -> void;
-
-  auto construct_deferred_pass(const Window*, const Framebuffer&) -> void;
-  auto deferred_pass() -> void;
+  std::unordered_map<std::string,
+                     Core::Scope<RenderPass>,
+                     Detail::transparent_string_hash,
+                     std::equal_to<>>
+    render_passes;
 
   auto flush_draw_lists() -> void;
 
@@ -178,10 +182,8 @@ private:
 
 }
 
-namespace std {
-
 inline auto
-hash<Engine::Graphics::CommandKey>::operator()(
+std::hash<Engine::Graphics::CommandKey>::operator()(
   const Engine::Graphics::CommandKey& key) const noexcept -> Engine::Core::usize
 {
   static constexpr auto combine = []<class... T>(auto& seed,
@@ -194,5 +196,3 @@ hash<Engine::Graphics::CommandKey>::operator()(
   return combine(
     seed, key.vertex_buffer, key.index_buffer, key.material, key.submesh_index);
 }
-
-} // namespace std

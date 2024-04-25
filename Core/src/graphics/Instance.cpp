@@ -197,6 +197,10 @@ Instance::deinitialise() -> void
 auto
 Instance::destroy() -> void
 {
+  if (!impl) {
+    return;
+  }
+
   impl->deinitialise();
   impl.reset();
 }

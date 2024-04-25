@@ -31,7 +31,7 @@ public:
     f64 frames_per_seconds{ 0.0 };
   };
 
-  explicit Application(Configuration);
+  explicit Application(const Configuration&);
   virtual ~Application();
 
   auto run() -> i32;

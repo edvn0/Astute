@@ -158,6 +158,10 @@ Swapchain::create(const Core::Extent& input_size, bool vsync) -> void
 auto
 Swapchain::destroy() -> void
 {
+  if (destroyed) {
+    return;
+  }
+
   auto device = Device::the().device();
   vkDeviceWaitIdle(device);
 
@@ -188,6 +192,8 @@ Swapchain::destroy() -> void
     vkDestroyFence(device, fence, nullptr);
 
   vkDeviceWaitIdle(device);
+
+  destroyed = true;
 }
 
 Swapchain::Swapchain(const Window* window)
@@ -288,7 +294,6 @@ Swapchain::present() -> void
 
   if (result != VK_SUCCESS) {
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-      info("Resizing from present.");
       auto new_size = recompute_size(backpointer->get_native());
       on_resize(new_size);
     } else {

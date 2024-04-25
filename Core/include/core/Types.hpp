@@ -37,7 +37,7 @@ struct BasicExtent
 
   BasicExtent() = default;
 
-  BasicExtent(T val)
+  explicit BasicExtent(T val)
     : width(val)
     , height(val)
   {
@@ -50,7 +50,8 @@ struct BasicExtent
   }
 
   // Constructor for integral types separate from T
-  template<typename U = T, typename = std::enable_if_t<std::is_integral_v<U>>>
+  template<typename U = T>
+    requires(std::is_integral_v<U> && !std::is_same_v<T, U>)
   BasicExtent(U w, U h)
     : width(static_cast<T>(w))
     , height(static_cast<T>(h))
@@ -71,6 +72,18 @@ struct BasicExtent
   {
     return static_cast<f32>(width) / static_cast<f32>(height);
   }
+
+  auto operator==(const BasicExtent& other) const -> bool
+  {
+    return width == other.width && height == other.height;
+  }
+
+  template<Number U>
+  auto operator==(const BasicExtent<U>& other) const -> bool
+  {
+    const auto casted = other.as<T>();
+    return width == casted.width && height == casted.height;
+  }
 };
 
 using Extent = BasicExtent<u32>;
@@ -89,7 +102,12 @@ struct DefaultDelete
   template<class T>
   auto operator()(T* ptr) const noexcept -> void
   {
-    delete ptr;
+    if constexpr (requires(T* p) { p->destroy(); }) {
+      ptr->destroy();
+      delete ptr;
+    } else {
+      delete ptr;
+    }
   }
 };
 }

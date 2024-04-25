@@ -61,6 +61,7 @@ public:
   VkImageAspectFlags aspect_mask{ VK_IMAGE_ASPECT_COLOR_BIT };
   VkFormat format{ VK_FORMAT_UNDEFINED };
   VkImageLayout layout{ VK_IMAGE_LAYOUT_UNDEFINED };
+  VkDescriptorImageInfo descriptor_info{};
 
   bool destroyed{ false };
 
@@ -71,8 +72,13 @@ public:
       destroyed = true;
     }
   }
-
-  VkDescriptorImageInfo descriptor_info{};
+  Image() = default;
+  // Make noncopyable
+  Image(const Image&) = delete;
+  auto operator=(const Image&) -> Image& = delete;
+  // Make nonmovable
+  Image(Image&&) = delete;
+  auto operator=(Image&&) -> Image& = delete;
 
   auto get_aspect_flags() const -> VkImageAspectFlags { return aspect_mask; }
   auto hash() const -> Core::usize;
@@ -80,8 +86,10 @@ public:
   auto get_descriptor_info() const -> const VkDescriptorImageInfo&;
 
   static auto load_from_file(std::string_view) -> Core::Ref<Image>;
-  static auto load_from_memory(Core::u32, Core::u32, const Core::DataBuffer&)
-    -> Core::Ref<Image>;
+  static auto load_from_memory(Core::u32,
+                               Core::u32,
+                               const Core::DataBuffer&,
+                               std::string_view = "") -> Core::Ref<Image>;
 };
 
 } // namespace Engine::Graphics

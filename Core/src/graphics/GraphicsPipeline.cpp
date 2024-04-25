@@ -27,8 +27,22 @@ GraphicsPipeline::GraphicsPipeline(const Configuration& config)
 
 GraphicsPipeline::~GraphicsPipeline()
 {
+  destroy();
+}
+
+auto
+GraphicsPipeline::destroy() -> void
+{
   vkDestroyPipeline(Device::the().device(), pipeline, nullptr);
   vkDestroyPipelineLayout(Device::the().device(), layout, nullptr);
+}
+
+auto
+GraphicsPipeline::on_resize(const Core::Extent&) -> void
+{
+  destroy();
+  create_layout();
+  create_pipeline();
 }
 
 auto
