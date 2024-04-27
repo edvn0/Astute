@@ -7,7 +7,7 @@
 #include <format>
 #include <imgui.h>
 
-namespace Engine::UI {
+namespace Engine::Core::UI {
 
 template<class T>
 struct InterfaceImageProperties

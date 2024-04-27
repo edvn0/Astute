@@ -12,16 +12,6 @@
 
 namespace Engine::Graphics {
 
-enum class TextureType : Core::u8
-{
-  Normal,
-  Albedo,
-  Roughness,
-  Shadow,
-  Position,
-  Specular,
-};
-
 class Material
 {
 public:
@@ -32,7 +22,7 @@ public:
   explicit Material(Configuration);
   ~Material();
 
-  auto set(std::string_view, TextureType, const Core::Ref<Image>&) -> bool;
+  auto set(std::string_view, const Core::Ref<Image>&) -> bool;
 
   auto get_descriptor_set() -> decltype(auto) { return descriptor_sets.get(); }
 
@@ -41,7 +31,7 @@ public:
 
 private:
   const Shader* shader{ nullptr };
-  std::unordered_map<TextureType, Core::Ref<Image>> images{};
+  std::unordered_map<std::string, Core::Ref<Image>> images{};
 
   Core::FrameBasedCollection<
     std::unordered_map<Core::u32, VkWriteDescriptorSet>>

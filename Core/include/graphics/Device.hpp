@@ -26,13 +26,24 @@ public:
   static auto the() -> Device&;
   static auto destroy() -> void;
   static auto initialise(VkSurfaceKHR = nullptr) -> void;
-  auto device() const -> const VkDevice& { return vk_device; }
-  auto device() -> VkDevice { return vk_device; }
+  auto device() const -> const VkDevice&
+  {
+    static std::mutex mutex;
+    std::scoped_lock lock{ mutex };
+    return vk_device;
+  }
+  auto device() -> VkDevice
+  {
+    static std::mutex mutex;
+    std::scoped_lock lock{ mutex };
+    return vk_device;
+  }
   auto physical() -> VkPhysicalDevice { return vk_physical_device; }
   auto physical() const -> const VkPhysicalDevice&
   {
     return vk_physical_device;
   }
+  auto wait() -> void;
 
   auto get_queue(QueueType t) { return queue_support.at(t).queue; }
   auto get_queue(QueueType t) const { return queue_support.at(t).queue; }

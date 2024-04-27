@@ -42,7 +42,10 @@ add_library(Core STATIC
     include/graphics/Swapchain.hpp
     include/graphics/Vertex.hpp
     include/graphics/Window.hpp
-    include/graphics/render_passes
+    include/graphics/render_passes/Deferred.hpp
+    include/graphics/render_passes/MainGeometry.hpp
+    include/graphics/render_passes/Predepth.hpp
+    include/graphics/render_passes/Shadow.hpp
     include/pch/CorePCH.hpp
     include/ui/UI.hpp
     src/core/Application.cpp

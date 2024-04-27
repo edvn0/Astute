@@ -56,14 +56,16 @@ end_renderpass(const CommandBuffer& command_buffer) -> void
 
 auto
 explicitly_clear_framebuffer(const CommandBuffer& command_buffer,
-                             const Framebuffer& framebuffer) -> void
+                             const Framebuffer& framebuffer,
+                             const bool clear_depth) -> void
 {
   const std::vector<VkClearValue>& fb_clear_values =
     framebuffer.get_clear_values();
 
   const auto color_attachment_count = framebuffer.get_colour_attachment_count();
   const auto total_attachment_count =
-    color_attachment_count + (framebuffer.has_depth_attachment() ? 1 : 0);
+    color_attachment_count +
+    (framebuffer.has_depth_attachment() && clear_depth ? 1 : 0);
 
   const VkExtent2D extent_2_d = framebuffer.get_extent();
   std::vector<VkClearAttachment> attachments(total_attachment_count);
@@ -82,7 +84,7 @@ explicitly_clear_framebuffer(const CommandBuffer& command_buffer,
     clear_rects[i].layerCount = 1;
   }
 
-  if (framebuffer.has_depth_attachment()) {
+  if (framebuffer.has_depth_attachment() && clear_depth) {
     auto aspect_bits = framebuffer.get_depth_attachment()->get_aspect_flags();
     attachments[color_attachment_count].aspectMask = aspect_bits;
     attachments[color_attachment_count].clearValue =

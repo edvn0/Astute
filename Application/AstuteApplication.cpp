@@ -72,48 +72,43 @@ AstuteApplication::render() -> void
 auto
 AstuteApplication::interface() -> void
 {
-  using namespace Engine::UI;
-  ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
+  ImGui::DockSpaceOverViewport(ImGui::GetMainViewport(),
+                               ImGuiDockNodeFlags_PassthruCentralNode);
 
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0F, 0.0F));
-  scope("Output Position", [&](f32 w, f32 h) {
-    image<f32>(*renderer->get_output_image(),
-               {
-                 .extent = { w, h },
-                 .flipped = true,
-               });
+  UI::scope("Output Position", [&](f32 w, f32 h) {
+    UI::image<f32>(*renderer->get_output_image(),
+                   {
+                     .extent = { w, h },
+                   });
   });
 
-  scope("Output Normals", [&](f32 w, f32 h) {
-    image<f32>(*renderer->get_output_image(1),
-               {
-                 .extent = { w, h },
-                 .flipped = true,
-               });
+  UI::scope("Output Normals", [&](f32 w, f32 h) {
+    UI::image<f32>(*renderer->get_output_image(1),
+                   {
+                     .extent = { w, h },
+                   });
   });
 
-  scope("Output Albedo + Spec", [&](f32 w, f32 h) {
-    image<f32>(*renderer->get_output_image(2),
-               {
-                 .extent = { w, h },
-                 .flipped = true,
-               });
+  UI::scope("Output Albedo + Spec", [&](f32 w, f32 h) {
+    UI::image<f32>(*renderer->get_output_image(2),
+                   {
+                     .extent = { w, h },
+                   });
   });
 
-  scope("Output Depth", [&](f32 w, f32 h) {
-    image<f32>(*renderer->get_shadow_output_image(),
-               {
-                 .extent = { w, h },
-                 .flipped = true,
-               });
+  UI::scope("Output Depth", [&](f32 w, f32 h) {
+    UI::image<f32>(*renderer->get_shadow_output_image(),
+                   {
+                     .extent = { w, h },
+                   });
   });
 
-  scope("Final Output", [&](f32 w, f32 h) {
-    image<f32>(*renderer->get_final_output(),
-               {
-                 .extent = { w, h },
-                 .flipped = true,
-               });
+  UI::scope("Final Output", [&](f32 w, f32 h) {
+    UI::image<f32>(*renderer->get_final_output(),
+                   {
+                     .extent = { w, h },
+                   });
   });
 
   ImGui::PopStyleVar();

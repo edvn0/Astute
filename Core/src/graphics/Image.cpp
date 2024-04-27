@@ -13,9 +13,8 @@
 
 #include <stb_image.h>
 
-namespace std {
 template<>
-struct hash<VkImage>
+struct std::hash<VkImage>
 {
   auto operator()(VkImage const& image) const -> Engine::Core::usize
   {
@@ -23,12 +22,37 @@ struct hash<VkImage>
       std::bit_cast<Engine::Core::usize>(image));
   }
 };
+
+namespace Engine::Graphics {
+auto to_string(VkFormat) -> std::string_view;
+auto to_string(VkImageLayout) -> std::string_view;
 }
+
+template<>
+struct std::formatter<VkFormat>
+{
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const VkFormat& type, std::format_context& ctx) const
+  {
+    return std::format_to(ctx.out(), "{}", Engine::Graphics::to_string(type));
+  }
+};
+template<>
+struct std::formatter<VkImageLayout>
+{
+  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
+
+  auto format(const VkImageLayout& type, std::format_context& ctx) const
+  {
+    return std::format_to(ctx.out(), "{}", Engine::Graphics::to_string(type));
+  }
+};
 
 namespace Engine::Graphics {
 
 auto
-to_string(VkFormat format)
+to_string(VkFormat format) -> std::string_view
 {
   switch (format) {
     case VK_FORMAT_UNDEFINED:
@@ -538,6 +562,74 @@ to_string(VkFormat format)
 }
 
 auto
+to_string(VkImageLayout layout) -> std::string_view
+{
+  switch (layout) {
+    case VK_IMAGE_LAYOUT_UNDEFINED:
+      return "VK_IMAGE_LAYOUT_UNDEFINED";
+    case VK_IMAGE_LAYOUT_GENERAL:
+      return "VK_IMAGE_LAYOUT_GENERAL";
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+      return "VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL";
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+      return "VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL";
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL:
+      return "VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL";
+    case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+      return "VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL";
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+      return "VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL";
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+      return "VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL";
+    case VK_IMAGE_LAYOUT_PREINITIALIZED:
+      return "VK_IMAGE_LAYOUT_PREINITIALIZED";
+    case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL:
+      return "VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL";
+    case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL:
+      return "VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL";
+    case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL:
+      return "VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL";
+    case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL:
+      return "VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL";
+    case VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL:
+      return "VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL";
+    case VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL:
+      return "VK_IMAGE_LAYOUT_STENCIL_READ_ONLY_OPTIMAL";
+    case VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL:
+      return "VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL";
+    case VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL:
+      return "VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL";
+    case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
+      return "VK_IMAGE_LAYOUT_PRESENT_SRC_KHR";
+    case VK_IMAGE_LAYOUT_VIDEO_DECODE_DST_KHR:
+      return "VK_IMAGE_LAYOUT_VIDEO_DECODE_DST_KHR";
+    case VK_IMAGE_LAYOUT_VIDEO_DECODE_SRC_KHR:
+      return "VK_IMAGE_LAYOUT_VIDEO_DECODE_SRC_KHR";
+    case VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR:
+      return "VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR";
+    case VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR:
+      return "VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR";
+    case VK_IMAGE_LAYOUT_FRAGMENT_DENSITY_MAP_OPTIMAL_EXT:
+      return "VK_IMAGE_LAYOUT_FRAGMENT_DENSITY_MAP_OPTIMAL_EXT";
+    case VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR:
+      return "VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR";
+    case VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ_KHR:
+      return "VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ_KHR";
+    case VK_IMAGE_LAYOUT_VIDEO_ENCODE_DST_KHR:
+      return "VK_IMAGE_LAYOUT_VIDEO_ENCODE_DST_KHR";
+    case VK_IMAGE_LAYOUT_VIDEO_ENCODE_SRC_KHR:
+      return "VK_IMAGE_LAYOUT_VIDEO_ENCODE_SRC_KHR";
+    case VK_IMAGE_LAYOUT_VIDEO_ENCODE_DPB_KHR:
+      return "VK_IMAGE_LAYOUT_VIDEO_ENCODE_DPB_KHR";
+    case VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT:
+      return "VK_IMAGE_LAYOUT_ATTACHMENT_FEEDBACK_LOOP_OPTIMAL_EXT";
+    default:
+      return "Missing";
+  }
+  return "Missing";
+}
+
+auto
 to_string(VkSampleCountFlagBits samples)
 {
   switch (samples) {
@@ -658,7 +750,14 @@ transition_image_layout(VkCommandBuffer buffer,
     sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
   } else {
-    throw std::invalid_argument("unsupported layout transition!");
+    error("unsupported layout transition between {} and {}",
+          old_layout,
+          new_layout);
+
+    throw Core::InvalidOperationException(
+      "unsupported layout transition between {} and {}",
+      old_layout,
+      new_layout);
   }
 
   vkCmdPipelineBarrier(buffer,
@@ -711,6 +810,45 @@ transition_image_layout(VkImage image,
 
       sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
       destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    } else if (old_layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL &&
+               new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+      barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+      barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+      sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+      destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    } else if (old_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL &&
+               new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+      barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+      barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+      sourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+      destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    } else if (old_layout ==
+                 VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL &&
+               new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+      barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                              VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+      barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+      sourceStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+      destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    } else if (old_layout ==
+                 VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL &&
+               new_layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+      barrier.srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                              VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+      barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+      sourceStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+      destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    } else if (old_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL &&
+               new_layout == VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
+      barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+      barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+      destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+      sourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
     } else if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED &&
                new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
       barrier.srcAccessMask = 0;
@@ -727,7 +865,14 @@ transition_image_layout(VkImage image,
       sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
       destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     } else {
-      throw std::invalid_argument("unsupported layout transition!");
+      error("unsupported layout transition between {} and {}",
+            old_layout,
+            new_layout);
+
+      throw Core::InvalidOperationException(
+        "unsupported layout transition between {} and {}",
+        old_layout,
+        new_layout);
     }
 
     vkCmdPipelineBarrier(buffer,
@@ -856,11 +1001,11 @@ Image::hash() const -> Core::usize
 }
 
 auto
-Image::load_from_file(const std::string_view path) -> Core::Ref<Image>
+Image::load_from_file(const Configuration& config) -> Core::Ref<Image>
 {
   Core::Ref<Image> image = Core::make_ref<Image>();
 
-  std::filesystem::path whole_path{ path };
+  std::filesystem::path whole_path{ config.path };
 
   if (!std::filesystem::exists(whole_path)) {
     error("Could not find image at '{}'", whole_path.string());
@@ -881,21 +1026,21 @@ Image::load_from_file(const std::string_view path) -> Core::Ref<Image>
   return load_from_memory(static_cast<Core::u32>(width),
                           static_cast<Core::u32>(height),
                           data_buffer,
-                          path);
+                          config);
 }
 
 auto
 Image::load_from_memory(Core::u32 width,
                         Core::u32 height,
                         const Core::DataBuffer& data_buffer,
-                        const std::string_view name) -> Core::Ref<Image>
+                        const Configuration& config) -> Core::Ref<Image>
 {
   Core::Ref<Image> image = Core::make_ref<Image>();
 
   create_image(width,
                height,
                1,
-               VK_SAMPLE_COUNT_1_BIT,
+               config.sample_count,
                VK_FORMAT_R8G8B8A8_UNORM,
                VK_IMAGE_TILING_OPTIMAL,
                VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
@@ -904,7 +1049,9 @@ Image::load_from_memory(Core::u32 width,
                image->image,
                image->allocation,
                image->allocation_info,
-               name);
+               config.path);
+  image->sample_count = config.sample_count;
+  image->extent = { width, height, 1 };
   image->format = VK_FORMAT_R8G8B8A8_UNORM;
   image->layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
   image->aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;

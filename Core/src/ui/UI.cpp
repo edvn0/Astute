@@ -9,7 +9,7 @@
 #include <initializer_list>
 #include <span>
 
-namespace Engine::UI {
+namespace Engine::Core::UI {
 
 namespace {
 

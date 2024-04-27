@@ -93,6 +93,13 @@ public:
 
   [[nodiscard]] auto allocate_descriptor_set(Core::u32 set) const
     -> Reflection::MaterialDescriptorSet;
+
+  /**
+   * @brief Get the descriptor set object
+   * @param descriptor_name name of a descriptor in a set
+   * @param set_index the descriptor set as described by a shader
+   * @return const VkWriteDescriptorSet*
+   */
   [[nodiscard]] auto get_descriptor_set(std::string_view, Core::u32) const
     -> const VkWriteDescriptorSet*;
 

@@ -112,15 +112,14 @@ Scene::Scene(const std::string_view name_view)
   material = Core::make_ref<Graphics::Material>(
     Graphics::Material::Configuration{ shader.get() });
   material->set("normal_map",
-                Graphics::TextureType::Normal,
-                Graphics::Renderer::get_white_texture());
-  material->set(
-    "albedo_map",
-    Graphics::TextureType::Albedo,
-    Graphics::Image::load_from_file("Assets/images/Disarray_Logo.png"));
-  material->set("specular_map",
-                Graphics::TextureType::Specular,
-                Graphics::Renderer::get_white_texture());
+                Graphics::Image::load_from_file({
+                  .path = "Assets/images/cube_normal.png",
+                }));
+  material->set("albedo_map",
+                Graphics::Image::load_from_file({
+                  .path = "Assets/images/cube_albedo.jpeg",
+                }));
+  material->set("specular_map", Graphics::Renderer::get_white_texture());
 
   auto& transform = registry.emplace<TransformComponent>(entity);
   transform.translation = { 0, 0, 0 };
@@ -133,22 +132,35 @@ Scene::Scene(const std::string_view name_view)
   // Floor is big!
   transform2.scale = { 10, 1, 10 };
 
-  for (auto i = 0; i < 3; i++) {
+  auto point_light_material = Core::make_ref<Graphics::Material>(
+    Graphics::Material::Configuration{ shader.get() });
+  point_light_material->set("normal_map",
+                            Graphics::Image::load_from_file({
+                              .path = "Assets/images/cube_normal.png",
+                            }));
+  point_light_material->set("albedo_map",
+                            Graphics::Image::load_from_file({
+                              .path = "Assets/images/cube_albedo.jpeg",
+                            }));
+  point_light_material->set("specular_map",
+                            Graphics::Renderer::get_white_texture());
+  for (auto i = 0; i < 30; i++) {
     auto light = registry.create();
     registry.emplace<SimpleMeshComponent>(
-      light, vertex, index, material, shader);
+      light, vertex, index, point_light_material, shader);
     auto& t = registry.emplace<TransformComponent>(light);
     auto& light_data = registry.emplace<PointLightComponent>(light);
     t.scale *= 0.1;
-    t.translation = Random::random_in_rectangle(-30, 30);
+    t.translation = Random::random_in_rectangle(-5, 5);
+    t.translation.y *= 3;
     light_data.radiance = Random::random_colour();
   }
 
-  for (auto i = 0; i < 3; i++) {
+  for (auto i = 0; i < 30; i++) {
     auto light = registry.create();
     auto& t = registry.emplace<TransformComponent>(light);
     registry.emplace<SimpleMeshComponent>(
-      light, vertex, index, material, shader);
+      light, vertex, index, point_light_material, shader);
     t.scale *= 0.1;
 
     t.translation = Random::random_in_rectangle(-5, 5);
@@ -162,7 +174,7 @@ auto
 Scene::on_update_editor(f64 ts) -> void
 {
   static f64 rotation = 0;
-  rotation += ts;
+  rotation += 0.1 * ts;
   glm::vec3 begin{ 0 };
   begin.x = 10 * glm::cos(rotation);
   begin.y = -10;
@@ -176,27 +188,12 @@ Scene::on_update_editor(f64 ts) -> void
   light_environment.spot_lights.clear();
   light_environment.point_lights.clear();
 
-  static f32 time = 0;
-  time += ts;
-
   [&]() {
     auto count = 0U;
 
     for (auto&& [entity, transform, point_light] :
          registry.view<TransformComponent, PointLightComponent>().each()) {
       auto& light = light_environment.point_lights.emplace_back();
-
-      f32 radius = 5.0f;
-      f32 speed = 1.0f;
-      f32 phaseOffset = 0.5f;
-
-      f32 angle = time * speed + phaseOffset * count;
-
-      // Update position to move in a circle
-      transform.translation.x = radius * cos(angle);
-      transform.translation.z =
-        radius * sin(angle); // Assuming circular motion in x-z plane
-
       light.pos = transform.translation;
       light.casts_shadows = point_light.casts_shadows;
       light.falloff = point_light.falloff;
@@ -214,17 +211,6 @@ Scene::on_update_editor(f64 ts) -> void
     for (auto&& [entity, transform, spot_light] :
          registry.view<TransformComponent, SpotLightComponent>().each()) {
       auto& light = light_environment.spot_lights.emplace_back();
-      f32 radius = 5.0f;
-      f32 speed = 1.0f;
-      f32 phaseOffset = 0.5f;
-
-      f32 angle = time * speed + phaseOffset * static_cast<f32>(count);
-
-      // Update position to move in a circle
-      transform.translation.x = radius * cos(angle);
-      transform.translation.y =
-        radius * sin(angle); // Assuming circular motion in x-z plane
-
       light.pos = transform.translation;
       light.radiance = spot_light.radiance;
       light.intensity = spot_light.intensity;
@@ -251,22 +237,35 @@ Scene::on_render_editor(Graphics::Renderer& renderer, const Camera& camera)
                          camera.get_far_clip(),
                          camera.get_fov(),
                        });
-  bool submitted_sun = false;
   for (auto&& [entity, mesh, transform] :
-       registry.view<SimpleMeshComponent, TransformComponent>().each()) {
+       registry
+         .view<SimpleMeshComponent, TransformComponent>(
+           entt::exclude<PointLightComponent, SpotLightComponent>)
+         .each()) {
     renderer.submit_static_mesh(*mesh.vertex_buffer,
                                 *mesh.index_buffer,
                                 *mesh.material,
                                 transform.compute());
+  }
 
-    if (!submitted_sun) {
-      submitted_sun = true;
-      renderer.submit_static_mesh(
-        *mesh.vertex_buffer,
-        *mesh.index_buffer,
-        *mesh.material,
-        glm::translate(glm::mat4{ 1 }, light_environment.sun_position));
-    }
+  for (auto&& [entity, light, mesh, transform] :
+       registry
+         .view<PointLightComponent, SimpleMeshComponent, TransformComponent>()
+         .each()) {
+    renderer.submit_static_light(*mesh.vertex_buffer,
+                                 *mesh.index_buffer,
+                                 *mesh.material,
+                                 transform.compute());
+  }
+
+  for (auto&& [entity, light, mesh, transform] :
+       registry
+         .view<SpotLightComponent, SimpleMeshComponent, TransformComponent>()
+         .each()) {
+    renderer.submit_static_light(*mesh.vertex_buffer,
+                                 *mesh.index_buffer,
+                                 *mesh.material,
+                                 transform.compute());
   }
 
   renderer.end_scene();

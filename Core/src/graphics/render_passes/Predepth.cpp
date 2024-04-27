@@ -18,22 +18,23 @@
 namespace Engine::Graphics {
 
 auto
-PreDepthRenderPass::construct(Renderer& renderer) -> void
+PreDepthRenderPass::construct() -> void
 {
-  auto&& [predepth_framebuffer,
-          predepth_shader,
-          predepth_pipeline,
-          predepth_material] = get_data();
-  predepth_framebuffer =
-    Core::make_scope<Framebuffer>(Framebuffer::Configuration{
-      .size = renderer.get_size(),
-      .depth_attachment_format = VK_FORMAT_D24_UNORM_S8_UINT,
-      .sample_count = VK_SAMPLE_COUNT_4_BIT,
-      .name = "Predepth",
-    });
-  predepth_shader = Shader::compile_graphics_scoped(
-    "Assets/shaders/predepth.vert", "Assets/shaders/predepth.frag");
-  predepth_pipeline =
+  RenderPass::for_each([&](const auto key, auto& val) {
+    auto&& [predepth_framebuffer,
+            predepth_shader,
+            predepth_pipeline,
+            predepth_material] = val;
+    predepth_framebuffer =
+      Core::make_scope<Framebuffer>(Framebuffer::Configuration{
+        .size = get_renderer().get_size(),
+        .depth_attachment_format = VK_FORMAT_D24_UNORM_S8_UINT,
+        .sample_count = VK_SAMPLE_COUNT_4_BIT,
+        .name = "Predepth",
+      });
+    predepth_shader = Shader::compile_graphics_scoped(
+      "Assets/shaders/predepth.vert", "Assets/shaders/predepth.frag");
+    predepth_pipeline =
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
       .framebuffer = predepth_framebuffer.get(),
       .shader = predepth_shader.get(),
@@ -43,23 +44,22 @@ PreDepthRenderPass::construct(Renderer& renderer) -> void
           { { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 } },
         },
     });
-
-  predepth_material = Core::make_scope<Material>(Material::Configuration{
-    .shader = predepth_shader.get(),
+    predepth_material = Core::make_scope<Material>(Material::Configuration{
+      .shader = predepth_shader.get(),
+    });
   });
 }
 
 auto
-PreDepthRenderPass::execute_impl(Renderer& renderer,
-                                 CommandBuffer& command_buffer) -> void
+PreDepthRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 {
-  const auto&& [predepth_framebuffer,
-                predepth_shader,
-                predepth_pipeline,
-                predepth_material] = get_data();
+  const auto& [predepth_framebuffer,
+               predepth_shader,
+               predepth_pipeline,
+               predepth_material] = get_data();
 
   auto descriptor_set =
-    generate_and_update_descriptor_write_sets(renderer, *predepth_material);
+    generate_and_update_descriptor_write_sets(*predepth_material);
 
   vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
                           VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -70,7 +70,7 @@ PreDepthRenderPass::execute_impl(Renderer& renderer,
                           0,
                           nullptr);
 
-  for (const auto& [key, command] : renderer.draw_commands) {
+  for (const auto& [key, command] : get_renderer().draw_commands) {
     const auto& [vertex_buffer,
                  index_buffer,
                  material,
@@ -86,10 +86,10 @@ PreDepthRenderPass::execute_impl(Renderer& renderer,
                            offsets.data());
 
     const auto& transform_vertex_buffer =
-      renderer.transform_buffers
-        .at(Core::Application::the().current_frame_index())
+      get_renderer()
+        .transform_buffers.at(Core::Application::the().current_frame_index())
         .transform_buffer;
-    auto offset = renderer.mesh_transform_map.at(key).offset;
+    auto offset = get_renderer().mesh_transform_map.at(key).offset;
     RendererExtensions::bind_vertex_buffer(
       command_buffer, *transform_vertex_buffer, 1, offset);
 
@@ -104,6 +104,16 @@ PreDepthRenderPass::execute_impl(Renderer& renderer,
                      0,
                      0);
   }
+}
+
+auto
+PreDepthRenderPass::on_resize(const Core::Extent& ext) -> void
+{
+  RenderPass::for_each([&](const auto key, auto& val) {
+    auto&& [framebuffer, shader, pipeline, material] = val;
+    framebuffer->on_resize(ext);
+    pipeline->on_resize(ext);
+  });
 }
 
 } // namespace Engine::Graphics

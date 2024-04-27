@@ -21,68 +21,33 @@ namespace Engine::Graphics {
 static Core::Ref<Image> normal_map;
 
 auto
-MainGeometryRenderPass::construct(Renderer& renderer) -> void
+MainGeometryRenderPass::construct() -> void
 {
-  auto&& [main_geometry_framebuffer,
-          main_geometry_shader,
-          main_geometry_pipeline,
-          main_geometry_material] = get_data();
-  main_geometry_framebuffer =
-    Core::make_scope<Framebuffer>(Framebuffer::Configuration{
-      .size = renderer.get_size(),
-      .colour_attachment_formats = { VK_FORMAT_R32G32B32A32_SFLOAT, // position
-                                     VK_FORMAT_R32G32B32A32_SFLOAT, // normals
-                                     VK_FORMAT_R32G32B32A32_SFLOAT, // albedo + spec
-                                     },
-      .sample_count = VK_SAMPLE_COUNT_4_BIT,
-      .dependent_attachments = {
-        renderer.get_render_pass("PreDepth").get_depth_attachment(),
-      },
-      .name = "MainGeometry",
-    });
-  main_geometry_shader = Shader::compile_graphics_scoped(
-    "Assets/shaders/main_geometry.vert", "Assets/shaders/main_geometry.frag");
-  main_geometry_pipeline =
-    Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
-      .framebuffer = main_geometry_framebuffer.get(),
-      .shader = main_geometry_shader.get(),
-      .sample_count = VK_SAMPLE_COUNT_4_BIT,
-    });
-  main_geometry_material = Core::make_scope<Material>(Material::Configuration{
-    .shader = main_geometry_shader.get(),
-  });
-
-  main_geometry_material->set(
-    "shadow_map",
-    TextureType::Shadow,
-    renderer.get_render_pass("Shadow").get_depth_attachment());
-
-  normal_map = Graphics::Image::load_from_file("Assets/images/cube_normal.png");
+  on_resize(get_renderer().get_size());
 }
 
 auto
-MainGeometryRenderPass::execute_impl(Renderer& renderer,
-                                     CommandBuffer& command_buffer) -> void
+MainGeometryRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 {
-  const auto&& [main_geometry_framebuffer,
-                main_geometry_shader,
-                main_geometry_pipeline,
-                main_geometry_material] = get_data();
+  const auto& [main_geometry_framebuffer,
+               main_geometry_shader,
+               main_geometry_pipeline,
+               main_geometry_material] = get_data();
 
-  auto descriptor_set = generate_and_update_descriptor_write_sets(
-    renderer, *main_geometry_material);
+  auto descriptor_set =
+    generate_and_update_descriptor_write_sets(*main_geometry_material);
 
-  for (const auto& [key, command] : renderer.draw_commands) {
+  for (const auto& [key, command] : get_renderer().draw_commands) {
     const auto& [vertex_buffer,
                  index_buffer,
                  material,
                  submesh_index,
                  instance_count] = command;
     const auto& transform_vertex_buffer =
-      renderer.transform_buffers
-        .at(Core::Application::the().current_frame_index())
+      get_renderer()
+        .transform_buffers.at(Core::Application::the().current_frame_index())
         .transform_buffer;
-    auto offset = renderer.mesh_transform_map.at(key).offset;
+    auto offset = get_renderer().mesh_transform_map.at(key).offset;
 
     material->generate_and_update_descriptor_write_sets(descriptor_set);
 
@@ -112,6 +77,47 @@ auto
 MainGeometryRenderPass::destruct_impl() -> void
 {
   normal_map.reset();
+}
+
+auto
+MainGeometryRenderPass::on_resize(const Core::Extent& ext) -> void
+{
+  RenderPass::for_each([&](const auto key, auto& val) {
+    auto&& [main_geometry_framebuffer,
+            main_geometry_shader,
+            main_geometry_pipeline,
+            main_geometry_material] = val;
+    main_geometry_framebuffer =
+    Core::make_scope<Framebuffer>(Framebuffer::Configuration{
+      .size = ext,
+      .colour_attachment_formats = {
+          VK_FORMAT_R32G32B32A32_SFLOAT,
+          VK_FORMAT_R32G32B32A32_SFLOAT,
+          VK_FORMAT_R32G32B32A32_SFLOAT,
+          VK_FORMAT_D24_UNORM_S8_UINT,
+      },
+      .sample_count = VK_SAMPLE_COUNT_4_BIT,
+      .dependent_images = {
+        {3, get_renderer().get_render_pass("PreDepth").get_depth_attachment()},
+      },
+      .name = "MainGeometry",
+    });
+    main_geometry_shader = Shader::compile_graphics_scoped(
+      "Assets/shaders/main_geometry.vert", "Assets/shaders/main_geometry.frag");
+    main_geometry_pipeline =
+      Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
+        .framebuffer = main_geometry_framebuffer.get(),
+        .shader = main_geometry_shader.get(),
+        .sample_count = VK_SAMPLE_COUNT_4_BIT,
+      });
+    main_geometry_material = Core::make_scope<Material>(Material::Configuration{
+      .shader = main_geometry_shader.get(),
+    });
+
+    main_geometry_material->set(
+      "shadow_map",
+      get_renderer().get_render_pass("Shadow").get_depth_attachment());
+  });
 }
 
 } // namespace Engine::Graphics

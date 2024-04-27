@@ -9,33 +9,28 @@
 namespace Engine::Graphics {
 
 auto
-RenderPass::update_attachment(Core::u32 index, const Core::Ref<Image>& image)
-  -> void
-{
-  framebuffer->update_attachment(index, image);
-}
-
-auto
 RenderPass::get_colour_attachment(Core::u32 index) const
   -> const Core::Ref<Image>&
 {
-  return framebuffer->get_colour_attachment(index);
+  return get_framebuffer()->get_colour_attachment(index);
 }
 
 auto
-RenderPass::get_depth_attachment() const -> const Core::Ref<Image>&
+RenderPass::get_depth_attachment(const bool sampled) const
+  -> const Core::Ref<Image>&
 {
-  return framebuffer->get_depth_attachment();
+  return get_framebuffer()->get_depth_attachment(sampled);
 }
 
 auto
 RenderPass::bind(CommandBuffer& command_buffer) -> void
 {
-  RendererExtensions::begin_renderpass(command_buffer, *framebuffer);
+  RendererExtensions::begin_renderpass(command_buffer, *get_framebuffer());
 
-  vkCmdBindPipeline(command_buffer.get_command_buffer(),
-                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    pipeline->get_pipeline());
+  vkCmdBindPipeline(
+    command_buffer.get_command_buffer(),
+    VK_PIPELINE_BIND_POINT_GRAPHICS,
+    std::get<Core::Scope<GraphicsPipeline>>(*pass)->get_pipeline());
 }
 
 auto
@@ -45,11 +40,90 @@ RenderPass::unbind(CommandBuffer& command_buffer) -> void
 }
 
 auto
-RenderPass::generate_and_update_descriptor_write_sets(Renderer& renderer,
-                                                      Material& material)
+RenderPass::generate_and_update_descriptor_write_sets(Material& material)
   -> VkDescriptorSet
 {
   return renderer.generate_and_update_descriptor_write_sets(material);
+}
+
+auto
+RenderPass::blit_to(const CommandBuffer& command_buffer,
+                    const Framebuffer& destination,
+                    BlitProperties properties) -> void
+{
+  if (!properties.colour_attachment_index.has_value() &&
+      !properties.depth_attachment) {
+    return;
+  }
+
+  VkImage src_image;
+  VkImageLayout src_layout;
+  VkImage dst_image;
+  VkImageLayout dst_layout;
+  VkImageAspectFlags aspect_flags;
+  VkExtent3D extent;
+  if (properties.depth_attachment) {
+    src_image = get_framebuffer()->get_depth_attachment()->image;
+    src_layout = get_framebuffer()->get_depth_attachment()->layout;
+    dst_image = destination.get_depth_attachment()->image;
+    dst_layout = destination.get_depth_attachment()->layout;
+
+    extent = get_framebuffer()->get_depth_attachment()->extent;
+
+    // Lets assume they share aspect mask.
+    aspect_flags = get_framebuffer()->get_depth_attachment()->aspect_mask;
+  } else {
+    auto& val = properties.colour_attachment_index;
+    if (!properties.colour_attachment_index.has_value())
+      return;
+
+    src_image = get_framebuffer()->get_colour_attachment(val.value())->image;
+    src_layout = get_framebuffer()->get_colour_attachment(val.value())->layout;
+    dst_image = destination.get_colour_attachment(val.value())->image;
+    dst_layout = destination.get_colour_attachment(val.value())->layout;
+
+    extent = destination.get_colour_attachment(val.value())->extent;
+  }
+
+  std::array<VkImageCopy, 1> regions{
+    VkImageCopy{
+      .srcSubresource =
+        VkImageSubresourceLayers{
+          .aspectMask = aspect_flags,
+          .mipLevel = 0,
+          .baseArrayLayer = 0,
+          .layerCount = 1,
+        },
+      .srcOffset = { 0, 0, 0 },
+      .dstSubresource =
+        VkImageSubresourceLayers{
+          .aspectMask = aspect_flags,
+          .mipLevel = 0,
+          .baseArrayLayer = 0,
+          .layerCount = 1,
+        },
+      .dstOffset = { 0, 0, 0 },
+      .extent = extent,
+    },
+  };
+
+  transition_image_layout(
+    src_image, src_layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, aspect_flags);
+  transition_image_layout(
+    dst_image, dst_layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, aspect_flags);
+
+  vkCmdCopyImage(command_buffer.get_command_buffer(),
+                 src_image,
+                 src_layout,
+                 dst_image,
+                 dst_layout,
+                 1,
+                 regions.data());
+
+  transition_image_layout(
+    src_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, src_layout, aspect_flags);
+  transition_image_layout(
+    dst_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, dst_layout, aspect_flags);
 }
 
 } // namespace Engine::Graphic

@@ -7,39 +7,6 @@
 
 #include <ranges>
 
-template<>
-struct std::formatter<Engine::Graphics::TextureType>
-{
-  // for debugging only
-
-  constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
-
-  auto format(const Engine::Graphics::TextureType& type,
-              std::format_context& ctx) const
-  {
-    return std::format_to(ctx.out(), "{}", to_string_view(type));
-  }
-
-private:
-  static constexpr auto to_string_view = [](const auto type) {
-    switch (type) {
-      case Engine::Graphics::TextureType::Albedo:
-        return "Albedo";
-      case Engine::Graphics::TextureType::Normal:
-        return "Normal";
-      case Engine::Graphics::TextureType::Shadow:
-        return "Shadow";
-      case Engine::Graphics::TextureType::Roughness:
-        return "Roughness";
-      case Engine::Graphics::TextureType::Position:
-        return "Position";
-      default:
-        return "Missing";
-    }
-    return "Missing";
-  };
-};
-
 namespace Engine::Graphics {
 
 Material::~Material() = default;
@@ -50,9 +17,8 @@ Material::Material(Configuration config)
 }
 
 auto
-Material::set(const std::string_view name,
-              TextureType type,
-              const Core::Ref<Image>& image) -> bool
+Material::set(const std::string_view name, const Core::Ref<Image>& image)
+  -> bool
 {
   if (!image) {
     return false;
@@ -62,12 +28,13 @@ Material::set(const std::string_view name,
     return false;
   }
 
-  if (images.contains(type)) {
-    error("Could not map new image into type '{}'", type);
+  const auto as_string = std::string{ name };
+  if (images.contains(as_string)) {
+    error("Could not map new image into type '{}'", as_string);
     return false;
   }
 
-  images[type] = image;
+  images[as_string] = image;
 
   write_descriptors.for_each([&](const auto&, auto& container) {
     if (!container.contains(resource->get_register())) {
@@ -76,7 +43,7 @@ Material::set(const std::string_view name,
       desc.descriptorCount = 1;
       desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
       desc.dstBinding = resource->get_register();
-      desc.pImageInfo = &images[type]->descriptor_info;
+      desc.pImageInfo = &images[as_string]->descriptor_info;
     }
   });
 
@@ -93,9 +60,10 @@ Material::generate_and_update_descriptor_write_sets(VkDescriptorSet dst) -> void
   }
 
   std::vector<VkWriteDescriptorSet> values{};
-  values.reserve(current_writes.size());
+  values.resize(current_writes.size());
+  auto i = 0ULL;
   for (const auto& [index, write] : current_writes) {
-    values.push_back(write);
+    values.at(i++) = write;
   }
 
   vkUpdateDescriptorSets(Device::the().device(),

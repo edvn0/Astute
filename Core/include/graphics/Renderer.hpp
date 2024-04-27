@@ -104,23 +104,30 @@ public:
                           const Graphics::IndexBuffer&,
                           Graphics::Material&,
                           const glm::mat4&) -> void;
+  auto submit_static_light(const Graphics::VertexBuffer&,
+                           const Graphics::IndexBuffer&,
+                           Graphics::Material&,
+                           const glm::mat4&) -> void;
 
   auto get_output_image(Core::u32 attachment = 0) const -> const Image*
   {
     return render_passes.at("MainGeometry")
-      ->framebuffer->get_colour_attachment(attachment)
+      ->get_framebuffer()
+      ->get_colour_attachment(attachment)
       .get();
   }
   auto get_shadow_output_image() const -> const Image*
   {
     return render_passes.at("Shadow")
-      ->framebuffer->get_depth_attachment()
+      ->get_framebuffer()
+      ->get_depth_attachment(true)
       .get();
   }
   auto get_final_output() const -> const Image*
   {
     return render_passes.at("Deferred")
-      ->framebuffer->get_colour_attachment(0)
+      ->get_framebuffer()
+      ->get_colour_attachment(0)
       .get();
   }
 
@@ -137,6 +144,10 @@ public:
 
   auto get_size() const -> const Core::Extent& { return size; }
   auto get_render_pass(const std::string& name) -> RenderPass&
+  {
+    return *render_passes.at(name);
+  }
+  auto get_render_pass(const std::string& name) const -> const RenderPass&
   {
     return *render_passes.at(name);
   }
@@ -173,6 +184,7 @@ private:
 
   std::unordered_map<CommandKey, DrawCommand> draw_commands;
   std::unordered_map<CommandKey, DrawCommand> shadow_draw_commands;
+  std::unordered_map<CommandKey, DrawCommand> point_light_draw_commands;
 
   std::vector<SubmeshTransformBuffer> transform_buffers;
   std::unordered_map<CommandKey, TransformMapData> mesh_transform_map;
@@ -185,6 +197,7 @@ private:
   friend class MainGeometryRenderPass;
   friend class PreDepthRenderPass;
   friend class ShadowRenderPass;
+  friend class LightsRenderPass;
 };
 
 }

@@ -341,6 +341,12 @@ Device::the() -> Device&
 }
 
 auto
+Device::wait() -> void
+{
+  vkDeviceWaitIdle(vk_device);
+}
+
+auto
 Device::initialise(VkSurfaceKHR surface) -> void
 {
   if (!is_initialised) {

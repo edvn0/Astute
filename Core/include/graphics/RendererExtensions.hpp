@@ -23,6 +23,8 @@ bind_index_buffer(const CommandBuffer&,
                   BufferOffset = 0) -> void;
 
 auto
-explicitly_clear_framebuffer(const CommandBuffer&, const Framebuffer&) -> void;
+explicitly_clear_framebuffer(const CommandBuffer&,
+                             const Framebuffer&,
+                             bool clear_depth = true) -> void;
 
 }

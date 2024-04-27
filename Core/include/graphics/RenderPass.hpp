@@ -2,6 +2,7 @@
 
 #include "graphics/Forward.hpp"
 
+#include "core/FrameBasedCollection.hpp"
 #include "core/Types.hpp"
 
 #include <tuple>
@@ -14,13 +15,12 @@ class RenderPass
 public:
   virtual ~RenderPass() = default;
 
-  virtual auto construct(Renderer&) -> void = 0;
-  virtual auto on_resize(Renderer& renderer, const Core::Extent& new_size)
-    -> void = 0;
-  auto execute(Renderer& renderer, CommandBuffer& command_buffer) -> void
+  virtual auto construct() -> void = 0;
+  virtual auto on_resize(const Core::Extent& new_size) -> void = 0;
+  auto execute(CommandBuffer& command_buffer) -> void
   {
     bind(command_buffer);
-    execute_impl(renderer, command_buffer);
+    execute_impl(command_buffer);
     unbind(command_buffer);
   }
 
@@ -28,46 +28,51 @@ public:
   {
     destruct_impl();
 
-    if (framebuffer)
-      framebuffer.reset();
-    if (shader)
-      shader.reset();
-    if (pipeline)
-      pipeline.reset();
-    if (material)
-      material.reset();
+    pass.clear();
   }
 
-  auto update_attachment(Core::u32, const Core::Ref<Image>&) -> void;
   auto get_colour_attachment(Core::u32) const -> const Core::Ref<Image>&;
-  auto get_depth_attachment() const -> const Core::Ref<Image>&;
+  auto get_depth_attachment(bool sampled = false) const
+    -> const Core::Ref<Image>&;
+  auto get_framebuffer() -> decltype(auto)
+  {
+    return std::get<Core::Scope<Framebuffer>>(*pass);
+  }
+  auto get_framebuffer() const -> const auto&
+  {
+    return std::get<Core::Scope<Framebuffer>>(*pass);
+  }
+
+  struct BlitProperties
+  {
+    std::optional<Core::u32> colour_attachment_index{};
+    bool depth_attachment{ false };
+  };
+  auto blit_to(const CommandBuffer&, const Framebuffer&, BlitProperties = {})
+    -> void;
 
 protected:
-  virtual auto destruct_impl() -> void = 0;
-  virtual auto execute_impl(Renderer&, CommandBuffer&) -> void = 0;
-  auto generate_and_update_descriptor_write_sets(Renderer&, Material&)
-    -> VkDescriptorSet;
-  auto get_data() -> std::tuple<Core::Scope<Framebuffer>&,
-                                Core::Scope<Shader>&,
-                                Core::Scope<GraphicsPipeline>&,
-                                Core::Scope<Material>&>
+  explicit RenderPass(Renderer& input)
+    : renderer(input)
   {
-    return std::tuple<Core::Scope<Framebuffer>&,
-                      Core::Scope<Shader>&,
-                      Core::Scope<GraphicsPipeline>&,
-                      Core::Scope<Material>&>{
-      framebuffer, shader, pipeline, material
-    };
   }
+  virtual auto destruct_impl() -> void = 0;
+  virtual auto execute_impl(CommandBuffer&) -> void = 0;
+  virtual auto bind(CommandBuffer& command_buffer) -> void;
+  virtual auto unbind(CommandBuffer& command_buffer) -> void;
+  auto generate_and_update_descriptor_write_sets(Material&) -> VkDescriptorSet;
+  auto get_data() -> auto& { return *pass; }
+  auto get_renderer() -> Renderer& { return renderer; }
+
+  auto for_each(auto&& func) { pass.for_each(func); }
 
 private:
-  Core::Scope<Framebuffer> framebuffer{ nullptr };
-  Core::Scope<Shader> shader{ nullptr };
-  Core::Scope<GraphicsPipeline> pipeline{ nullptr };
-  Core::Scope<Material> material{ nullptr };
-
-  auto bind(CommandBuffer& command_buffer) -> void;
-  auto unbind(CommandBuffer& command_buffer) -> void;
+  Renderer& renderer;
+  using RenderTuple = std::tuple<Core::Scope<Framebuffer>,
+                                 Core::Scope<Shader>,
+                                 Core::Scope<GraphicsPipeline>,
+                                 Core::Scope<Material>>;
+  Core::FrameBasedCollection<RenderTuple> pass{};
 
   friend class Renderer;
 };

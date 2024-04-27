@@ -23,7 +23,7 @@
 
 namespace Engine::Graphics {
 
-static const std::array<std::string, 4> render_pass_order{
+static constexpr std::array render_pass_order{
   "PreDepth",
   "Shadow",
   "MainGeometry",
@@ -117,14 +117,15 @@ Renderer::Renderer(Configuration config, const Window* window)
     .primary = true,
   });
 
-  render_passes["MainGeometry"] = Core::make_scope<MainGeometryRenderPass>();
+  render_passes["MainGeometry"] =
+    Core::make_scope<MainGeometryRenderPass>(*this);
   render_passes["Shadow"] =
-    Core::make_scope<ShadowRenderPass>(config.shadow_pass_size);
-  render_passes["Deferred"] = Core::make_scope<DeferredRenderPass>();
-  render_passes["PreDepth"] = Core::make_scope<PreDepthRenderPass>();
+    Core::make_scope<ShadowRenderPass>(*this, config.shadow_pass_size);
+  render_passes["Deferred"] = Core::make_scope<DeferredRenderPass>(*this);
+  render_passes["PreDepth"] = Core::make_scope<PreDepthRenderPass>(*this);
 
   for (const auto& k : render_pass_order) {
-    render_passes.at(k)->construct(*this);
+    render_passes.at(k)->construct();
   }
 
   transform_buffers.resize(3);
@@ -135,7 +136,9 @@ Renderer::Renderer(Configuration config, const Window* window)
     transform_buffer->fill_zero();
   }
 
-  Core::DataBuffer data_buffer{ sizeof(Core::u32) };
+  Core::DataBuffer data_buffer{
+    sizeof(Core::u32),
+  };
   static constexpr auto white_data = 0xFFFFFFFF;
   data_buffer.write(&white_data, sizeof(Core::u32), 0U);
 
@@ -166,10 +169,18 @@ Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
   -> void
 {
   if (old_size != size) {
-    auto& shadow_render_pass = get_render_pass("Shadow");
-    // We've been resized.
-    shadow_render_pass.on_resize(*this, size);
+    Device::the().wait();
     old_size = size;
+    // We've been resized.
+
+    auto& shadow_render_pass = get_render_pass("Shadow");
+    auto& predepth_render_pass = get_render_pass("PreDepth");
+    auto& main_geom = get_render_pass("MainGeometry");
+    auto& deferred = get_render_pass("Deferred");
+    shadow_render_pass.on_resize(size);
+    predepth_render_pass.on_resize(size);
+    main_geom.on_resize(size);
+    deferred.on_resize(size);
   }
 
   const auto& light_environment = scene.get_light_environment();
@@ -261,6 +272,42 @@ Renderer::submit_static_mesh(const Graphics::VertexBuffer& vertex_buffer,
 }
 
 auto
+Renderer::submit_static_light(const Graphics::VertexBuffer& vertex_buffer,
+                              const Graphics::IndexBuffer& index_buffer,
+                              Graphics::Material& material,
+                              const glm::mat4& transform) -> void
+{
+  CommandKey key{ &vertex_buffer, &index_buffer, &material, 0 };
+
+  auto& mesh_transform = mesh_transform_map[key].transforms.emplace_back();
+  mesh_transform.transform_rows[0] = {
+    transform[0][0],
+    transform[1][0],
+    transform[2][0],
+    transform[3][0],
+  };
+  mesh_transform.transform_rows[1] = {
+    transform[0][1],
+    transform[1][1],
+    transform[2][1],
+    transform[3][1],
+  };
+  mesh_transform.transform_rows[2] = {
+    transform[0][2],
+    transform[1][2],
+    transform[2][2],
+    transform[3][2],
+  };
+
+  auto& command = point_light_draw_commands[key];
+  command.vertex_buffer = &vertex_buffer;
+  command.index_buffer = &index_buffer;
+  command.material = &material;
+  command.submesh_index = 0;
+  command.instance_count++;
+}
+
+auto
 Renderer::end_scene() -> void
 {
   flush_draw_lists();
@@ -297,19 +344,20 @@ Renderer::flush_draw_lists() -> void
   command_buffer->begin();
 
   // Predepth pass
-  render_passes.at("PreDepth")->execute(*this, *command_buffer);
+  render_passes.at("PreDepth")->execute(*command_buffer);
   // Shadow pass
-  render_passes.at("Shadow")->execute(*this, *command_buffer);
+  render_passes.at("Shadow")->execute(*command_buffer);
   // Geometry pass
-  render_passes.at("MainGeometry")->execute(*this, *command_buffer);
+  render_passes.at("MainGeometry")->execute(*command_buffer);
   // Deferred
-  render_passes.at("Deferred")->execute(*this, *command_buffer);
+  render_passes.at("Deferred")->execute(*command_buffer);
 
   command_buffer->end();
   command_buffer->submit();
 
   draw_commands.clear();
   shadow_draw_commands.clear();
+  point_light_draw_commands.clear();
   mesh_transform_map.clear();
 }
 

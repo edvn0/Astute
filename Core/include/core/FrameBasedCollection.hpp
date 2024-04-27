@@ -25,7 +25,9 @@ public:
   }
 
   auto get() -> decltype(auto) { return collection.at(current_index()); }
+  auto get() const -> decltype(auto) { return collection.at(current_index()); }
   auto operator*() -> decltype(auto) { return get(); }
+  auto operator*() const -> decltype(auto) { return get(); }
   auto operator[](auto index) -> decltype(auto) { return collection.at(index); }
 
   template<class... Args>

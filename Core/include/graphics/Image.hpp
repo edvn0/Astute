@@ -60,8 +60,10 @@ public:
   VkSampler sampler{ nullptr };
   VkImageAspectFlags aspect_mask{ VK_IMAGE_ASPECT_COLOR_BIT };
   VkFormat format{ VK_FORMAT_UNDEFINED };
+  VkSampleCountFlagBits sample_count{ VK_SAMPLE_COUNT_1_BIT };
   VkImageLayout layout{ VK_IMAGE_LAYOUT_UNDEFINED };
   VkDescriptorImageInfo descriptor_info{};
+  VkExtent3D extent{};
 
   bool destroyed{ false };
 
@@ -73,10 +75,8 @@ public:
     }
   }
   Image() = default;
-  // Make noncopyable
   Image(const Image&) = delete;
   auto operator=(const Image&) -> Image& = delete;
-  // Make nonmovable
   Image(Image&&) = delete;
   auto operator=(Image&&) -> Image& = delete;
 
@@ -85,11 +85,16 @@ public:
   auto destroy() -> void;
   auto get_descriptor_info() const -> const VkDescriptorImageInfo&;
 
-  static auto load_from_file(std::string_view) -> Core::Ref<Image>;
+  struct Configuration
+  {
+    const std::string path;
+    const VkSampleCountFlagBits sample_count{ VK_SAMPLE_COUNT_1_BIT };
+  };
+  static auto load_from_file(const Configuration& = {}) -> Core::Ref<Image>;
   static auto load_from_memory(Core::u32,
                                Core::u32,
                                const Core::DataBuffer&,
-                               std::string_view = "") -> Core::Ref<Image>;
+                               const Configuration& = {}) -> Core::Ref<Image>;
 };
 
 } // namespace Engine::Graphics

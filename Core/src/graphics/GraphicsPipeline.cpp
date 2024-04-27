@@ -19,10 +19,10 @@ GraphicsPipeline::GraphicsPipeline(const Configuration& config)
   , framebuffer(config.framebuffer)
   , shader(config.shader)
 {
-  info("Creating graphics pipeline for framebuffer: {}",
-       framebuffer->get_name());
   create_layout();
   create_pipeline();
+  trace("Created graphics pipeline for framebuffer: {}",
+        framebuffer->get_name());
 }
 
 GraphicsPipeline::~GraphicsPipeline()

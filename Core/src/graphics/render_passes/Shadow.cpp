@@ -18,48 +18,52 @@
 namespace Engine::Graphics {
 
 auto
-ShadowRenderPass::construct(Renderer& renderer) -> void
+ShadowRenderPass::construct() -> void
 {
-  auto&& [shadow_framebuffer, shadow_shader, shadow_pipeline, shadow_material] =
-    get_data();
-  shadow_framebuffer =
+  RenderPass::for_each([&](const auto key, auto& val) {
+    auto&& [shadow_framebuffer,
+            shadow_shader,
+            shadow_pipeline,
+            shadow_material] = val;
+    shadow_framebuffer =
     Core::make_scope<Framebuffer>(Framebuffer::Configuration{
       .size = {
         size,
         size,
       },
       .depth_attachment_format = VK_FORMAT_D32_SFLOAT,
-      .sample_count = VK_SAMPLE_COUNT_1_BIT,
+      .sample_count = VK_SAMPLE_COUNT_4_BIT,
       .resizable = false,
       .name = "Shadow",
     });
-  shadow_shader = Shader::compile_graphics_scoped("Assets/shaders/shadow.vert",
-                                                  "Assets/shaders/shadow.frag");
-  shadow_pipeline =
-    Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
-      .framebuffer = shadow_framebuffer.get(),
-      .shader = shadow_shader.get(),
-      .override_vertex_attributes = { {
-        { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
-      } },
-    });
+    shadow_shader = Shader::compile_graphics_scoped(
+      "Assets/shaders/shadow.vert", "Assets/shaders/shadow.frag");
+    shadow_pipeline =
+      Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
+        .framebuffer = shadow_framebuffer.get(),
+        .shader = shadow_shader.get(),
+        .sample_count = VK_SAMPLE_COUNT_4_BIT,
+        .override_vertex_attributes = { {
+          { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
+        } },
+      });
 
-  shadow_material = Core::make_scope<Material>(Material::Configuration{
-    .shader = shadow_shader.get(),
+    shadow_material = Core::make_scope<Material>(Material::Configuration{
+      .shader = shadow_shader.get(),
+    });
   });
 }
 
 auto
-ShadowRenderPass::execute_impl(Renderer& renderer,
-                               CommandBuffer& command_buffer) -> void
+ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 {
-  const auto&& [shadow_framebuffer,
-                shadow_shader,
-                shadow_pipeline,
-                shadow_material] = get_data();
+  const auto& [shadow_framebuffer,
+               shadow_shader,
+               shadow_pipeline,
+               shadow_material] = get_data();
 
   auto descriptor_set =
-    generate_and_update_descriptor_write_sets(renderer, *shadow_material);
+    generate_and_update_descriptor_write_sets(*shadow_material);
 
   vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
                           VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -70,7 +74,7 @@ ShadowRenderPass::execute_impl(Renderer& renderer,
                           0,
                           nullptr);
 
-  for (const auto& [key, command] : renderer.shadow_draw_commands) {
+  for (const auto& [key, command] : get_renderer().shadow_draw_commands) {
     const auto& [vertex_buffer,
                  index_buffer,
                  material,
@@ -86,11 +90,11 @@ ShadowRenderPass::execute_impl(Renderer& renderer,
                            offsets.data());
 
     const auto& transform_vertex_buffer =
-      renderer.transform_buffers
-        .at(Core::Application::the().current_frame_index())
+      get_renderer()
+        .transform_buffers.at(Core::Application::the().current_frame_index())
         .transform_buffer;
     auto vb = transform_vertex_buffer->get_buffer();
-    auto offset = renderer.mesh_transform_map.at(key).offset;
+    auto offset = get_renderer().mesh_transform_map.at(key).offset;
 
     offsets = std::array{ VkDeviceSize{ offset } };
 
@@ -108,6 +112,16 @@ ShadowRenderPass::execute_impl(Renderer& renderer,
                      0,
                      0);
   }
+}
+
+auto
+ShadowRenderPass::on_resize(const Core::Extent& ext) -> void
+{
+  RenderPass::for_each([&](const auto key, auto& val) {
+    auto&& [framebuffer, shader, pipeline, material] = val;
+    framebuffer->on_resize(ext);
+    pipeline->on_resize(ext);
+  });
 }
 
 } // namespace Engine::Graphics

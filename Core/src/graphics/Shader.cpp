@@ -117,6 +117,9 @@ Shader::Shader(std::unordered_map<Type, std::vector<Core::u32>> spirv_stages,
     name_hash ^= vector_hasher(parsed_spirv_per_stage_u32.at(Type::Fragment));
   }
 
+  name_hash ^=
+    string_hasher(std::bit_cast<const char*>(std::bit_cast<const void*>(this)));
+
   hash_value = name_hash;
 }
 

@@ -17,7 +17,8 @@ public:
     const VkFormat depth_attachment_format{ VK_FORMAT_UNDEFINED };
     const VkSampleCountFlagBits sample_count{ VK_SAMPLE_COUNT_1_BIT };
     const bool resizable{ true };
-    const std::vector<Core::Ref<Image>> dependent_attachments{};
+    const std::unordered_map<Core::u32, Core::Ref<Image>> dependent_images{};
+    const bool clear_colour_on_load{ true };
     const std::string name;
   };
   explicit Framebuffer(const Configuration&);
@@ -40,8 +41,12 @@ public:
   {
     return depth_attachment != nullptr;
   }
-  auto get_depth_attachment() const -> const Core::Ref<Image>&
+  auto get_depth_attachment(const bool sampled = false) const
+    -> const Core::Ref<Image>&
   {
+    if (sampled) {
+      return depth_resolve_attachment;
+    }
     return depth_attachment;
   }
   auto get_renderpass() -> VkRenderPass { return renderpass; }
@@ -59,11 +64,6 @@ public:
     -> std::vector<VkPipelineColorBlendAttachmentState>;
 
   auto on_resize(const Core::Extent&) -> void;
-  auto update_attachment(Core::u32 index, const Core::Ref<Image>& image) -> void
-  {
-    dependent_attachments[index] = image;
-  }
-
   auto get_name() const -> const std::string& { return name; }
 
 private:
@@ -72,15 +72,17 @@ private:
   VkFormat depth_attachment_format;
   const VkSampleCountFlagBits sample_count{ VK_SAMPLE_COUNT_1_BIT };
   const bool resizable;
-  // Not const because we might need to update the pointers on resize
-  std::vector<Core::Ref<Image>> dependent_attachments{};
+  std::unordered_map<Core::u32, Core::Ref<Image>> dependent_images{};
+  const bool clear_colour_on_load{ true };
   const std::string name;
+  Core::i32 depth_attachment_index{ -1 };
 
   auto search_dependents_for_depth_format() -> const Image*;
 
   std::vector<VkClearValue> clear_values;
   std::vector<Core::Ref<Image>> colour_attachments;
   Core::Ref<Image> depth_attachment;
+  Core::Ref<Image> depth_resolve_attachment;
 
   VkFramebuffer framebuffer{ VK_NULL_HANDLE };
   VkRenderPass renderpass{ VK_NULL_HANDLE };
@@ -89,6 +91,14 @@ private:
   auto create_colour_attachments() -> void;
   auto create_depth_attachment() -> void;
   auto create_renderpass() -> void;
+  void attach_depth_attachments(
+    std::vector<VkAttachmentDescription2>& attachments,
+    VkAttachmentReference2& depth_attachment_ref,
+    VkAttachmentReference2& depth_stencil_resolve_attachment_ref);
+  void attach_colour_attachments(
+    std::vector<VkAttachmentDescription2>& attachments,
+    std::vector<VkAttachmentReference2>& color_attachment_refs,
+    std::vector<VkAttachmentReference2>& resolve_attachment_refs);
   auto create_framebuffer() -> void;
 };
 
