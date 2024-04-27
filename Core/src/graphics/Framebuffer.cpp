@@ -164,12 +164,13 @@ Framebuffer::create_colour_attachments() -> void
 auto
 Framebuffer::create_depth_attachment() -> void
 {
-  auto i = 0;
+  auto i = -1;
   auto maybe_image =
     std::ranges::find_if(dependent_images, [&i](const auto& val) {
       auto&& [k, v] = val;
-      i++;
+
       if (static_cast<bool>(v) && is_depth_format(v->format)) {
+        i = k;
         return true;
       }
       return false;
@@ -365,8 +366,14 @@ Framebuffer::create_renderpass() -> void
 
   if (depth_attachment_format != VK_FORMAT_UNDEFINED) {
     VkClearValue clear_value{};
-    clear_value.depthStencil = { 1.0F, 0 };
+    clear_value.depthStencil = { 0.0F, 0 };
     clear_values.push_back(clear_value);
+
+    if (depth_resolve_attachment) {
+      VkClearValue clear_value{};
+      clear_value.depthStencil = { 0.0F, 0 };
+      clear_values.push_back(clear_value);
+    }
   }
 }
 
@@ -407,14 +414,13 @@ Framebuffer::attach_depth_attachments(
       resolve_attachment.sType = VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2;
       resolve_attachment.format = depth_attachment_format;
       resolve_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-      resolve_attachment.loadOp = clear_colour_on_load
-                                    ? VK_ATTACHMENT_LOAD_OP_DONT_CARE
-                                    : VK_ATTACHMENT_LOAD_OP_LOAD;
+      resolve_attachment.loadOp = should_clear ? VK_ATTACHMENT_LOAD_OP_DONT_CARE
+                                               : VK_ATTACHMENT_LOAD_OP_LOAD;
       resolve_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
       resolve_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
       resolve_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
       resolve_attachment.initialLayout =
-        clear_colour_on_load
+        should_clear
           ? VK_IMAGE_LAYOUT_UNDEFINED
           : VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
       resolve_attachment.finalLayout =

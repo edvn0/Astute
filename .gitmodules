@@ -17,3 +17,6 @@
 [submodule "Library/SPIRV-Cross"]
 	path = Library/SPIRV-Cross
 	url = git@github.com:KhronosGroup/SPIRV-Cross.git
+[submodule "Library/assimp"]
+	path = Library/assimp
+	url = git@github.com:assimp/assimp.git

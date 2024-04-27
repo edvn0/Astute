@@ -66,6 +66,7 @@ private:
   template<class T, GPUBufferType BufferType>
   friend class UniformBufferObject;
   friend class VertexBuffer;
+  friend class IndexBuffer;
 };
 
 class VertexBuffer
@@ -133,6 +134,12 @@ public:
     : buffer(GPUBufferType::Index, indices.size_bytes())
   {
     buffer.write(indices);
+  }
+
+  explicit IndexBuffer(const void* indices, Core::usize size)
+    : buffer(GPUBufferType::Index, size)
+  {
+    buffer.write(indices, size);
   }
 
   auto size() const -> Core::usize { return buffer.get_size(); }

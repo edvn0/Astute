@@ -79,6 +79,8 @@ DeferredRenderPass::on_resize(const Core::Extent& ext) -> void
       .framebuffer = deferred_framebuffer.get(),
       .shader = deferred_shader.get(),
       .sample_count = VK_SAMPLE_COUNT_4_BIT,
+      .cull_mode = VK_CULL_MODE_NONE,
+      .depth_comparator = VK_COMPARE_OP_LESS,
       .override_vertex_attributes = {
           {  },
         },

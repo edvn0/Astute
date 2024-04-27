@@ -14,8 +14,12 @@ namespace Engine::Graphics {
 
 GraphicsPipeline::GraphicsPipeline(const Configuration& config)
   : sample_count(config.sample_count)
+  , face_mode(config.face_mode)
+  , cull_mode(config.cull_mode)
+  , depth_comparator(config.depth_comparator)
   , override_vertex_attributes(config.override_vertex_attributes)
   , override_instance_attributes(config.override_instance_attributes)
+  , clear_depth_value(config.clear_depth_value)
   , framebuffer(config.framebuffer)
   , shader(config.shader)
 {
@@ -51,25 +55,11 @@ GraphicsPipeline::create_pipeline() -> void
   VkGraphicsPipelineCreateInfo pipeline_info{};
   pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 
-  VkViewport viewport{};
-  viewport.x = 0.0f;
-  viewport.y = 0.0f;
-  viewport.width = static_cast<float>(framebuffer->get_extent().width);
-  viewport.height = static_cast<float>(framebuffer->get_extent().height);
-  viewport.minDepth = 0.0f;
-  viewport.maxDepth = 1.0f;
-
-  VkRect2D scissor{};
-  scissor.offset = { 0, 0 };
-  scissor.extent = framebuffer->get_extent();
-
   VkPipelineViewportStateCreateInfo viewport_state_info{};
   viewport_state_info.sType =
     VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
   viewport_state_info.viewportCount = 1;
-  viewport_state_info.pViewports = &viewport;
   viewport_state_info.scissorCount = 1;
-  viewport_state_info.pScissors = &scissor;
   pipeline_info.pViewportState = &viewport_state_info;
 
   const auto maybe_vertex_stage =
@@ -174,9 +164,13 @@ GraphicsPipeline::create_pipeline() -> void
     VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
   depth_stencil_info.depthTestEnable = VK_TRUE;
   depth_stencil_info.depthWriteEnable = VK_TRUE;
-  depth_stencil_info.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+  depth_stencil_info.depthCompareOp = depth_comparator;
   depth_stencil_info.depthBoundsTestEnable = VK_FALSE;
   depth_stencil_info.stencilTestEnable = VK_FALSE;
+  depth_stencil_info.back.failOp = VK_STENCIL_OP_KEEP;
+  depth_stencil_info.back.passOp = VK_STENCIL_OP_KEEP;
+  depth_stencil_info.back.compareOp = VK_COMPARE_OP_ALWAYS;
+  depth_stencil_info.front = depth_stencil_info.back;
   pipeline_info.pDepthStencilState = &depth_stencil_info;
 
   VkPipelineColorBlendStateCreateInfo color_blend_info{};

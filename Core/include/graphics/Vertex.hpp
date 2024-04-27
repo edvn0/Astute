@@ -32,6 +32,4 @@ struct Vertex
   constexpr auto operator<=>(const Vertex&) const = default;
 };
 
-using Index = std::uint32_t;
-
 }

@@ -43,6 +43,8 @@ ShadowRenderPass::construct() -> void
         .framebuffer = shadow_framebuffer.get(),
         .shader = shadow_shader.get(),
         .sample_count = VK_SAMPLE_COUNT_4_BIT,
+        .depth_comparator = VK_COMPARE_OP_LESS_OR_EQUAL,
+        .clear_depth_value = 1.0F,
         .override_vertex_attributes = { {
           { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
         } },
@@ -75,13 +77,11 @@ ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                           nullptr);
 
   for (const auto& [key, command] : get_renderer().shadow_draw_commands) {
-    const auto& [vertex_buffer,
-                 index_buffer,
-                 material,
-                 submesh_index,
-                 instance_count] = command;
+    const auto& [mesh, submesh_index, instance_count] = command;
 
-    auto vertex_buffers = std::array{ vertex_buffer->get_buffer() };
+    const auto& mesh_asset = mesh->get_mesh_asset();
+    auto vertex_buffers =
+      std::array{ mesh_asset->get_vertex_buffer().get_buffer() };
     auto offsets = std::array<VkDeviceSize, 1>{ 0 };
     vkCmdBindVertexBuffers(command_buffer.get_command_buffer(),
                            0,
@@ -102,15 +102,16 @@ ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
       command_buffer.get_command_buffer(), 1, 1, &vb, offsets.data());
 
     vkCmdBindIndexBuffer(command_buffer.get_command_buffer(),
-                         index_buffer->get_buffer(),
+                         mesh_asset->get_index_buffer().get_buffer(),
                          0,
                          VK_INDEX_TYPE_UINT32);
-    vkCmdDrawIndexed(command_buffer.get_command_buffer(),
-                     static_cast<Core::u32>(index_buffer->count()),
-                     instance_count,
-                     0,
-                     0,
-                     0);
+    vkCmdDrawIndexed(
+      command_buffer.get_command_buffer(),
+      static_cast<Core::u32>(mesh_asset->get_index_buffer().count()),
+      instance_count,
+      0,
+      0,
+      0);
   }
 }
 

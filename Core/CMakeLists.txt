@@ -34,6 +34,7 @@ add_library(Core STATIC
     include/graphics/Instance.hpp
     include/graphics/InterfaceSystem.hpp
     include/graphics/Material.hpp
+    include/graphics/Mesh.hpp
     include/graphics/RenderPass.hpp
     include/graphics/Renderer.hpp
     include/graphics/RendererExtensions.hpp
@@ -68,6 +69,7 @@ add_library(Core STATIC
     src/graphics/Instance.cpp
     src/graphics/InterfaceSystem.cpp
     src/graphics/Material.cpp
+    src/graphics/Mesh.cpp
     src/graphics/RenderPass.cpp
     src/graphics/Renderer.cpp
     src/graphics/RendererExtensions.cpp
@@ -81,7 +83,7 @@ add_library(Core STATIC
     src/graphics/render_passes/Shadow.cpp
     src/ui/UI.cpp
 )
-target_include_directories(Core PUBLIC include ${CMAKE_SOURCE_DIR}/Library/imgui ${CMAKE_SOURCE_DIR}/Library/glm ${CMAKE_SOURCE_DIR}/Library/src PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(Core PUBLIC ShaderCompilation glfw Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator PRIVATE imgui glm EnTT::EnTT stbimage::stbimage)
+target_include_directories(Core PUBLIC include ${CMAKE_SOURCE_DIR}/Library/imgui ${CMAKE_SOURCE_DIR}/Library/glm ${CMAKE_SOURCE_DIR}/Library/src PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/Library/assimp/include)
+target_link_libraries(Core PUBLIC ShaderCompilation glfw Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator PRIVATE imgui glm EnTT::EnTT stbimage::stbimage assimp)
 
 target_precompile_headers(Core PRIVATE include/pch/CorePCH.hpp)

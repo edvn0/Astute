@@ -9,6 +9,7 @@
 #include "graphics/GPUBuffer.hpp"
 #include "graphics/GraphicsPipeline.hpp"
 #include "graphics/Material.hpp"
+#include "graphics/Mesh.hpp"
 #include "graphics/RenderPass.hpp"
 #include "graphics/Shader.hpp"
 
@@ -100,14 +101,8 @@ public:
   auto begin_scene(Core::Scene&, const SceneRendererCamera&) -> void;
   auto end_scene() -> void;
 
-  auto submit_static_mesh(const Graphics::VertexBuffer&,
-                          const Graphics::IndexBuffer&,
-                          Graphics::Material&,
-                          const glm::mat4&) -> void;
-  auto submit_static_light(const Graphics::VertexBuffer&,
-                           const Graphics::IndexBuffer&,
-                           Graphics::Material&,
-                           const glm::mat4&) -> void;
+  auto submit_static_mesh(Core::Ref<StaticMesh>&, const glm::mat4&) -> void;
+  auto submit_static_light(Core::Ref<StaticMesh>&, const glm::mat4&) -> void;
 
   auto get_output_image(Core::u32 attachment = 0) const -> const Image*
   {
@@ -175,9 +170,7 @@ private:
 
   struct DrawCommand
   {
-    const Graphics::VertexBuffer* vertex_buffer;
-    const Graphics::IndexBuffer* index_buffer;
-    Graphics::Material* material;
+    Core::Ref<StaticMesh> static_mesh{};
     Core::u32 submesh_index{ 0 };
     Core::u32 instance_count{ 0 };
   };

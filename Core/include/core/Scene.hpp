@@ -5,6 +5,7 @@
 #include "core/Camera.hpp"
 #include "core/Types.hpp"
 #include "graphics/Material.hpp"
+#include "graphics/Mesh.hpp"
 #include "graphics/ShaderBuffers.hpp"
 
 #include <glm/glm.hpp>
@@ -20,6 +21,11 @@ struct SimpleMeshComponent
   Ref<Graphics::IndexBuffer> index_buffer{ nullptr };
   Ref<Graphics::Material> material{ nullptr };
   Ref<Graphics::Shader> shader{ nullptr };
+};
+
+struct MeshComponent
+{
+  Core::Ref<Graphics::StaticMesh> mesh;
 };
 
 struct TransformComponent

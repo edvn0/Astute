@@ -32,5 +32,5 @@ private:
   Scope<Camera> camera;
 
   SceneState scene_state{ SceneState::Edit };
-  Ref<Scene> scene{ nullptr };
+  Ref<Engine::Core::Scene> scene{ nullptr };
 };

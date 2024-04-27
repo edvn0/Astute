@@ -23,7 +23,7 @@ AstuteApplication::AstuteApplication(Application::Configuration config)
                              static_cast<f32>(config.size.height),
                              0.1F,
                              1000.0F })
-  , scene(std::make_shared<Scene>(config.scene_name)){
+  , scene(std::make_shared<Engine::Core::Scene>(config.scene_name)){
 
   };
 

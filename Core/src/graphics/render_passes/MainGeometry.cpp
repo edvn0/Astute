@@ -38,23 +38,25 @@ MainGeometryRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
     generate_and_update_descriptor_write_sets(*main_geometry_material);
 
   for (const auto& [key, command] : get_renderer().draw_commands) {
-    const auto& [vertex_buffer,
-                 index_buffer,
-                 material,
-                 submesh_index,
-                 instance_count] = command;
+    const auto& [mesh, submesh_index, instance_count] = command;
+
+    const auto& mesh_asset = mesh->get_mesh_asset();
     const auto& transform_vertex_buffer =
       get_renderer()
         .transform_buffers.at(Core::Application::the().current_frame_index())
         .transform_buffer;
     auto offset = get_renderer().mesh_transform_map.at(key).offset;
 
+    auto& material = mesh->get_materials().at(
+      mesh_asset->get_submeshes().at(submesh_index).material_index);
     material->generate_and_update_descriptor_write_sets(descriptor_set);
 
-    RendererExtensions::bind_vertex_buffer(command_buffer, *vertex_buffer, 0);
+    RendererExtensions::bind_vertex_buffer(
+      command_buffer, mesh_asset->get_vertex_buffer(), 0);
     RendererExtensions::bind_vertex_buffer(
       command_buffer, *transform_vertex_buffer, 1, offset);
-    RendererExtensions::bind_index_buffer(command_buffer, *index_buffer);
+    RendererExtensions::bind_index_buffer(command_buffer,
+                                          mesh_asset->get_index_buffer());
 
     vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
                             VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -64,12 +66,13 @@ MainGeometryRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                             &descriptor_set,
                             0,
                             nullptr);
-    vkCmdDrawIndexed(command_buffer.get_command_buffer(),
-                     static_cast<Core::u32>(index_buffer->count()),
-                     instance_count,
-                     0,
-                     0,
-                     0);
+    vkCmdDrawIndexed(
+      command_buffer.get_command_buffer(),
+      static_cast<Core::u32>(mesh_asset->get_index_buffer().count()),
+      instance_count,
+      0,
+      0,
+      0);
   }
 }
 
@@ -106,9 +109,9 @@ MainGeometryRenderPass::on_resize(const Core::Extent& ext) -> void
       "Assets/shaders/main_geometry.vert", "Assets/shaders/main_geometry.frag");
     main_geometry_pipeline =
       Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
-        .framebuffer = main_geometry_framebuffer.get(),
-        .shader = main_geometry_shader.get(),
-        .sample_count = VK_SAMPLE_COUNT_4_BIT,
+        .framebuffer{ main_geometry_framebuffer.get() },
+        .shader{ main_geometry_shader.get() },
+        .sample_count{ VK_SAMPLE_COUNT_4_BIT },
       });
     main_geometry_material = Core::make_scope<Material>(Material::Configuration{
       .shader = main_geometry_shader.get(),

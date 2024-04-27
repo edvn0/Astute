@@ -227,84 +227,98 @@ Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
 }
 
 auto
-Renderer::submit_static_mesh(const Graphics::VertexBuffer& vertex_buffer,
-                             const Graphics::IndexBuffer& index_buffer,
-                             Graphics::Material& material,
+Renderer::submit_static_mesh(Core::Ref<StaticMesh>& static_mesh,
                              const glm::mat4& transform) -> void
 {
-  CommandKey key{ &vertex_buffer, &index_buffer, &material, 0 };
+  const auto& source = static_mesh->get_mesh_asset();
+  const auto& submesh_data = source->get_submeshes();
+  for (const auto submesh_index : static_mesh->get_submeshes()) {
+    glm::mat4 submesh_transform =
+      transform * submesh_data[submesh_index].transform;
 
-  auto& mesh_transform = mesh_transform_map[key].transforms.emplace_back();
-  mesh_transform.transform_rows[0] = {
-    transform[0][0],
-    transform[1][0],
-    transform[2][0],
-    transform[3][0],
-  };
-  mesh_transform.transform_rows[1] = {
-    transform[0][1],
-    transform[1][1],
-    transform[2][1],
-    transform[3][1],
-  };
-  mesh_transform.transform_rows[2] = {
-    transform[0][2],
-    transform[1][2],
-    transform[2][2],
-    transform[3][2],
-  };
+    const auto& vertex_buffer = source->get_vertex_buffer();
+    const auto& index_buffer = source->get_index_buffer();
+    const auto& material =
+      source->get_materials().at(submesh_data[submesh_index].material_index);
 
-  auto& command = draw_commands[key];
-  command.vertex_buffer = &vertex_buffer;
-  command.index_buffer = &index_buffer;
-  command.material = &material;
-  command.submesh_index = 0;
-  command.instance_count++;
+    CommandKey key{ &vertex_buffer, &index_buffer, material.get(), 0 };
+    auto& mesh_transform = mesh_transform_map[key].transforms.emplace_back();
+    mesh_transform.transform_rows[0] = {
+      submesh_transform[0][0],
+      submesh_transform[1][0],
+      submesh_transform[2][0],
+      submesh_transform[3][0],
+    };
+    mesh_transform.transform_rows[1] = {
+      submesh_transform[0][1],
+      submesh_transform[1][1],
+      submesh_transform[2][1],
+      submesh_transform[3][1],
+    };
+    mesh_transform.transform_rows[2] = {
+      submesh_transform[0][2],
+      submesh_transform[1][2],
+      submesh_transform[2][2],
+      submesh_transform[3][2],
+    };
 
-  if (true /*mesh->casts_shadows()*/) {
-    auto& shadow_command = shadow_draw_commands[key];
-    shadow_command.vertex_buffer = &vertex_buffer;
-    shadow_command.index_buffer = &index_buffer;
-    shadow_command.submesh_index = 0;
-    shadow_command.instance_count++;
-    // shadow_command.material = shadow_material.get();
+    auto& command = draw_commands[key];
+    command.static_mesh = static_mesh;
+    command.submesh_index = 0;
+    command.instance_count++;
+
+    if (true /*mesh->casts_shadows()*/) {
+      auto& shadow_command = shadow_draw_commands[key];
+      shadow_command.static_mesh = static_mesh;
+      shadow_command.submesh_index = 0;
+      shadow_command.instance_count++;
+      // shadow_command.material = shadow_material.get();
+    }
   }
 }
 
 auto
-Renderer::submit_static_light(const Graphics::VertexBuffer& vertex_buffer,
-                              const Graphics::IndexBuffer& index_buffer,
-                              Graphics::Material& material,
+Renderer::submit_static_light(Core::Ref<StaticMesh>& static_mesh,
                               const glm::mat4& transform) -> void
 {
-  CommandKey key{ &vertex_buffer, &index_buffer, &material, 0 };
 
-  auto& mesh_transform = mesh_transform_map[key].transforms.emplace_back();
-  mesh_transform.transform_rows[0] = {
-    transform[0][0],
-    transform[1][0],
-    transform[2][0],
-    transform[3][0],
-  };
-  mesh_transform.transform_rows[1] = {
-    transform[0][1],
-    transform[1][1],
-    transform[2][1],
-    transform[3][1],
-  };
-  mesh_transform.transform_rows[2] = {
-    transform[0][2],
-    transform[1][2],
-    transform[2][2],
-    transform[3][2],
-  };
+  const auto& source = static_mesh->get_mesh_asset();
+  const auto& submesh_data = source->get_submeshes();
+  for (const auto submesh_index : static_mesh->get_submeshes()) {
+    glm::mat4 submesh_transform =
+      transform * submesh_data[submesh_index].transform;
 
-  auto& command = point_light_draw_commands[key];
-  command.vertex_buffer = &vertex_buffer;
-  command.index_buffer = &index_buffer;
-  command.material = &material;
-  command.submesh_index = 0;
-  command.instance_count++;
+    const auto& vertex_buffer = source->get_vertex_buffer();
+    const auto& index_buffer = source->get_index_buffer();
+    const auto& material =
+      source->get_materials().at(submesh_data[submesh_index].material_index);
+
+    CommandKey key{ &vertex_buffer, &index_buffer, material.get(), 0 };
+    auto& mesh_transform = mesh_transform_map[key].transforms.emplace_back();
+    mesh_transform.transform_rows[0] = {
+      submesh_transform[0][0],
+      submesh_transform[1][0],
+      submesh_transform[2][0],
+      submesh_transform[3][0],
+    };
+    mesh_transform.transform_rows[1] = {
+      submesh_transform[0][1],
+      submesh_transform[1][1],
+      submesh_transform[2][1],
+      submesh_transform[3][1],
+    };
+    mesh_transform.transform_rows[2] = {
+      submesh_transform[0][2],
+      submesh_transform[1][2],
+      submesh_transform[2][2],
+      submesh_transform[3][2],
+    };
+
+    auto& command = point_light_draw_commands[key];
+    command.static_mesh = static_mesh;
+    command.submesh_index = 0;
+    command.instance_count++;
+  }
 }
 
 auto
