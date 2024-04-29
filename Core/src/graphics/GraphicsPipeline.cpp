@@ -71,6 +71,21 @@ GraphicsPipeline::create_pipeline() -> void
     throw std::runtime_error("Failed to get shader modules");
   }
 
+  // Use specialization constants to pass number of samples to the shader (used
+  // for MSAA resolve)
+  VkSpecializationMapEntry specialization_entry{};
+  specialization_entry.constantID = 0;
+  specialization_entry.offset = 0;
+  specialization_entry.size = sizeof(uint32_t);
+
+  Core::u32 specialisation_data = sample_count;
+
+  VkSpecializationInfo specialisation_info{};
+  specialisation_info.mapEntryCount = 1;
+  specialisation_info.pMapEntries = &specialization_entry;
+  specialisation_info.dataSize = sizeof(specialisation_data);
+  specialisation_info.pData = &specialisation_data;
+
   std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages = {
     VkPipelineShaderStageCreateInfo{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -83,6 +98,7 @@ GraphicsPipeline::create_pipeline() -> void
       .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
       .module = maybe_fragment_stage.value(),
       .pName = "main",
+      .pSpecializationInfo = &specialisation_info,
     },
   };
   pipeline_info.stageCount = static_cast<Core::u32>(shader_stages.size());
@@ -154,7 +170,7 @@ GraphicsPipeline::create_pipeline() -> void
   multisample_info.sType =
     VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
   multisample_info.sampleShadingEnable =
-    sample_count == VK_SAMPLE_COUNT_1_BIT ? VK_TRUE : VK_FALSE;
+    sample_count != VK_SAMPLE_COUNT_1_BIT ? VK_TRUE : VK_FALSE;
   multisample_info.rasterizationSamples = sample_count;
 
   pipeline_info.pMultisampleState = &multisample_info;
@@ -221,8 +237,21 @@ GraphicsPipeline::create_layout() -> void
   layout_info.setLayoutCount =
     static_cast<Core::u32>(descriptor_set_layouts.size());
   layout_info.pSetLayouts = descriptor_set_layouts.data();
-  layout_info.pushConstantRangeCount = 0;
-  layout_info.pPushConstantRanges = nullptr;
+
+  const auto& pcs_from_shader =
+    shader->get_reflection_data().push_constant_ranges;
+  std::vector<VkPushConstantRange> vk_pc_range(pcs_from_shader.size());
+  for (Core::u32 i = 0; i < pcs_from_shader.size(); i++) {
+    const auto& pc_range = pcs_from_shader[i];
+    auto& vulkan_pc_range = vk_pc_range[i];
+
+    vulkan_pc_range.stageFlags = pc_range.shader_stage;
+    vulkan_pc_range.offset = pc_range.offset;
+    vulkan_pc_range.size = pc_range.size;
+  }
+  layout_info.pushConstantRangeCount =
+    static_cast<Core::u32>(vk_pc_range.size());
+  layout_info.pPushConstantRanges = vk_pc_range.data();
 
   VK_CHECK(vkCreatePipelineLayout(
     Device::the().device(), &layout_info, nullptr, &layout));

@@ -181,6 +181,7 @@ public:
   {
     return mesh_asset->get_materials();
   }
+  auto get_materials() -> auto& { return mesh_asset->get_materials(); }
 
 private:
   Core::Ref<MeshAsset> mesh_asset;

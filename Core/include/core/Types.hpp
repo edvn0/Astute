@@ -139,4 +139,23 @@ template<class T, typename... Args>
 template<class T>
 using Maybe = std::optional<T>;
 
+template<class T, Core::usize PadBytes>
+struct Padded
+{
+  T value;
+  std::array<Core::u8, PadBytes> padding{};
+  explicit(false) Padded(T v = T{})
+    : value(v)
+  {
+  }
+
+  auto operator=(T new_value) -> void { value = new_value; }
+  auto operator=(const Padded& new_value) -> void { value = new_value.value; }
+
+  explicit(false) operator T() const { return value; }
+};
+
+using PaddedBool = Padded<bool, 3>;
+using PaddedU32 = Padded<Core::u32, 12>;
+
 } // namespace Core

@@ -16,10 +16,9 @@ RenderPass::get_colour_attachment(Core::u32 index) const
 }
 
 auto
-RenderPass::get_depth_attachment(const bool sampled) const
-  -> const Core::Ref<Image>&
+RenderPass::get_depth_attachment() const -> const Core::Ref<Image>&
 {
-  return get_framebuffer()->get_depth_attachment(sampled);
+  return get_framebuffer()->get_depth_attachment();
 }
 
 auto

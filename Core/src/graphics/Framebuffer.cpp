@@ -97,66 +97,35 @@ Framebuffer::create_colour_attachments() -> void
     if (image) {
       colour_attachments.push_back(std::move(image));
     } else {
-      if (sample_count != VK_SAMPLE_COUNT_1_BIT) {
-        Core::Ref<Image> image = Core::make_ref<Image>();
-        create_image(size.width,
-                     size.height,
-                     1,
-                     sample_count,
-                     format,
-                     VK_IMAGE_TILING_OPTIMAL,
-                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                       VK_IMAGE_USAGE_SAMPLED_BIT,
-                     image->image,
-                     image->allocation,
-                     image->allocation_info,
-                     name + "-Colour Attachment MSAA");
-        image->extent = { size.width, size.height, 1 };
-        image->format = format;
-        image->layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        image->aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;
-        image->view =
-          create_view(image->image, format, VK_IMAGE_ASPECT_COLOR_BIT);
-        image->sampler = create_sampler(VK_FILTER_LINEAR,
-                                        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                                        VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK);
-
-        auto& descriptor_info = image->descriptor_info;
-        descriptor_info.imageLayout = image->layout;
-        descriptor_info.imageView = image->view;
-        descriptor_info.sampler = image->sampler;
-
-        colour_attachments.push_back(std::move(image));
-      }
-      Core::Ref<Image> resolve_image = Core::make_ref<Image>();
+      Core::Ref<Image> image = Core::make_ref<Image>();
       create_image(size.width,
                    size.height,
                    1,
-                   VK_SAMPLE_COUNT_1_BIT,
+                   sample_count,
                    format,
                    VK_IMAGE_TILING_OPTIMAL,
                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
                      VK_IMAGE_USAGE_SAMPLED_BIT,
-                   resolve_image->image,
-                   resolve_image->allocation,
-                   resolve_image->allocation_info,
-                   name + "-Colour Attachment (1 Sample)");
-      resolve_image->extent = { size.width, size.height, 1 };
-      resolve_image->format = format;
-      resolve_image->layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-      resolve_image->aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;
-      resolve_image->view =
-        create_view(resolve_image->image, format, VK_IMAGE_ASPECT_COLOR_BIT);
-      resolve_image->sampler =
-        create_sampler(VK_FILTER_LINEAR,
-                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                       VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK);
+                   image->image,
+                   image->allocation,
+                   image->allocation_info,
+                   name + "-Colour Attachment MSAA");
+      image->extent = { size.width, size.height, 1 };
+      image->format = format;
+      image->layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+      image->aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;
+      image->view =
+        create_view(image->image, format, VK_IMAGE_ASPECT_COLOR_BIT);
+      image->sampler = create_sampler(VK_FILTER_LINEAR,
+                                      VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                                      VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK);
 
-      resolve_image->descriptor_info.imageLayout =
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-      resolve_image->descriptor_info.imageView = resolve_image->view;
-      resolve_image->descriptor_info.sampler = resolve_image->sampler;
-      colour_attachments.push_back(std::move(resolve_image));
+      auto& descriptor_info = image->descriptor_info;
+      descriptor_info.imageLayout = image->layout;
+      descriptor_info.imageView = image->view;
+      descriptor_info.sampler = image->sampler;
+
+      colour_attachments.push_back(std::move(image));
     }
   }
 }
@@ -188,84 +157,44 @@ Framebuffer::create_depth_attachment() -> void
   }
 
   if (!image) {
-    if (is_msaa()) {
-      Core::Ref<Image> created_image = Core::make_ref<Image>();
-      create_image(size.width,
-                   size.height,
-                   1,
-                   sample_count,
-                   depth_attachment_format,
-                   VK_IMAGE_TILING_OPTIMAL,
-                   VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
-                     VK_IMAGE_USAGE_SAMPLED_BIT,
-                   created_image->image,
-                   created_image->allocation,
-                   created_image->allocation_info);
-      created_image->extent = { size.width, size.height, 1 };
-      created_image->format = depth_attachment_format;
-      created_image->layout =
-        VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
-      created_image->aspect_mask = VK_IMAGE_ASPECT_DEPTH_BIT;
-      if (depth_attachment_format == VK_FORMAT_D24_UNORM_S8_UINT ||
-          depth_attachment_format == VK_FORMAT_D16_UNORM_S8_UINT ||
-          depth_attachment_format == VK_FORMAT_D32_SFLOAT_S8_UINT) {
-        created_image->aspect_mask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-      }
-
-      created_image->view = create_view(created_image->image,
-                                        depth_attachment_format,
-                                        created_image->aspect_mask);
-      created_image->sampler =
-        create_sampler(VK_FILTER_LINEAR,
-                       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
-                       VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE);
-
-      auto& descriptor_info = created_image->descriptor_info;
-      descriptor_info.imageLayout =
-        VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
-      descriptor_info.imageView = created_image->view;
-      descriptor_info.sampler = created_image->sampler;
-
-      depth_attachment = std::move(created_image);
-    }
-    Core::Ref<Image> resolve_image = Core::make_ref<Image>();
+    Core::Ref<Image> created_image = Core::make_ref<Image>();
     create_image(size.width,
                  size.height,
                  1,
-                 VK_SAMPLE_COUNT_1_BIT,
+                 sample_count,
                  depth_attachment_format,
                  VK_IMAGE_TILING_OPTIMAL,
                  VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
                    VK_IMAGE_USAGE_SAMPLED_BIT,
-                 resolve_image->image,
-                 resolve_image->allocation,
-                 resolve_image->allocation_info,
-                 name + "-Colour Attachment (1 Sample)");
-    resolve_image->extent = { size.width, size.height, 1 };
-    resolve_image->format = depth_attachment_format;
-    resolve_image->layout =
+                 created_image->image,
+                 created_image->allocation,
+                 created_image->allocation_info);
+    created_image->extent = { size.width, size.height, 1 };
+    created_image->format = depth_attachment_format;
+    created_image->layout =
       VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
-    resolve_image->aspect_mask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    created_image->aspect_mask = VK_IMAGE_ASPECT_DEPTH_BIT;
     if (depth_attachment_format == VK_FORMAT_D24_UNORM_S8_UINT ||
         depth_attachment_format == VK_FORMAT_D16_UNORM_S8_UINT ||
         depth_attachment_format == VK_FORMAT_D32_SFLOAT_S8_UINT) {
-      resolve_image->aspect_mask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+      created_image->aspect_mask |= VK_IMAGE_ASPECT_STENCIL_BIT;
     }
 
-    resolve_image->view = create_view(resolve_image->image,
+    created_image->view = create_view(created_image->image,
                                       depth_attachment_format,
-                                      resolve_image->aspect_mask);
-    resolve_image->sampler =
+                                      created_image->aspect_mask);
+    created_image->sampler =
       create_sampler(VK_FILTER_LINEAR,
                      VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
                      VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE);
 
-    auto& descriptor_info = resolve_image->descriptor_info;
+    auto& descriptor_info = created_image->descriptor_info;
     descriptor_info.imageLayout =
       VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
-    descriptor_info.imageView = resolve_image->view;
-    descriptor_info.sampler = resolve_image->sampler;
-    depth_resolve_attachment = std::move(resolve_image);
+    descriptor_info.imageView = created_image->view;
+    descriptor_info.sampler = created_image->sampler;
+
+    depth_attachment = std::move(created_image);
   } else {
     depth_attachment_index = i;
     depth_attachment = image;
@@ -277,17 +206,13 @@ Framebuffer::create_renderpass() -> void
 {
   std::vector<VkAttachmentDescription2> attachments;
   std::vector<VkAttachmentReference2> color_attachment_refs;
-  std::vector<VkAttachmentReference2> resolve_attachment_refs;
   VkAttachmentReference2 depth_attachment_ref{};
-  VkAttachmentReference2 depth_stencil_resolve_attachment_ref{};
   attachments.reserve(colour_attachment_formats.size() + 1);
 
   // Iterate over color attachment formats
-  attach_colour_attachments(
-    attachments, color_attachment_refs, resolve_attachment_refs);
+  attach_colour_attachments(attachments, color_attachment_refs);
 
-  attach_depth_attachments(
-    attachments, depth_attachment_ref, depth_stencil_resolve_attachment_ref);
+  attach_depth_attachments(attachments, depth_attachment_ref);
 
   VkSubpassDescription2 subpass{};
   subpass.sType = VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_2;
@@ -296,24 +221,8 @@ Framebuffer::create_renderpass() -> void
     static_cast<Core::u32>(color_attachment_refs.size());
   subpass.pColorAttachments = color_attachment_refs.data();
 
-  VkSubpassDescriptionDepthStencilResolve depth_stencil_resolve{};
-  depth_stencil_resolve.sType =
-    VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_DEPTH_STENCIL_RESOLVE;
-  depth_stencil_resolve.pDepthStencilResolveAttachment =
-    &depth_stencil_resolve_attachment_ref;
-  depth_stencil_resolve.stencilResolveMode = VK_RESOLVE_MODE_SAMPLE_ZERO_BIT;
-  depth_stencil_resolve.depthResolveMode = VK_RESOLVE_MODE_SAMPLE_ZERO_BIT;
-
   if (depth_attachment != nullptr) {
     subpass.pDepthStencilAttachment = &depth_attachment_ref;
-
-    if (depth_resolve_attachment != nullptr) {
-      subpass.pNext = &depth_stencil_resolve;
-    }
-  }
-
-  if (const auto has_msaa = !resolve_attachment_refs.empty()) {
-    subpass.pResolveAttachments = resolve_attachment_refs.data();
   }
 
   VkSubpassDependency2 dependency{};
@@ -358,30 +267,17 @@ Framebuffer::create_renderpass() -> void
     clear_values.push_back(clear_value);
   }
 
-  for (const auto& _ : resolve_attachment_refs) {
-    VkClearValue clear_value{};
-    clear_value.color = { 0.0F, 0.0F, 0.0F, 0.0F };
-    clear_values.push_back(clear_value);
-  }
-
   if (depth_attachment_format != VK_FORMAT_UNDEFINED) {
     VkClearValue clear_value{};
     clear_value.depthStencil = { 0.0F, 0 };
     clear_values.push_back(clear_value);
-
-    if (depth_resolve_attachment) {
-      VkClearValue clear_value{};
-      clear_value.depthStencil = { 0.0F, 0 };
-      clear_values.push_back(clear_value);
-    }
   }
 }
 
 void
 Framebuffer::attach_depth_attachments(
   std::vector<VkAttachmentDescription2>& attachments,
-  VkAttachmentReference2& depth_attachment_ref,
-  VkAttachmentReference2& depth_stencil_resolve_attachment_ref)
+  VkAttachmentReference2& depth_attachment_ref)
 {
   // Depth attachment if needed
   if (depth_attachment != nullptr) {
@@ -408,39 +304,13 @@ Framebuffer::attach_depth_attachments(
       static_cast<uint32_t>(attachments.size() - 1);
     depth_attachment_ref.layout =
       VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    if (depth_resolve_attachment) {
-      VkAttachmentDescription2 resolve_attachment{};
-      resolve_attachment.sType = VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2;
-      resolve_attachment.format = depth_attachment_format;
-      resolve_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-      resolve_attachment.loadOp = should_clear ? VK_ATTACHMENT_LOAD_OP_DONT_CARE
-                                               : VK_ATTACHMENT_LOAD_OP_LOAD;
-      resolve_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-      resolve_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-      resolve_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-      resolve_attachment.initialLayout =
-        should_clear
-          ? VK_IMAGE_LAYOUT_UNDEFINED
-          : VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
-      resolve_attachment.finalLayout =
-        VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
-      attachments.push_back(resolve_attachment);
-
-      VkAttachmentReference2 resolve_ref{};
-      resolve_ref.sType = VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2;
-      resolve_ref.attachment = static_cast<uint32_t>(attachments.size() - 1);
-      resolve_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-      depth_stencil_resolve_attachment_ref = resolve_ref;
-    }
   }
 }
 
 void
 Framebuffer::attach_colour_attachments(
   std::vector<VkAttachmentDescription2>& attachments,
-  std::vector<VkAttachmentReference2>& color_attachment_refs,
-  std::vector<VkAttachmentReference2>& resolve_attachment_refs)
+  std::vector<VkAttachmentReference2>& color_attachment_refs)
 {
   for (const auto& format : colour_attachment_formats) {
     if (is_depth_format(format))
@@ -466,7 +336,6 @@ Framebuffer::attach_colour_attachments(
       color_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
       color_attachment_refs.push_back(color_ref);
     } else {
-      // Always add a basic color attachment
       VkAttachmentDescription2 color_attachment{};
       color_attachment.sType = VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2;
       color_attachment.format = format;
@@ -488,32 +357,6 @@ Framebuffer::attach_colour_attachments(
       color_ref.attachment = static_cast<uint32_t>(attachments.size() - 1);
       color_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
       color_attachment_refs.push_back(color_ref);
-
-      // Add a resolve attachment only when MSAA is used
-      if (sample_count != VK_SAMPLE_COUNT_1_BIT) {
-        VkAttachmentDescription2 resolve_attachment{};
-        resolve_attachment.sType = VK_STRUCTURE_TYPE_ATTACHMENT_DESCRIPTION_2;
-        resolve_attachment.format = format;
-        resolve_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-        resolve_attachment.loadOp = clear_colour_on_load
-                                      ? VK_ATTACHMENT_LOAD_OP_DONT_CARE
-                                      : VK_ATTACHMENT_LOAD_OP_LOAD;
-        resolve_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        resolve_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        resolve_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        resolve_attachment.initialLayout =
-          clear_colour_on_load ? VK_IMAGE_LAYOUT_UNDEFINED
-                               : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        resolve_attachment.finalLayout =
-          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        attachments.push_back(resolve_attachment);
-
-        VkAttachmentReference2 resolve_ref{};
-        resolve_ref.sType = VK_STRUCTURE_TYPE_ATTACHMENT_REFERENCE_2;
-        resolve_ref.attachment = static_cast<uint32_t>(attachments.size() - 1);
-        resolve_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        resolve_attachment_refs.push_back(resolve_ref);
-      }
     }
   }
 }
@@ -528,10 +371,6 @@ Framebuffer::create_framebuffer() -> void
 
   if (depth_attachment) {
     attachments.push_back(depth_attachment->view);
-
-    if (depth_resolve_attachment) {
-      attachments.push_back(depth_resolve_attachment->view);
-    }
   }
 
   VkFramebufferCreateInfo framebuffer_info{};

@@ -15,7 +15,6 @@
 
 #include "graphics/render_passes/Deferred.hpp"
 #include "graphics/render_passes/MainGeometry.hpp"
-#include "graphics/render_passes/PreDepth.hpp"
 #include "graphics/render_passes/Shadow.hpp"
 
 #include <ranges>
@@ -24,7 +23,6 @@
 namespace Engine::Graphics {
 
 static constexpr std::array render_pass_order{
-  "PreDepth",
   "Shadow",
   "MainGeometry",
   "Deferred",
@@ -78,11 +76,12 @@ Renderer::generate_and_update_descriptor_write_sets(Material& material)
   VkDescriptorSetAllocateInfo alloc_info{};
   alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
   const auto& layouts = shader->get_descriptor_set_layouts();
-  alloc_info.descriptorSetCount = static_cast<Core::u32>(layouts.size());
-  alloc_info.pSetLayouts = layouts.data();
+  alloc_info.descriptorSetCount = 1;
+  alloc_info.pSetLayouts = &layouts.at(0);
   auto allocated =
     DescriptorResource::the().allocate_descriptor_set(alloc_info);
 
+  material.update_descriptor_write_sets(allocated);
   for (auto& wds : write_descriptor_sets) {
     wds.dstSet = allocated;
   }
@@ -92,9 +91,6 @@ Renderer::generate_and_update_descriptor_write_sets(Material& material)
                          write_descriptor_sets.data(),
                          0,
                          nullptr);
-
-  // Material specific writes now.
-  material.generate_and_update_descriptor_write_sets(allocated);
 
   return allocated;
 }
@@ -112,7 +108,6 @@ Renderer::Renderer(Configuration config, const Window* window)
   });
 
   command_buffer = Core::make_scope<CommandBuffer>(CommandBuffer::Properties{
-    .image_count = window->get_swapchain().get_image_count(),
     .queue_type = QueueType::Graphics,
     .primary = true,
   });
@@ -122,7 +117,6 @@ Renderer::Renderer(Configuration config, const Window* window)
   render_passes["Shadow"] =
     Core::make_scope<ShadowRenderPass>(*this, config.shadow_pass_size);
   render_passes["Deferred"] = Core::make_scope<DeferredRenderPass>(*this);
-  render_passes["PreDepth"] = Core::make_scope<PreDepthRenderPass>(*this);
 
   for (const auto& k : render_pass_order) {
     render_passes.at(k)->construct();
@@ -174,11 +168,9 @@ Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
     // We've been resized.
 
     auto& shadow_render_pass = get_render_pass("Shadow");
-    auto& predepth_render_pass = get_render_pass("PreDepth");
     auto& main_geom = get_render_pass("MainGeometry");
     auto& deferred = get_render_pass("Deferred");
     shadow_render_pass.on_resize(size);
-    predepth_render_pass.on_resize(size);
     main_geom.on_resize(size);
     deferred.on_resize(size);
   }
@@ -357,8 +349,6 @@ Renderer::flush_draw_lists() -> void
 
   command_buffer->begin();
 
-  // Predepth pass
-  render_passes.at("PreDepth")->execute(*command_buffer);
   // Shadow pass
   render_passes.at("Shadow")->execute(*command_buffer);
   // Geometry pass

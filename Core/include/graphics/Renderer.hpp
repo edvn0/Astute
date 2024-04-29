@@ -115,7 +115,7 @@ public:
   {
     return render_passes.at("Shadow")
       ->get_framebuffer()
-      ->get_depth_attachment(true)
+      ->get_depth_attachment()
       .get();
   }
   auto get_final_output() const -> const Image*

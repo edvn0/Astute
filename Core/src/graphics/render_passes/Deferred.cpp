@@ -35,15 +35,19 @@ DeferredRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
           deferred_pipeline,
           deferred_material] = get_data();
 
-  auto descriptor_set =
+  auto renderer_desc_set =
     generate_and_update_descriptor_write_sets(*deferred_material);
 
+  auto material_set =
+    deferred_material->generate_and_update_descriptor_write_sets();
+
+  std::array desc_sets{ renderer_desc_set, material_set };
   vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
                           VK_PIPELINE_BIND_POINT_GRAPHICS,
                           deferred_pipeline->get_layout(),
                           0,
-                          1,
-                          &descriptor_set,
+                          static_cast<Core::u32>(desc_sets.size()),
+                          desc_sets.data(),
                           0,
                           nullptr);
 
@@ -66,10 +70,8 @@ DeferredRenderPass::on_resize(const Core::Extent& ext) -> void
     deferred_framebuffer =
     Core::make_scope<Framebuffer>(Framebuffer::Configuration{
       .size = get_renderer().get_size(),
-      .colour_attachment_formats = { VK_FORMAT_R32G32B32A32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT, },
+      .colour_attachment_formats = { VK_FORMAT_R32G32B32A32_SFLOAT, },
       .sample_count = VK_SAMPLE_COUNT_4_BIT,
-      .dependent_images =
-        {{1, get_renderer().get_render_pass("MainGeometry").get_depth_attachment(false),},},
       .name = "Deferred",
     });
     deferred_shader = Shader::compile_graphics_scoped(

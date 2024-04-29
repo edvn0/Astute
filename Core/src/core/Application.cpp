@@ -44,8 +44,6 @@ Application::Application(const Configuration& conf)
 
   Graphics::Allocator::construct();
 
-  interface_system = make_scope<Graphics::InterfaceSystem>(*window);
-
   instance = this;
 }
 
@@ -66,6 +64,8 @@ Application::run() -> i32
   constexpr auto delta_time = 1.0 / 60.0;
   auto accumulator = 0.0;
   i32 frame_count = 0;
+
+  interface_system = make_scope<Graphics::InterfaceSystem>(*window);
 
   construct();
 

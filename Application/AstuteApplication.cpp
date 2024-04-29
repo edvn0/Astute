@@ -65,8 +65,6 @@ AstuteApplication::render() -> void
     default:
       break;
   }
-
-  vkDeviceWaitIdle(Device::the().device());
 }
 
 auto

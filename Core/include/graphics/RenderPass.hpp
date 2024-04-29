@@ -32,8 +32,7 @@ public:
   }
 
   auto get_colour_attachment(Core::u32) const -> const Core::Ref<Image>&;
-  auto get_depth_attachment(bool sampled = false) const
-    -> const Core::Ref<Image>&;
+  auto get_depth_attachment() const -> const Core::Ref<Image>&;
   auto get_framebuffer() -> decltype(auto)
   {
     return std::get<Core::Scope<Framebuffer>>(*pass);

@@ -961,7 +961,7 @@ create_sampler(VkFilter filter,
   sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
   sampler_info.mipLodBias = 0.0f;
   sampler_info.minLod = 0.0f;
-  sampler_info.maxLod = 0.0f;
+  sampler_info.maxLod = 1.0f;
 
   VkSampler sampler;
   VK_CHECK(

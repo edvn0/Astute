@@ -4,11 +4,25 @@
 
 layout(location = 0) in vec2 input_uvs;
 
-layout(set = 0, binding = 10) uniform sampler2D gPositionMap;
-layout(set = 0, binding = 11) uniform sampler2D gNormalMap;
-layout(set = 0, binding = 12) uniform sampler2D gAlbedoSpecMap;
+layout(set = 1, binding = 10) uniform sampler2DMS gPositionMap;
+layout(set = 1, binding = 11) uniform sampler2DMS gNormalMap;
+layout(set = 1, binding = 12) uniform sampler2DMS gAlbedoSpecMap;
+
+layout(constant_id = 0) const int NUM_SAMPLES = 4;
 
 layout(location = 0) out vec4 FragColor;
+
+vec4
+resolve(sampler2DMS tex, ivec2 uv)
+{
+  vec4 result = vec4(0.0);
+  for (int i = 0; i < NUM_SAMPLES; i++) {
+    vec4 val = texelFetch(tex, uv, i);
+    result += val;
+  }
+  // Average resolved samples
+  return result / float(NUM_SAMPLES);
+}
 
 float
 calculate_attenuation(float dist, PointLight light)
@@ -88,6 +102,80 @@ calculate_diffuse_and_specular(const in vec3 normal,
   return result;
 }
 
+vec3
+calculateLighting(vec3 pos,
+                  vec3 normal,
+                  vec4 albedo,
+                  uint point_light_count,
+                  uint spot_light_count)
+{
+  vec3 result = vec3(0.0);
+
+  for (int i = 0; i < point_light_count; ++i) {
+    // Vector to light
+    vec3 L = point_lights.lights[i].pos.xyz - pos;
+    // Distance from light to fragment position
+    float dist = length(L);
+
+    // Viewer to fragment
+    vec3 V = renderer.camera_position.xyz - pos;
+    V = normalize(V);
+
+    // Light to fragment
+    L = normalize(L);
+
+    // Attenuation
+    float atten = point_lights.lights[i].radius / (pow(dist, 2.0) + 1.0);
+
+    // Diffuse part
+    vec3 N = normalize(normal);
+    float NdotL = max(0.0, dot(N, L));
+    vec3 diff = point_lights.lights[i].radiance * albedo.rgb * NdotL * atten;
+
+    // Specular part
+    vec3 R = reflect(-L, N);
+    float NdotR = max(0.0, dot(R, V));
+    vec3 spec =
+      point_lights.lights[i].radiance * albedo.a * pow(NdotR, 8.0) * atten;
+
+    result += diff + spec;
+  }
+
+  for (int i = 0; i < spot_light_count; ++i) {
+    // Vector to light
+    vec3 L = spot_lights.lights[i].pos - pos;
+    // Distance from light to fragment position
+    float dist = length(L);
+    // Normalize L
+    L = normalize(L);
+
+    // Check if fragment is within the light cone
+    float spotEffect = dot(-L, normalize(spot_lights.lights[i].direction));
+    if (spotEffect > cos(radians(spot_lights.lights[i].angle))) {
+      // Attenuation including distance and cone attenuation
+      float atten = (1.0 / (pow(dist, 2.0) + 1.0)) *
+                    pow(spotEffect, spot_lights.lights[i].falloff);
+
+      // Viewer to fragment
+      vec3 V = normalize(renderer.camera_position - pos);
+
+      // Diffuse part
+      vec3 N = normalize(normal);
+      float NdotL = max(0.0, dot(N, L));
+      vec3 diff = spot_lights.lights[i].radiance * albedo.rgb * NdotL * atten;
+
+      // Specular part
+      vec3 R = reflect(-L, N);
+      float NdotR = max(0.0, dot(R, V));
+      vec3 spec =
+        spot_lights.lights[i].radiance * albedo.a * pow(NdotR, 8.0) * atten;
+
+      result += diff + spec;
+    }
+  }
+  return result;
+}
+
 const mat3 aces_m1 = mat3(0.59719,
                           0.07600,
                           0.02840,
@@ -119,46 +207,27 @@ ACESTonemap(vec3 color)
 void
 main()
 {
-  // retrieve data from G-buffer
-  vec3 FragPos = texture(gPositionMap, input_uvs).rgb;
-  vec3 Normal = texture(gNormalMap, input_uvs).rgb;
-  vec4 AlbedoSpecular = texture(gAlbedoSpecMap, input_uvs);
-  vec3 Albedo = AlbedoSpecular.rgb;
-  float Specular = AlbedoSpecular.a;
-
-  // then calculate lighting as usual
-  vec3 lighting = Albedo * 0.1; // hard-coded ambient component
-
-  vec3 viewDir = normalize(renderer.camera_position - FragPos);
-
+  ivec2 attDim = textureSize(gPositionMap);
+  ivec2 UV = ivec2(input_uvs * attDim);
   uint count_point_lights = point_lights.count;
   uint count_spot_lights = spot_lights.count;
 
-  for (int i = 0; i < count_point_lights; ++i) {
-    // calculate distance between light source and current fragment
-    vec3 light_dir = point_lights.lights[i].pos - FragPos;
-    float dist = length(light_dir);
-    if (dist < point_lights.lights[i].radius) {
-      lighting += calculate_diffuse_and_specular(
-        Normal, FragPos, viewDir, point_lights.lights[i], Specular);
-    }
+  // Ambient part
+  vec4 alb = resolve(gAlbedoSpecMap, UV);
+  vec3 fragColor = vec3(0.0);
+
+  // Calualte lighting for every MSAA sample
+  for (int i = 0; i < NUM_SAMPLES; i++) {
+    vec3 pos = texelFetch(gPositionMap, UV, i).rgb;
+    vec3 normal = texelFetch(gNormalMap, UV, i).rgb;
+    vec4 albedo = texelFetch(gAlbedoSpecMap, UV, i);
+    fragColor += calculateLighting(
+      pos, normal, albedo, count_point_lights, count_spot_lights);
   }
 
-  for (int i = 0; i < count_spot_lights; ++i) {
-    // calculate distance between light source and current fragment
-    vec3 light_dir = spot_lights.lights[i].pos - FragPos;
-    float dist = length(light_dir);
-    if (dist < spot_lights.lights[i].range) {
-      lighting += calculate_diffuse_and_specular(
-        Normal, FragPos, viewDir, spot_lights.lights[i], Specular);
-    }
-  }
+  fragColor = (alb.rgb * 0.15) + fragColor / float(NUM_SAMPLES);
 
-  // Apply tone mapping
-  vec3 mapped = ACESTonemap(lighting);
-
-  // Apply gamma correction
+  vec3 mapped = ACESTonemap(fragColor);
   vec3 gamma_corrected = pow(mapped, vec3(1.0 / 2.2));
-
   FragColor = vec4(gamma_corrected, 1.0);
 }

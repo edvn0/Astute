@@ -12,13 +12,12 @@ class CommandBuffer
 public:
   struct Properties
   {
-    const Core::u32 image_count;
     const QueueType queue_type;
     const bool owned_by_swapchain{ false };
     const bool primary{ true };
   };
 
-  explicit CommandBuffer(Properties);
+  explicit CommandBuffer(const Properties&);
   ~CommandBuffer();
 
   auto begin(const VkCommandBufferBeginInfo* = nullptr) -> void;

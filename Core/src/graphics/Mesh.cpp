@@ -49,7 +49,21 @@ struct AssimpLogStream : public Assimp::LogStream
   }
 };
 
-static constexpr Core::u32 mesh_import_flags = 0;
+static constexpr Core::u32 mesh_import_flags =
+  aiProcess_CalcTangentSpace | // Create binormals/tangents just in case
+  aiProcess_Triangulate |      // Make sure we're triangles
+  aiProcess_SortByPType |      // Split meshes by primitive type
+  aiProcess_GenNormals |       // Make sure we have legit normals
+  aiProcess_GenUVCoords |      // Convert UVs if required
+                               //		aiProcess_OptimizeGraph |
+  aiProcess_OptimizeMeshes |   // Batch draws where possible
+  aiProcess_JoinIdenticalVertices | aiProcess_FlipUVs |
+  aiProcess_LimitBoneWeights | // If more than N (=4) bone weights, discard
+                               // least influencing bones and renormalise sum to
+                               // 1
+  aiProcess_ValidateDataStructure | // Validation
+  aiProcess_GlobalScale; // e.g. convert cm to m for fbx import (and other
+                         // formats where cm is native)
 
 namespace Utils {
 
@@ -205,11 +219,23 @@ MeshAsset::MeshAsset(const std::string& file_name)
   const auto& white_texture = Renderer::get_white_texture();
   auto i = 0ULL;
   for (const auto& ai_material : scene_mats) {
-    auto aiMaterialName = ai_material->GetName();
     materials.at(i) = Core::make_scope<Material>(Material::Configuration{
       .shader = deferred_pbr_shader.get(),
     });
     aiString aiTexPath;
+
+    float shininess{};
+    float metalness{};
+    if (ai_material->Get(AI_MATKEY_SHININESS, shininess) != aiReturn_SUCCESS) {
+      shininess = 80.0f;
+    }
+
+    if (ai_material->Get(AI_MATKEY_REFLECTIVITY, metalness) !=
+        aiReturn_SUCCESS) {
+      metalness = 0.0f;
+    }
+
+    float roughness = 1.0f - glm::sqrt(shininess / 100.0f);
 
     bool hasAlbedoMap = ai_material->GetTexture(
                           aiTextureType_DIFFUSE, 0, &aiTexPath) == AI_SUCCESS;
@@ -233,8 +259,7 @@ MeshAsset::MeshAsset(const std::string& file_name)
 
       if (texture) {
         materials.at(i)->set("albedo_map", texture);
-        // materials.at(i)->set("u_MaterialUniforms.AlbedoColor",
-        // glm::vec3(1.0f));
+        materials.at(i)->set("mat_pc.albedo_colour", glm::vec3(1.0f));
       } else {
         fallback = true;
       }
@@ -267,19 +292,97 @@ MeshAsset::MeshAsset(const std::string& file_name)
 
       if (texture) {
         materials.at(i)->set("normal_map", texture);
-        // materials.at(i)->set("u_MaterialUniforms.AlbedoColor",
-        // glm::vec3(1.0f));
+        materials.at(i)->set("mat_pc.use_normal_map", true);
       } else {
         fallback = true;
       }
     }
     if (fallback) {
       materials.at(i)->set("normal_map", white_texture);
-      // materials.at(i)->set("u_MaterialUniforms.UseNormalMap", false);
+      materials.at(i)->set("mat_pc.use_normal_map", false);
     }
 
-    // Specular map
-    materials.at(i)->set("specular_map", white_texture);
+    // Normal maps
+    bool hasSpecularMap =
+      ai_material->GetTexture(aiTextureType_SPECULAR, 0, &aiTexPath) ==
+      AI_SUCCESS;
+    fallback = !hasSpecularMap;
+    if (hasSpecularMap) {
+      Core::Ref<Image> texture;
+      if (auto aiTexEmbedded = scene->GetEmbeddedTexture(aiTexPath.C_Str())) {
+        Core::DataBuffer buffer{ aiTexEmbedded->mWidth *
+                                 aiTexEmbedded->mHeight * 4 };
+        buffer.write(aiTexEmbedded->pcData,
+                     aiTexEmbedded->mWidth * aiTexEmbedded->mHeight * 4);
+        texture = Image::load_from_memory(
+          aiTexEmbedded->mWidth, aiTexEmbedded->mHeight, std::move(buffer));
+      } else {
+        std::filesystem::path path = file_name;
+        auto parentPath = path.parent_path();
+        parentPath /= std::string(aiTexPath.data);
+        std::string texturePath = parentPath.string();
+        texture = Image::load_from_file({ .path = texturePath });
+      }
+
+      if (texture) {
+        materials.at(i)->set("specular_map", texture);
+      } else {
+        fallback = true;
+      }
+    }
+    if (fallback) {
+      materials.at(i)->set("specular_map", white_texture);
+    }
+
+    // Roughness map
+    bool hasRoughnessMap =
+      ai_material->GetTexture(aiTextureType_SHININESS, 0, &aiTexPath) ==
+      AI_SUCCESS;
+
+    aiString combined_roughness_metallic_file;
+    ai_material->GetTexture(
+      aiTextureType_UNKNOWN, 0, &combined_roughness_metallic_file);
+
+    bool prefer_combined = false;
+    if (combined_roughness_metallic_file.length > 0) {
+      prefer_combined = true;
+      hasRoughnessMap = true;
+    }
+
+    fallback = !hasRoughnessMap;
+    if (hasRoughnessMap) {
+      Core::Ref<Image> texture;
+
+      if (auto aiTexEmbedded = scene->GetEmbeddedTexture(
+            prefer_combined ? combined_roughness_metallic_file.C_Str()
+                            : aiTexPath.C_Str())) {
+        Core::DataBuffer buffer{ aiTexEmbedded->mWidth *
+                                 aiTexEmbedded->mHeight * 4 };
+        buffer.write(aiTexEmbedded->pcData,
+                     aiTexEmbedded->mWidth * aiTexEmbedded->mHeight * 4);
+        texture = Image::load_from_memory(
+          aiTexEmbedded->mWidth, aiTexEmbedded->mHeight, std::move(buffer));
+      } else {
+        std::filesystem::path path = file_name;
+        auto parentPath = path.parent_path();
+        parentPath /= std::string(aiTexPath.data);
+        std::string texturePath = parentPath.string();
+        texture = Image::load_from_file({ .path = texturePath });
+      }
+
+      if (texture) {
+        materials.at(i)->set("roughness_map", texture);
+        materials.at(i)->set("mat_pc.roughness", 1.0F);
+      } else {
+        fallback = true;
+      }
+    }
+
+    if (fallback) {
+      materials.at(i)->set("roughness_map", white_texture);
+      materials.at(i)->set("mat_pc.roughness.Roughness", roughness);
+    }
+
     i++;
   }
 

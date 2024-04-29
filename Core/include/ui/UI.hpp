@@ -9,7 +9,7 @@
 
 namespace Engine::Core::UI {
 
-template<class T>
+template<Number T>
 struct InterfaceImageProperties
 {
   Core::BasicExtent<T> extent{ T{ 64 }, T{ 64 } };

@@ -3,6 +3,7 @@
 #include "graphics/Material.hpp"
 
 #include "core/Application.hpp"
+#include "graphics/DescriptorResource.hpp"
 #include "graphics/Device.hpp"
 
 #include <ranges>
@@ -14,6 +15,16 @@ Material::~Material() = default;
 Material::Material(Configuration config)
   : shader(config.shader)
 {
+  const auto& shader_buffers = shader->get_reflection_data().constant_buffers;
+
+  if (shader_buffers.size() > 0) {
+    Core::u32 size = 0;
+    for (auto&& [name, buffer] : shader_buffers)
+      size += buffer.size;
+
+    uniform_storage.set_size_and_reallocate(size);
+    uniform_storage.fill_zero();
+  }
 }
 
 auto
@@ -51,7 +62,7 @@ Material::set(const std::string_view name, const Core::Ref<Image>& image)
 }
 
 auto
-Material::generate_and_update_descriptor_write_sets(VkDescriptorSet dst) -> void
+Material::update_descriptor_write_sets(VkDescriptorSet dst) -> void
 {
   auto& current_writes = *write_descriptors;
 
@@ -74,6 +85,39 @@ Material::generate_and_update_descriptor_write_sets(VkDescriptorSet dst) -> void
 }
 
 auto
+Material::generate_and_update_descriptor_write_sets() -> VkDescriptorSet
+{
+  auto& current_writes = *write_descriptors;
+
+  VkDescriptorSetAllocateInfo alloc_info{};
+  alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  const auto& layouts = shader->get_descriptor_set_layouts();
+  alloc_info.descriptorSetCount = 1;
+  alloc_info.pSetLayouts = &layouts.at(1);
+  auto allocated =
+    DescriptorResource::the().allocate_descriptor_set(alloc_info);
+
+  for (auto& [index, write] : current_writes) {
+    write.dstSet = allocated;
+  }
+
+  std::vector<VkWriteDescriptorSet> values{};
+  values.resize(current_writes.size());
+  auto i = 0ULL;
+  for (const auto& [index, write] : current_writes) {
+    values.at(i++) = write;
+  }
+
+  vkUpdateDescriptorSets(Device::the().device(),
+                         static_cast<Core::u32>(values.size()),
+                         values.data(),
+                         0,
+                         nullptr);
+
+  return allocated;
+}
+
+auto
 Material::find_resource_by_name(const std::string_view name) const
   -> const Reflection::ShaderResourceDeclaration*
 {
@@ -84,6 +128,31 @@ Material::find_resource_by_name(const std::string_view name) const
   }
 
   return nullptr;
+}
+
+auto
+Material::set(const std::string_view name, const void* data, Core::usize size)
+  -> void
+{
+  const auto& shader_buffers = shader->get_reflection_data().constant_buffers;
+  const Engine::Reflection::ShaderUniform* found = nullptr;
+  for (auto&& [k, v] : shader_buffers) {
+    if (v.uniforms.contains(std::string{ name })) {
+      found = &v.uniforms.at(std::string(name));
+    }
+  }
+
+  if (!found) {
+    return;
+  }
+
+  if (size != found->get_size()) {
+    error("Size mismatch between glsl and cpp for uniform: {}", name);
+    return;
+  }
+
+  auto& buffer = uniform_storage;
+  buffer.write(data, found->get_size(), found->get_offset());
 }
 
 } // namespace Engine::Graphics

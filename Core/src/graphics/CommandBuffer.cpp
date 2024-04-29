@@ -8,8 +8,8 @@
 
 namespace Engine::Graphics {
 
-CommandBuffer::CommandBuffer(Properties props)
-  : image_count(props.image_count)
+CommandBuffer::CommandBuffer(const Properties& props)
+  : image_count(Core::Application::the().get_image_count())
   , queue_family_index(Device::the().get_family(props.queue_type))
   , owned_by_swapchain(props.owned_by_swapchain)
   , primary(props.primary)
@@ -46,6 +46,8 @@ CommandBuffer::create_command_pool() -> void
 {
   VkCommandPoolCreateInfo pool_info = {};
   pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+  pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT |
+                    VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
   pool_info.queueFamilyIndex = queue_family_index;
 
   vkCreateCommandPool(
@@ -101,9 +103,6 @@ CommandBuffer::begin(const VkCommandBufferBeginInfo* begin_info) -> void
   } else {
     active_command_buffer = command_buffers[current_frame_index];
   }
-
-  vkResetCommandPool(Device::the().device(), command_pool, 0);
-
   vkBeginCommandBuffer(active_command_buffer, &default_begin_info);
 }
 
@@ -124,12 +123,14 @@ CommandBuffer::submit() -> void
   submit_info.commandBufferCount = 1;
   VkCommandBuffer buffer = active_command_buffer;
   submit_info.pCommandBuffers = &buffer;
+  vkResetFences(device.device(), 1, &fences[current_frame_index]);
+
+  vkQueueSubmit(queue, 1, &submit_info, fences[current_frame_index]);
 
   vkWaitForFences(
     device.device(), 1, &fences[current_frame_index], VK_TRUE, UINT64_MAX);
 
   vkResetFences(device.device(), 1, &fences[current_frame_index]);
-  vkQueueSubmit(queue, 1, &submit_info, fences[current_frame_index]);
 
   active_command_buffer = nullptr;
 }

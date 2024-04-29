@@ -244,7 +244,7 @@ Swapchain::begin_frame() -> bool
 
   current_image_index = acquired.value();
 
-  vkResetCommandPool(device, command_buffers[current_buffer_index].pool, 0);
+  // vkResetCommandPool(device, command_buffers[current_buffer_index].pool, 0);
 
   return true;
 }

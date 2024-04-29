@@ -1,31 +1,12 @@
 #pragma once
 
+#include "core/Types.hpp"
+
 #include <glm/glm.hpp>
 
 #include <string_view>
 
 namespace Engine::Graphics {
-
-namespace Detail {
-template<class T, Core::usize PadBytes>
-struct Padded
-{
-  T value;
-  std::array<Core::u8, PadBytes> padding{};
-  explicit(false) Padded(T v = T{})
-    : value(v)
-  {
-  }
-
-  auto operator=(T new_value) -> void { value = new_value; }
-  auto operator=(const Padded& new_value) -> void { value = new_value.value; }
-
-  explicit(false) operator T() const { return value; }
-};
-
-using PaddedBool = Padded<bool, 3>;
-using PaddedU32 = Padded<Core::u32, 12>;
-}
 
 static constexpr auto max_light_count = 1000;
 
@@ -60,12 +41,12 @@ struct PointLight
   float radius{ 0 };
   float falloff{ 0 };
   float light_size{ 0 };
-  Detail::PaddedBool casts_shadows{ true };
+  Core::PaddedBool casts_shadows{ true };
 };
 
 struct PointLightUBO
 {
-  Detail::PaddedU32 count{ 0 };
+  Core::PaddedU32 count{ 0 };
   std::array<PointLight, max_light_count> lights;
 
   static constexpr std::string_view name = "PointLightUBO";
@@ -81,13 +62,13 @@ struct SpotLight
   float range{ 0 };
   float angle{ 0 };
   float falloff{ 0 };
-  Detail::PaddedBool soft_shadows{ false };
-  Detail::PaddedBool casts_shadows{ true };
+  Core::PaddedBool soft_shadows{ false };
+  Core::PaddedBool casts_shadows{ true };
 };
 
 struct SpotLightUBO
 {
-  Detail::PaddedU32 count{ 0 };
+  Core::PaddedU32 count{ 0 };
   std::array<SpotLight, max_light_count> lights;
 
   static constexpr std::string_view name = "SpotLightUBO";

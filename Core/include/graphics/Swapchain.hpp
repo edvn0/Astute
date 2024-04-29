@@ -43,14 +43,6 @@ public:
   {
     return command_buffers[index].command_buffer;
   }
-  auto get_present_semaphore() const -> VkSemaphore
-  {
-    return semaphores[get_current_buffer_index()].present_complete;
-  }
-  auto get_render_semaphore() const -> VkSemaphore
-  {
-    return semaphores[get_current_buffer_index()].present_complete;
-  }
   auto get_current_buffer_index() const -> Core::u32
   {
     return current_buffer_index;

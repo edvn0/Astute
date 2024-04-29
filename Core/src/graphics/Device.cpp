@@ -90,6 +90,9 @@ Device::is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface)
   if (!supported_features.sampleRateShading) {
     is_suitable = false;
   }
+  if (!supported_features.pipelineStatisticsQuery) {
+    is_suitable = false;
+  }
 
   // IS DISCRETE!
   VkPhysicalDeviceProperties device_properties;
@@ -187,6 +190,7 @@ Device::create_device(VkSurfaceKHR surface) -> void
   device_features.logicOp = VK_TRUE;
   device_features.wideLines = VK_TRUE;
   device_features.sampleRateShading = VK_TRUE;
+  device_features.pipelineStatisticsQuery = VK_TRUE;
 
   VkDeviceCreateInfo create_info{};
   create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -223,6 +227,9 @@ Device::create_device(VkSurfaceKHR surface) -> void
 
   VkCommandPoolCreateInfo command_pool_create_info = {};
   command_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+  command_pool_create_info.flags =
+    VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT |
+    VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
   command_pool_create_info.queueFamilyIndex =
     queue_support.at(QueueType::Graphics).family_index;
   vkCreateCommandPool(
@@ -285,10 +292,10 @@ Device::execute_immediate(QueueType type,
   vkFreeCommandBuffers(
     device(), allocation_info.commandPool, 1, &command_buffer);
 
-  vkResetCommandPool(device(),
-                     type == QueueType::Compute ? compute_command_pool
-                                                : graphics_command_pool,
-                     0);
+  // vkResetCommandPool(device(),
+  //                    type == QueueType::Compute ? compute_command_pool
+  //                                              : graphics_command_pool,
+  //                   0);
 }
 
 auto
@@ -309,8 +316,8 @@ Device::create_secondary_command_buffer() -> VkCommandBuffer
 auto
 Device::reset_command_pools() -> void
 {
-  vkResetCommandPool(device(), graphics_command_pool, 0);
-  vkResetCommandPool(device(), compute_command_pool, 0);
+  // vkResetCommandPool(device(), graphics_command_pool, 0);
+  // vkResetCommandPool(device(), compute_command_pool, 0);
 }
 
 auto

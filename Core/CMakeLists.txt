@@ -45,7 +45,6 @@ add_library(Core STATIC
     include/graphics/Window.hpp
     include/graphics/render_passes/Deferred.hpp
     include/graphics/render_passes/MainGeometry.hpp
-    include/graphics/render_passes/Predepth.hpp
     include/graphics/render_passes/Shadow.hpp
     include/pch/CorePCH.hpp
     include/ui/UI.hpp
@@ -79,7 +78,6 @@ add_library(Core STATIC
     src/graphics/Window.cpp
     src/graphics/render_passes/Deferred.cpp
     src/graphics/render_passes/MainGeometry.cpp
-    src/graphics/render_passes/Predepth.cpp
     src/graphics/render_passes/Shadow.cpp
     src/ui/UI.cpp
 )

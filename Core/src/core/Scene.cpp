@@ -21,31 +21,33 @@ Scene::Scene(const std::string_view name_view)
   auto& transform = registry.emplace<TransformComponent>(entity);
   transform.translation = { 0, 0, 0 };
 
+  auto cube_mesh = Core::make_ref<Graphics::StaticMesh>(
+    Core::make_ref<Graphics::MeshAsset>("Assets/meshes/cube.obj"));
   auto entity2 = registry.create();
-  registry.emplace<MeshComponent>(entity2, mesh);
+  registry.emplace<MeshComponent>(entity2, cube_mesh);
   auto& transform2 = registry.emplace<TransformComponent>(entity2);
   transform2.translation = { 0, 5, 0 };
   // Floor is big!
   transform2.scale = { 10, 1, 10 };
 
-  for (auto i = 0; i < 30; i++) {
+  for (auto i = 0; i < 100; i++) {
     auto light = registry.create();
-    registry.emplace<MeshComponent>(light, mesh);
+    registry.emplace<MeshComponent>(light, cube_mesh);
     auto& t = registry.emplace<TransformComponent>(light);
     auto& light_data = registry.emplace<PointLightComponent>(light);
     t.scale *= 0.1;
-    t.translation = Random::random_in_rectangle(-5, 5);
+    t.translation = Random::random_in_rectangle(-50, 50);
     t.translation.y *= 3;
     light_data.radiance = Random::random_colour();
   }
 
-  for (auto i = 0; i < 30; i++) {
+  for (auto i = 0; i < 100; i++) {
     auto light = registry.create();
     auto& t = registry.emplace<TransformComponent>(light);
-    registry.emplace<MeshComponent>(light, mesh);
+    registry.emplace<MeshComponent>(light, cube_mesh);
     t.scale *= 0.1;
 
-    t.translation = Random::random_in_rectangle(-5, 5);
+    t.translation = Random::random_in_rectangle(-50, 50);
 
     auto& light_data = registry.emplace<SpotLightComponent>(light);
     light_data.radiance = Random::random_colour();
