@@ -36,7 +36,8 @@ DeferredRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
           deferred_material] = get_data();
 
   auto renderer_desc_set =
-    generate_and_update_descriptor_write_sets(*deferred_material);
+    get_renderer().generate_and_update_descriptor_write_sets(
+      *deferred_material);
 
   auto material_set =
     deferred_material->generate_and_update_descriptor_write_sets();
@@ -62,7 +63,7 @@ DeferredRenderPass::destruct_impl() -> void
 auto
 DeferredRenderPass::on_resize(const Core::Extent& ext) -> void
 {
-  RenderPass::for_each([&](const auto key, auto& val) {
+  RenderPass::for_each([&](const auto, auto& val) {
     auto&& [deferred_framebuffer,
             deferred_shader,
             deferred_pipeline,
@@ -72,8 +73,12 @@ DeferredRenderPass::on_resize(const Core::Extent& ext) -> void
       .size = get_renderer().get_size(),
       .colour_attachment_formats = { VK_FORMAT_R32G32B32A32_SFLOAT, },
       .sample_count = VK_SAMPLE_COUNT_4_BIT,
+      .immediate_construction = false,
       .name = "Deferred",
     });
+    deferred_framebuffer->add_resolve_for_colour(0);
+    deferred_framebuffer->create_framebuffer_fully();
+
     deferred_shader = Shader::compile_graphics_scoped(
       "Assets/shaders/deferred.vert", "Assets/shaders/deferred.frag");
     deferred_pipeline =

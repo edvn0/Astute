@@ -79,6 +79,10 @@ private:
   // Hide the implementation details of the shader compiler.
   struct Impl;
   Core::Scope<Impl> impl;
+
+  static inline std::unordered_map<std::string, std::string> file_cache{};
+  static inline std::unordered_map<std::string, std::vector<Core::u32>>
+    compiled_cache{};
 };
 
 } // namespace Compilation

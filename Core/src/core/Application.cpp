@@ -113,6 +113,12 @@ Application::run() -> i32
     Graphics::DescriptorResource::the().end_frame();
   }
 
+  interface_system.reset();
+
+  for (const auto& func : deferred_destruction) {
+    func();
+  }
+
   Graphics::DescriptorResource::the().destroy();
   vkDeviceWaitIdle(Graphics::Device::the().device());
 

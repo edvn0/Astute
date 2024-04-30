@@ -52,6 +52,11 @@ public:
   auto get_swapchain() const -> const Graphics::Swapchain&;
   auto get_swapchain() -> Graphics::Swapchain&;
 
+  static auto defer_destruction(std::function<void()>&& func) -> void
+  {
+    deferred_destruction.emplace_back(std::move(func));
+  }
+
 protected:
   auto get_statistics() const -> const Statistics& { return statistics; }
   auto get_statistics() -> Statistics& { return statistics; }
@@ -63,6 +68,8 @@ protected:
 private:
   Configuration config{};
   Statistics statistics{};
+
+  static inline std::vector<std::function<void()>> deferred_destruction{};
 
   Scope<Graphics::Window> window;
   Scope<Graphics::InterfaceSystem> interface_system;

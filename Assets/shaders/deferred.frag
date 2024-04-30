@@ -24,82 +24,21 @@ resolve(sampler2DMS tex, ivec2 uv)
   return result / float(NUM_SAMPLES);
 }
 
-float
-calculate_attenuation(float dist, PointLight light)
+void
+calculate_light_for(vec3 L,
+                    vec3 N,
+                    vec3 V,
+                    vec4 albedo,
+                    float atten,
+                    vec3 radiance,
+                    out vec3 result)
 {
-  float attenuation = 0.0;
-  float range = light.radius - light.min_radius;
-  if (range > 0.0) {
-    float factor = clamp((dist - light.min_radius) / range, 0.0, 1.0);
-    attenuation = 1.0 - pow(factor, light.falloff);
-  }
-  return attenuation * light.multiplier;
-}
-
-float
-calculate_attenuation(float dist, SpotLight light)
-{
-  float attenuation = 0.0;
-  float range = light.range;
-  if (range > 0.0) {
-    float factor = clamp(dist / range, 0.0, 1.0);
-    attenuation = 1.0 - pow(factor, light.falloff);
-  }
-  return attenuation * light.multiplier;
-}
-
-vec3
-calculate_diffuse_and_specular(const in vec3 normal,
-                               const in vec3 fragPos,
-                               const in vec3 viewDir,
-                               const in PointLight light,
-                               const in float specular_strength)
-{
-  vec3 lightDir = normalize(light.pos - fragPos);
-  float dist = length(light.pos - fragPos);
-  vec3 reflectDir = reflect(-lightDir, normal);
-
-  float diff = max(dot(normal, lightDir), 0.0);
-  vec3 diffuse = diff * light.radiance * light.radiance;
-
-  float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0F);
-  vec3 specular = spec * specular_strength * light.radiance;
-
-  float attenuation = calculate_attenuation(dist, light);
-
-  // float shadow = light.casts_shadows ? compute_shadow(fragPos, lightDir)
-  // : 1.0;
-  float shadow = light.casts_shadows ? 0.1 : 1.0;
-
-  vec3 result = (diffuse + specular) * attenuation * shadow;
-  return result;
-}
-
-vec3
-calculate_diffuse_and_specular(const in vec3 normal,
-                               const in vec3 fragPos,
-                               const in vec3 viewDir,
-                               const in SpotLight light,
-                               const in float specular_strength)
-{
-  vec3 lightDir = normalize(light.pos - fragPos);
-  float dist = length(light.pos - fragPos);
-  vec3 reflectDir = reflect(-lightDir, normal);
-
-  float diff = max(dot(normal, lightDir), 0.0);
-  vec3 diffuse = diff * light.radiance * light.radiance;
-
-  float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0F);
-  vec3 specular = spec * specular_strength * light.radiance;
-
-  float attenuation = calculate_attenuation(dist, light);
-
-  // float shadow = light.casts_shadows ? compute_shadow(fragPos, lightDir)
-  // : 1.0;
-  float shadow = light.casts_shadows ? 0.1 : 1.0;
-
-  vec3 result = (diffuse + specular) * attenuation * shadow;
-  return result;
+  // Combine calculations into fewer lines to reduce complexity
+  vec3 R = reflect(-L, N);
+  float NdotL = max(dot(N, L), 0.0);
+  float NdotR = max(dot(R, V), 0.0);
+  result += radiance * albedo.rgb * NdotL * atten;
+  result += radiance * albedo.a * pow(NdotR, 8.0) * atten;
 }
 
 vec3
@@ -110,69 +49,47 @@ calculateLighting(vec3 pos,
                   uint spot_light_count)
 {
   vec3 result = vec3(0.0);
+  vec3 N = normalize(normal);                         // Normalizing once
+  vec3 V = normalize(renderer.camera_position - pos); // Compute once, use many
 
-  for (int i = 0; i < point_light_count; ++i) {
-    // Vector to light
-    vec3 L = point_lights.lights[i].pos.xyz - pos;
-    // Distance from light to fragment position
+  // Precompute constants for attenuation formula
+  const float linearTerm = 0.09;
+  const float quadraticTerm = 0.032;
+
+  for (uint i = 0; i < point_light_count; ++i) {
+    vec3 L = point_lights.lights[i].pos - pos;
     float dist = length(L);
-
-    // Viewer to fragment
-    vec3 V = renderer.camera_position.xyz - pos;
-    V = normalize(V);
-
-    // Light to fragment
-    L = normalize(L);
-
-    // Attenuation
-    float atten = point_lights.lights[i].radius / (pow(dist, 2.0) + 1.0);
-
-    // Diffuse part
-    vec3 N = normalize(normal);
-    float NdotL = max(0.0, dot(N, L));
-    vec3 diff = point_lights.lights[i].radiance * albedo.rgb * NdotL * atten;
-
-    // Specular part
-    vec3 R = reflect(-L, N);
-    float NdotR = max(0.0, dot(R, V));
-    vec3 spec =
-      point_lights.lights[i].radiance * albedo.a * pow(NdotR, 8.0) * atten;
-
-    result += diff + spec;
-  }
-
-  for (int i = 0; i < spot_light_count; ++i) {
-    // Vector to light
-    vec3 L = spot_lights.lights[i].pos - pos;
-    // Distance from light to fragment position
-    float dist = length(L);
-    // Normalize L
-    L = normalize(L);
-
-    // Check if fragment is within the light cone
-    float spotEffect = dot(-L, normalize(spot_lights.lights[i].direction));
-    if (spotEffect > cos(radians(spot_lights.lights[i].angle))) {
-      // Attenuation including distance and cone attenuation
-      float atten = (1.0 / (pow(dist, 2.0) + 1.0)) *
-                    pow(spotEffect, spot_lights.lights[i].falloff);
-
-      // Viewer to fragment
-      vec3 V = normalize(renderer.camera_position - pos);
-
-      // Diffuse part
-      vec3 N = normalize(normal);
-      float NdotL = max(0.0, dot(N, L));
-      vec3 diff = spot_lights.lights[i].radiance * albedo.rgb * NdotL * atten;
-
-      // Specular part
-      vec3 R = reflect(-L, N);
-      float NdotR = max(0.0, dot(R, V));
-      vec3 spec =
-        spot_lights.lights[i].radiance * albedo.a * pow(NdotR, 8.0) * atten;
-
-      result += diff + spec;
+    if (dist > point_lights.lights[i].radius) {
+      continue;
     }
+
+    L = normalize(L);
+    float atten = 1.0 / (1.0 + linearTerm * dist + quadraticTerm * dist * dist);
+
+    calculate_light_for(
+      L, N, V, albedo, atten, point_lights.lights[i].radiance, result);
   }
+
+  for (uint i = 0; i < spot_light_count; ++i) {
+    vec3 L = spot_lights.lights[i].pos - pos;
+    float dist = length(L);
+    if (dist > spot_lights.lights[i].range) {
+      continue;
+    }
+
+    L = normalize(L);
+    float spot_effect = dot(-L, normalize(spot_lights.lights[i].direction));
+    if (spot_effect <= cos(radians(spot_lights.lights[i].angle + 10.0))) {
+      continue;
+    }
+
+    float atten = (1.0 / (dist * dist + 1.0)) *
+                  pow(spot_effect, spot_lights.lights[i].falloff);
+
+    calculate_light_for(
+      L, N, V, albedo, atten, spot_lights.lights[i].radiance, result);
+  }
+
   return result;
 }
 
@@ -214,6 +131,7 @@ main()
 
   // Ambient part
   vec4 alb = resolve(gAlbedoSpecMap, UV);
+
   vec3 fragColor = vec3(0.0);
 
   // Calualte lighting for every MSAA sample

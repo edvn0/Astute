@@ -6,6 +6,7 @@
 
 #include <cassert>
 
+#include "core/Verify.hpp"
 #include "graphics/Device.hpp"
 #include "graphics/Instance.hpp"
 
@@ -66,7 +67,6 @@ Allocator::allocate_image(VkImage& image,
                           VkImageCreateInfo& image_create_info,
                           const AllocationProperties& props) -> VmaAllocation
 {
-  // ensure(allocator != nullptr, "Allocator was null.");
   VmaAllocationCreateInfo allocation_create_info = {};
   allocation_create_info.usage = static_cast<VmaMemoryUsage>(props.usage);
   if (props.flags != RequiredFlags::FLAG_BITS_MAX_ENUM) {
@@ -75,12 +75,12 @@ Allocator::allocate_image(VkImage& image,
   }
 
   VmaAllocation allocation{};
-  vmaCreateImage(allocator,
-                 &image_create_info,
-                 &allocation_create_info,
-                 &image,
-                 &allocation,
-                 nullptr);
+  VK_CHECK(vmaCreateImage(allocator,
+                          &image_create_info,
+                          &allocation_create_info,
+                          &image,
+                          &allocation,
+                          nullptr));
   vmaSetAllocationName(allocator, allocation, resource_name.data());
 
   return allocation;
@@ -92,7 +92,6 @@ Allocator::allocate_image(VkImage& image,
                           VkImageCreateInfo& image_create_info,
                           const AllocationProperties& props) -> VmaAllocation
 {
-  // ensure(allocator != nullptr, "Allocator was null.");
   VmaAllocationCreateInfo allocation_create_info = {};
   allocation_create_info.usage = static_cast<VmaMemoryUsage>(props.usage);
   if (props.flags != RequiredFlags::FLAG_BITS_MAX_ENUM) {
@@ -101,12 +100,12 @@ Allocator::allocate_image(VkImage& image,
   }
 
   VmaAllocation allocation{};
-  vmaCreateImage(allocator,
-                 &image_create_info,
-                 &allocation_create_info,
-                 &image,
-                 &allocation,
-                 &allocation_info);
+  VK_CHECK(vmaCreateImage(allocator,
+                          &image_create_info,
+                          &allocation_create_info,
+                          &image,
+                          &allocation,
+                          &allocation_info));
   vmaSetAllocationName(allocator, allocation, resource_name.data());
 
   return allocation;
@@ -115,7 +114,6 @@ Allocator::allocate_image(VkImage& image,
 void
 Allocator::deallocate_buffer(VmaAllocation allocation, VkBuffer& buffer)
 {
-  // ensure(allocator != nullptr, "Allocator was null.");
   vmaDestroyBuffer(allocator, buffer, allocation);
 }
 
@@ -142,7 +140,7 @@ Allocator::construct_allocator(const Device& device, const Instance& instance)
   allocator_create_info.instance = instance.instance();
 
   VmaAllocator alloc{};
-  vmaCreateAllocator(&allocator_create_info, &alloc);
+  VK_CHECK(vmaCreateAllocator(&allocator_create_info, &alloc));
   return alloc;
 }
 

@@ -81,7 +81,6 @@ Renderer::generate_and_update_descriptor_write_sets(Material& material)
   auto allocated =
     DescriptorResource::the().allocate_descriptor_set(alloc_info);
 
-  material.update_descriptor_write_sets(allocated);
   for (auto& wds : write_descriptor_sets) {
     wds.dstSet = allocated;
   }
@@ -111,6 +110,11 @@ Renderer::Renderer(Configuration config, const Window* window)
     .queue_type = QueueType::Graphics,
     .primary = true,
   });
+  compute_command_buffer =
+    Core::make_scope<CommandBuffer>(CommandBuffer::Properties{
+      .queue_type = QueueType::Compute,
+      .primary = true,
+    });
 
   render_passes["MainGeometry"] =
     Core::make_scope<MainGeometryRenderPass>(*this);
@@ -192,7 +196,7 @@ Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
 
   auto& [light_view, light_proj, light_view_proj, light_pos] =
     shadow_ubo.get_data();
-  auto projection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 0.1F, 20.0F);
+  auto projection = light_environment.shadow_projection;
   auto view_matrix = glm::lookAt(light_environment.sun_position,
                                  glm::vec3(0.0f),
                                  glm::vec3(0.0f, 1.0f, 0.0f));
@@ -348,6 +352,7 @@ Renderer::flush_draw_lists() -> void
   vb->write(std::span{ output });
 
   command_buffer->begin();
+  compute_command_buffer->begin();
 
   // Shadow pass
   render_passes.at("Shadow")->execute(*command_buffer);
@@ -356,6 +361,8 @@ Renderer::flush_draw_lists() -> void
   // Deferred
   render_passes.at("Deferred")->execute(*command_buffer);
 
+  compute_command_buffer->end();
+  compute_command_buffer->submit();
   command_buffer->end();
   command_buffer->submit();
 

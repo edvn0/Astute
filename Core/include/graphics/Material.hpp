@@ -58,7 +58,7 @@ private:
   Core::FrameBasedCollection<
     std::unordered_map<Core::u32, VkWriteDescriptorSet>>
     write_descriptors;
-  Core::FrameBasedCollection<VkDescriptorSet> descriptor_sets;
+  Core::FrameBasedCollection<Reflection::MaterialDescriptorSet> descriptor_sets;
 
   Core::DataBuffer uniform_storage;
 

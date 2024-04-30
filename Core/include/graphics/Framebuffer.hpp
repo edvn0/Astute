@@ -19,6 +19,8 @@ public:
     const bool resizable{ true };
     const std::unordered_map<Core::u32, Core::Ref<Image>> dependent_images{};
     const bool clear_colour_on_load{ true };
+    const bool immediate_construction{ true };
+    const Core::u32 depth_clear_value{ 0 };
     const std::string name;
   };
   explicit Framebuffer(const Configuration&);
@@ -28,6 +30,11 @@ public:
   auto get_colour_attachment(Core::u32 index) const -> const Core::Ref<Image>&
   {
     return colour_attachments.at(index);
+  }
+  auto get_resolved_colour_attachment(Core::u32 index) const
+    -> const Core::Ref<Image>&
+  {
+    return resolved_attachments.at(index);
   }
   auto get_colour_attachment_count() const -> Core::u32
   {
@@ -58,6 +65,9 @@ public:
   auto on_resize(const Core::Extent&) -> void;
   auto get_name() const -> const std::string& { return name; }
 
+  auto add_resolve_for_colour(Core::u32) -> void;
+  auto create_framebuffer_fully() -> void;
+
 private:
   Core::Extent size;
   const std::vector<VkFormat> colour_attachment_formats;
@@ -66,7 +76,9 @@ private:
   const bool resizable;
   std::unordered_map<Core::u32, Core::Ref<Image>> dependent_images{};
   const bool clear_colour_on_load{ true };
+  const Core::u32 depth_clear_value{ 0 };
   const std::string name;
+
   Core::i32 depth_attachment_index{ -1 };
 
   auto search_dependents_for_depth_format() -> const Image*;
@@ -75,8 +87,12 @@ private:
   std::vector<Core::Ref<Image>> colour_attachments;
   Core::Ref<Image> depth_attachment;
 
-  VkFramebuffer framebuffer{ VK_NULL_HANDLE };
-  VkRenderPass renderpass{ VK_NULL_HANDLE };
+  std::vector<Core::Ref<Image>> resolved_attachments;
+  std::vector<std::pair<VkAttachmentDescription2, VkAttachmentReference2>>
+    resolved_render_pass_attachments;
+
+  VkFramebuffer framebuffer{ nullptr };
+  VkRenderPass renderpass{ nullptr };
 
   auto destroy() -> void;
   auto create_colour_attachments() -> void;

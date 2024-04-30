@@ -17,7 +17,7 @@ Material::Material(Configuration config)
 {
   const auto& shader_buffers = shader->get_reflection_data().constant_buffers;
 
-  if (shader_buffers.size() > 0) {
+  if (!shader_buffers.empty()) {
     Core::u32 size = 0;
     for (auto&& [name, buffer] : shader_buffers)
       size += buffer.size;
@@ -89,16 +89,12 @@ Material::generate_and_update_descriptor_write_sets() -> VkDescriptorSet
 {
   auto& current_writes = *write_descriptors;
 
-  VkDescriptorSetAllocateInfo alloc_info{};
-  alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-  const auto& layouts = shader->get_descriptor_set_layouts();
-  alloc_info.descriptorSetCount = 1;
-  alloc_info.pSetLayouts = &layouts.at(1);
-  auto allocated =
-    DescriptorResource::the().allocate_descriptor_set(alloc_info);
+  auto allocated = shader->allocate_descriptor_set(1);
+
+  descriptor_sets.get() = allocated;
 
   for (auto& [index, write] : current_writes) {
-    write.dstSet = allocated;
+    write.dstSet = allocated.descriptor_sets.at(0);
   }
 
   std::vector<VkWriteDescriptorSet> values{};
@@ -114,7 +110,7 @@ Material::generate_and_update_descriptor_write_sets() -> VkDescriptorSet
                          0,
                          nullptr);
 
-  return allocated;
+  return allocated.descriptor_sets.at(0);
 }
 
 auto

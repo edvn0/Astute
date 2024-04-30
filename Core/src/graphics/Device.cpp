@@ -286,16 +286,11 @@ Device::execute_immediate(QueueType type,
   static constexpr auto default_fence_timeout = 100000000000;
   vkWaitForFences(device(), 1, &to_use, VK_TRUE, default_fence_timeout);
 
-  if (!to_use) {
+  if (!fence) {
     vkDestroyFence(device(), to_use, nullptr);
   }
   vkFreeCommandBuffers(
     device(), allocation_info.commandPool, 1, &command_buffer);
-
-  // vkResetCommandPool(device(),
-  //                    type == QueueType::Compute ? compute_command_pool
-  //                                              : graphics_command_pool,
-  //                   0);
 }
 
 auto

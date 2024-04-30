@@ -34,13 +34,13 @@ struct ShadowUBO
 
 struct PointLight
 {
-  glm::vec3 pos{ 0 };
-  float intensity{ 0 };
-  glm::vec3 radiance{ 0 };
-  float min_radius{ 0 };
-  float radius{ 0 };
-  float falloff{ 0 };
-  float light_size{ 0 };
+  glm::vec3 pos{ 0, 5, 0 }; // Slightly elevated
+  float intensity{ 1.0 };
+  glm::vec3 radiance{ 1.0, 1.0, 1.0 }; // White light
+  float min_radius{ 0.0 };
+  float radius{ 10.0 };
+  float falloff{ 2.0 };
+  float light_size{ 0.1 };
   Core::PaddedBool casts_shadows{ true };
 };
 
@@ -54,14 +54,14 @@ struct PointLightUBO
 
 struct SpotLight
 {
-  glm::vec3 pos{ 0 };
-  float intensity{ 0 };
-  glm::vec3 direction{ 0 };
-  float angle_attenuation{ 0 };
-  glm::vec3 radiance{ 0 };
-  float range{ 0 };
-  float angle{ 0 };
-  float falloff{ 0 };
+  glm::vec3 pos{ 0, 10, 0 }; // Elevated above the scene
+  float intensity{ 1.0 };
+  glm::vec3 direction{ 0, -1, 0 }; // Pointing downwards
+  float angle_attenuation{ 3.0 };
+  glm::vec3 radiance{ 1.0, 1.0, 1.0 }; // White light
+  float range{ 10.0 };
+  float angle{ 45.0 }; // Degrees
+  float falloff{ 2.0 };
   Core::PaddedBool soft_shadows{ false };
   Core::PaddedBool casts_shadows{ true };
 };

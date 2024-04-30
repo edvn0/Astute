@@ -71,6 +71,8 @@ struct LightEnvironment
   glm::vec4 colour_and_intensity{ 0 };
   glm::vec4 specular_colour_and_intensity{ 0 };
 
+  glm::mat4 shadow_projection{ 1 };
+
   std::vector<Graphics::PointLight> point_lights;
   std::vector<Graphics::SpotLight> spot_lights;
 };
@@ -93,6 +95,10 @@ public:
   }
 
   auto get_light_environment() const -> const LightEnvironment&
+  {
+    return light_environment;
+  }
+  auto get_light_environment() -> LightEnvironment&
   {
     return light_environment;
   }

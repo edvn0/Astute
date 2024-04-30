@@ -2,12 +2,18 @@
 
 #include "core/DataBuffer.hpp"
 
+#include "graphics/CommandBuffer.hpp"
+
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
 #include <string_view>
 
 namespace Engine::Graphics {
+
+auto to_string(VkFormat) -> std::string_view;
+auto to_string(VkImageLayout) -> std::string_view;
+auto to_string(VkSampleCountFlagBits) -> std::string_view;
 
 void
 create_image(Core::u32 width,
@@ -95,6 +101,8 @@ public:
                                Core::u32,
                                const Core::DataBuffer&,
                                const Configuration& = {}) -> Core::Ref<Image>;
+  static auto resolve_msaa(const Image&, const CommandBuffer* = nullptr)
+    -> Core::Scope<Image>;
 };
 
 } // namespace Engine::Graphics

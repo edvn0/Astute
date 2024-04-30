@@ -160,7 +160,7 @@ GraphicsPipeline::create_pipeline() -> void
   rasterization_info.lineWidth = 1.0f;
   rasterization_info.cullMode = cull_mode;
   rasterization_info.frontFace = face_mode;
-  rasterization_info.depthBiasEnable = VK_FALSE;
+  rasterization_info.depthBiasEnable = VK_TRUE;
   rasterization_info.depthBiasConstantFactor = 0.0f;
   rasterization_info.depthBiasClamp = 0.0f;
   rasterization_info.depthBiasSlopeFactor = 0.0f;
@@ -204,9 +204,10 @@ GraphicsPipeline::create_pipeline() -> void
   VkPipelineDynamicStateCreateInfo dynamic_state_info{};
   dynamic_state_info.sType =
     VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-  std::array<VkDynamicState, 2> dynamic_states = {
+  std::array<VkDynamicState, 3> dynamic_states = {
     VK_DYNAMIC_STATE_VIEWPORT,
     VK_DYNAMIC_STATE_SCISSOR,
+    VK_DYNAMIC_STATE_DEPTH_BIAS
   };
   dynamic_state_info.dynamicStateCount =
     static_cast<Core::u32>(dynamic_states.size());

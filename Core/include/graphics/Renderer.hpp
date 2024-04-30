@@ -122,7 +122,7 @@ public:
   {
     return render_passes.at("Deferred")
       ->get_framebuffer()
-      ->get_colour_attachment(0)
+      ->get_resolved_colour_attachment(0)
       .get();
   }
 
@@ -151,6 +151,7 @@ private:
   Core::Extent size{ 0, 0 };
   Core::Extent old_size{ 0, 0 };
   Core::Scope<CommandBuffer> command_buffer{ nullptr };
+  Core::Scope<CommandBuffer> compute_command_buffer{ nullptr };
 
   std::unordered_map<std::string,
                      Core::Scope<RenderPass>,
@@ -188,9 +189,7 @@ private:
   friend class RenderPass;
   friend class DeferredRenderPass;
   friend class MainGeometryRenderPass;
-  friend class PreDepthRenderPass;
   friend class ShadowRenderPass;
-  friend class LightsRenderPass;
 };
 
 }

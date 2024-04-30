@@ -31,4 +31,31 @@ random_colour() -> glm::vec4
   };
 }
 
+auto
+random(Core::f32 min, Core::f32 max) -> Core::f32
+{
+  std::uniform_real_distribution distribution{ min, max };
+  return distribution(engine);
+}
+auto
+random(Core::f64 min, Core::f64 max) -> Core::f64
+{
+  std::uniform_real_distribution distribution{ min, max };
+  return distribution(engine);
+}
+auto
+random(Core::f64 min, Core::f32 max) -> Core::f64
+{
+  std::uniform_real_distribution distribution{ min,
+                                               static_cast<Core::f64>(max) };
+  return distribution(engine);
+}
+auto
+random(Core::f32 min, Core::f64 max) -> Core::f64
+{
+  std::uniform_real_distribution distribution{ static_cast<Core::f64>(min),
+                                               max };
+  return distribution(engine);
+}
+
 } // namespace Engine::Core

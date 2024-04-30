@@ -2,6 +2,7 @@
 
 #include <imgui.h>
 
+#include "core/Scene.hpp"
 #include "graphics/Window.hpp"
 
 auto
@@ -70,26 +71,12 @@ AstuteApplication::render() -> void
 auto
 AstuteApplication::interface() -> void
 {
-  ImGui::DockSpaceOverViewport(ImGui::GetMainViewport(),
-                               ImGuiDockNodeFlags_PassthruCentralNode);
+  ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
 
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0F, 0.0F));
-  UI::scope("Output Position", [&](f32 w, f32 h) {
-    UI::image<f32>(*renderer->get_output_image(),
-                   {
-                     .extent = { w, h },
-                   });
-  });
 
-  UI::scope("Output Normals", [&](f32 w, f32 h) {
-    UI::image<f32>(*renderer->get_output_image(1),
-                   {
-                     .extent = { w, h },
-                   });
-  });
-
-  UI::scope("Output Albedo + Spec", [&](f32 w, f32 h) {
-    UI::image<f32>(*renderer->get_output_image(2),
+  UI::scope("Final Output", [&](f32 w, f32 h) {
+    UI::image<f32>(*renderer->get_final_output(),
                    {
                      .extent = { w, h },
                    });
@@ -102,11 +89,34 @@ AstuteApplication::interface() -> void
                    });
   });
 
-  UI::scope("Final Output", [&](f32 w, f32 h) {
-    UI::image<f32>(*renderer->get_final_output(),
-                   {
-                     .extent = { w, h },
-                   });
+  UI::scope("Shadow projection", [s = scene]() {
+    auto& light_environment = s->get_light_environment();
+#ifndef ORTHO
+    static f32 left{ -10 };
+    static f32 right{ 10 };
+    static f32 bottom{ -10 };
+    static f32 top{ 10 };
+    static f32 near{ 3 };
+    static f32 far{ 90 };
+    ImGui::InputFloat("Left", &left);
+    ImGui::InputFloat("Right", &right);
+    ImGui::InputFloat("Bottom", &bottom);
+    ImGui::InputFloat("Top", &top);
+    ImGui::InputFloat("Near", &near);
+    ImGui::InputFloat("Far", &far);
+    auto projection = glm::ortho(left, right, bottom, top, far, near);
+#else
+    static f32 fov{ 45 };
+    static f32 aspect{ 1 };
+    static f32 near{ 0.1 };
+    static f32 far{ 100 };
+    ImGui::InputFloat("FOV", &fov);
+    ImGui::InputFloat("Aspect", &aspect);
+    ImGui::InputFloat("Near", &near);
+    ImGui::InputFloat("Far", &far);
+    auto projection = glm::perspective(glm::radians(fov), aspect, near, far);
+#endif
+    light_environment.shadow_projection = projection;
   });
 
   ImGui::PopStyleVar();

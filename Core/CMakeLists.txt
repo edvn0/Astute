@@ -65,6 +65,7 @@ add_library(Core STATIC
     src/graphics/GPUBuffer.cpp
     src/graphics/GraphicsPipeline.cpp
     src/graphics/Image.cpp
+    src/graphics/ImageUtilities.cpp
     src/graphics/Instance.cpp
     src/graphics/InterfaceSystem.cpp
     src/graphics/Material.cpp
@@ -85,3 +86,5 @@ target_include_directories(Core PUBLIC include ${CMAKE_SOURCE_DIR}/Library/imgui
 target_link_libraries(Core PUBLIC ShaderCompilation glfw Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator PRIVATE imgui glm EnTT::EnTT stbimage::stbimage assimp)
 
 target_precompile_headers(Core PRIVATE include/pch/CorePCH.hpp)
+
+target_compile_definitions(Core PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)

@@ -267,6 +267,7 @@ MeshAsset::MeshAsset(const std::string& file_name)
 
     if (fallback) {
       materials.at(i)->set("albedo_map", white_texture);
+      materials.at(i)->set("mat_pc.albedo_colour", glm::vec3(1.0f));
     }
 
     // Normal maps

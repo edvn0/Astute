@@ -50,7 +50,7 @@ compile_shader(shaderc::Compiler& compiler,
                shaderc::CompileOptions& options,
                const std::string& source_name,
                shaderc_shader_kind kind,
-               const std::string& source) -> std::vector<uint32_t>
+               const std::string& source) -> std::vector<Core::u32>
 {
   shaderc::SpvCompilationResult result =
     compiler.CompileGlslToSpv(source, kind, source_name.c_str(), options);
@@ -150,40 +150,54 @@ ShaderCompiler::compile_graphics(
   const std::filesystem::path& fragment_shader_path)
   -> Core::Ref<Graphics::Shader>
 {
+  std::string vertex_path_key = vertex_shader_path.string();
+  std::string fragment_path_key = fragment_shader_path.string();
 
-  // Read shader source files
-  std::string vertex_shader_source = read_file(vertex_shader_path);
-  std::string fragment_shader_source = read_file(fragment_shader_path);
+  // Check and read vertex shader source file from cache
+  auto& vertex_file = file_cache[vertex_path_key];
+  if (vertex_file.empty()) {
+    vertex_file = read_file(vertex_shader_path);
+  }
 
-  // Preprocess and compile vertex shader
-  auto preprocessed_vertex_shader =
-    preprocess_shader(impl->compiler,
-                      impl->options,
-                      vertex_shader_path.string(),
-                      shaderc_glsl_vertex_shader,
-                      vertex_shader_source);
-  auto compiled_vertex_shader = compile_shader(impl->compiler,
-                                               impl->options,
-                                               vertex_shader_path.string(),
-                                               shaderc_glsl_vertex_shader,
-                                               preprocessed_vertex_shader);
+  // Check and read fragment shader source file from cache
+  auto& fragment_file = file_cache[fragment_path_key];
+  if (fragment_file.empty()) {
+    fragment_file = read_file(fragment_shader_path);
+  }
 
-  // Preprocess and compile fragment shader
-  auto preprocessed_fragment_shader =
-    preprocess_shader(impl->compiler,
-                      impl->options,
-                      fragment_shader_path.string(),
-                      shaderc_glsl_fragment_shader,
-                      fragment_shader_source);
-  auto compiled_fragment_shader = compile_shader(impl->compiler,
-                                                 impl->options,
-                                                 fragment_shader_path.string(),
-                                                 shaderc_glsl_fragment_shader,
-                                                 preprocessed_fragment_shader);
+  // Check and compile vertex shader from cache
+  auto& compiled_vertex_shader = compiled_cache[vertex_path_key];
+  if (compiled_vertex_shader.empty()) {
+    auto preprocessed_vertex_shader = preprocess_shader(impl->compiler,
+                                                        impl->options,
+                                                        vertex_path_key,
+                                                        shaderc_vertex_shader,
+                                                        vertex_file);
+    compiled_vertex_shader = compile_shader(impl->compiler,
+                                            impl->options,
+                                            vertex_path_key,
+                                            shaderc_vertex_shader,
+                                            preprocessed_vertex_shader);
+  }
 
-  if (compiled_vertex_shader.empty() || compiled_fragment_shader.empty() ||
-      preprocessed_vertex_shader.empty() ||
-      preprocessed_fragment_shader.empty()) {
+  // Check and compile fragment shader from cache
+  auto& compiled_fragment_shader = compiled_cache[fragment_path_key];
+  if (compiled_fragment_shader.empty()) {
+    auto preprocessed_fragment_shader =
+      preprocess_shader(impl->compiler,
+                        impl->options,
+                        fragment_path_key,
+                        shaderc_fragment_shader,
+                        fragment_file);
+    compiled_fragment_shader = compile_shader(impl->compiler,
+                                              impl->options,
+                                              fragment_path_key,
+                                              shaderc_fragment_shader,
+                                              preprocessed_fragment_shader);
+  }
+
+  // Check for compilation errors
+  if (compiled_vertex_shader.empty() || compiled_fragment_shader.empty()) {
     return nullptr;
   }
 
@@ -250,40 +264,54 @@ ShaderCompiler::compile_graphics_scoped(
   const std::filesystem::path& fragment_shader_path)
   -> Core::Scope<Graphics::Shader>
 {
+  std::string vertex_path_key = vertex_shader_path.string();
+  std::string fragment_path_key = fragment_shader_path.string();
 
-  // Read shader source files
-  std::string vertex_shader_source = read_file(vertex_shader_path);
-  std::string fragment_shader_source = read_file(fragment_shader_path);
+  // Check and read vertex shader source file from cache
+  auto& vertex_file = file_cache[vertex_path_key];
+  if (vertex_file.empty()) {
+    vertex_file = read_file(vertex_shader_path);
+  }
 
-  // Preprocess and compile vertex shader
-  auto preprocessed_vertex_shader =
-    preprocess_shader(impl->compiler,
-                      impl->options,
-                      vertex_shader_path.string(),
-                      shaderc_glsl_vertex_shader,
-                      vertex_shader_source);
-  auto compiled_vertex_shader = compile_shader(impl->compiler,
-                                               impl->options,
-                                               vertex_shader_path.string(),
-                                               shaderc_glsl_vertex_shader,
-                                               preprocessed_vertex_shader);
+  // Check and read fragment shader source file from cache
+  auto& fragment_file = file_cache[fragment_path_key];
+  if (fragment_file.empty()) {
+    fragment_file = read_file(fragment_shader_path);
+  }
 
-  // Preprocess and compile fragment shader
-  auto preprocessed_fragment_shader =
-    preprocess_shader(impl->compiler,
-                      impl->options,
-                      fragment_shader_path.string(),
-                      shaderc_glsl_fragment_shader,
-                      fragment_shader_source);
-  auto compiled_fragment_shader = compile_shader(impl->compiler,
-                                                 impl->options,
-                                                 fragment_shader_path.string(),
-                                                 shaderc_glsl_fragment_shader,
-                                                 preprocessed_fragment_shader);
+  // Check and compile vertex shader from cache
+  auto& compiled_vertex_shader = compiled_cache[vertex_path_key];
+  if (compiled_vertex_shader.empty()) {
+    auto preprocessed_vertex_shader = preprocess_shader(impl->compiler,
+                                                        impl->options,
+                                                        vertex_path_key,
+                                                        shaderc_vertex_shader,
+                                                        vertex_file);
+    compiled_vertex_shader = compile_shader(impl->compiler,
+                                            impl->options,
+                                            vertex_path_key,
+                                            shaderc_vertex_shader,
+                                            preprocessed_vertex_shader);
+  }
 
-  if (compiled_vertex_shader.empty() || compiled_fragment_shader.empty() ||
-      preprocessed_vertex_shader.empty() ||
-      preprocessed_fragment_shader.empty()) {
+  // Check and compile fragment shader from cache
+  auto& compiled_fragment_shader = compiled_cache[fragment_path_key];
+  if (compiled_fragment_shader.empty()) {
+    auto preprocessed_fragment_shader =
+      preprocess_shader(impl->compiler,
+                        impl->options,
+                        fragment_path_key,
+                        shaderc_fragment_shader,
+                        fragment_file);
+    compiled_fragment_shader = compile_shader(impl->compiler,
+                                              impl->options,
+                                              fragment_path_key,
+                                              shaderc_fragment_shader,
+                                              preprocessed_fragment_shader);
+  }
+
+  // Check for compilation errors
+  if (compiled_vertex_shader.empty() || compiled_fragment_shader.empty()) {
     return nullptr;
   }
 
@@ -298,7 +326,6 @@ ShaderCompiler::compile_graphics_scoped(
         compiled_fragment_shader,
       },
     };
-
   auto name = vertex_shader_path.filename().replace_extension().string();
 
   return Core::make_scope<Graphics::Shader>(std::move(compiled_spirv_per_stage),
@@ -371,7 +398,7 @@ ShaderCompiler::ShaderCompiler(const ShaderCompilerConfiguration& conf)
   if (configuration.warnings_as_errors) {
     impl->options.SetWarningsAsErrors();
   }
-  // impl->options.SetInvertY(true);
+  impl->options.SetInvertY(true);
   impl->options.SetTargetSpirv(shaderc_spirv_version_1_6);
   impl->options.SetSourceLanguage(shaderc_source_language_glsl);
   impl->options.SetForcedVersionProfile(460, shaderc_profile_none);

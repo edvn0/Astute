@@ -32,8 +32,9 @@ ShadowRenderPass::construct() -> void
         size,
       },
       .depth_attachment_format = VK_FORMAT_D32_SFLOAT,
-      .sample_count = VK_SAMPLE_COUNT_4_BIT,
+      .sample_count = VK_SAMPLE_COUNT_1_BIT,
       .resizable = false,
+      .depth_clear_value = 1,
       .name = "Shadow",
     });
     shadow_shader = Shader::compile_graphics_scoped(
@@ -42,9 +43,10 @@ ShadowRenderPass::construct() -> void
       Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
         .framebuffer = shadow_framebuffer.get(),
         .shader = shadow_shader.get(),
-        .sample_count = VK_SAMPLE_COUNT_4_BIT,
+        .sample_count = VK_SAMPLE_COUNT_1_BIT,
+        .cull_mode = VK_CULL_MODE_BACK_BIT,
+        .face_mode = VK_FRONT_FACE_COUNTER_CLOCKWISE,
         .depth_comparator = VK_COMPARE_OP_LESS_OR_EQUAL,
-        .clear_depth_value = 1.0F,
         .override_vertex_attributes = { {
           { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
         } },
@@ -75,6 +77,14 @@ ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                           &descriptor_set,
                           0,
                           nullptr);
+
+  static constexpr float depthBiasConstant = 1.25f;
+  static constexpr float depthBiasSlope = 1.75f;
+
+  vkCmdSetDepthBias(command_buffer.get_command_buffer(),
+                    depthBiasConstant,
+                    0.0f,
+                    depthBiasSlope);
 
   for (const auto& [key, command] : get_renderer().shadow_draw_commands) {
     const auto& [mesh, submesh_index, instance_count] = command;

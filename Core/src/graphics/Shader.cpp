@@ -5,6 +5,7 @@
 #include "core/Exceptions.hpp"
 #include "core/Logger.hpp"
 #include "core/Verify.hpp"
+#include "graphics/DescriptorResource.hpp"
 #include "graphics/Device.hpp"
 
 #include <bit>
@@ -224,16 +225,14 @@ Shader::allocate_descriptor_set(Core::u32 set) const
     return result;
   }
 
-  // TODO: We'll need to disable this until we can figure out how to handle
-  // TODO: the descriptor set allocation properly.
-  /* VkDescriptorSetAllocateInfo allocation_info = {};
-   allocation_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-   allocation_info.descriptorSetCount = 1;
-   allocation_info.pSetLayouts = &descriptor_set_layouts[set];
-   auto& allocated_set = result.descriptor_sets.emplace_back();
-   allocated_set =
-     device.get_descriptor_resource()->allocate_descriptor_set(allocation_info);
-     */
+  VkDescriptorSetAllocateInfo allocation_info = {};
+  allocation_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  allocation_info.descriptorSetCount = 1;
+  allocation_info.pSetLayouts = &descriptor_set_layouts[set];
+  auto& allocated_set = result.descriptor_sets.emplace_back();
+  allocated_set =
+    DescriptorResource::the().allocate_descriptor_set(allocation_info);
+
   return result;
 }
 
@@ -249,8 +248,7 @@ Shader::create_descriptor_set_layouts() -> void
     std::vector<VkDescriptorSetLayoutBinding> layout_bindings{};
     for (const auto& [binding, uniform_buffer] :
          shader_descriptor_set.uniform_buffers) {
-      VkDescriptorSetLayoutBinding& layout_binding =
-        layout_bindings.emplace_back();
+      auto& layout_binding = layout_bindings.emplace_back();
       layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
       layout_binding.descriptorCount = 1;
       layout_binding.stageFlags = uniform_buffer.shader_stage;
@@ -268,8 +266,8 @@ Shader::create_descriptor_set_layouts() -> void
 
     for (const auto& [binding, storage_buffer] :
          shader_descriptor_set.storage_buffers) {
-      VkDescriptorSetLayoutBinding& layout_binding =
-        layout_bindings.emplace_back();
+
+      auto& layout_binding = layout_bindings.emplace_back();
       layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       layout_binding.descriptorCount = 1;
       layout_binding.stageFlags = storage_buffer.shader_stage;
@@ -289,6 +287,7 @@ Shader::create_descriptor_set_layouts() -> void
 
     for (const auto& [binding, image_sampler] :
          shader_descriptor_set.sampled_images) {
+
       auto& layout_binding = layout_bindings.emplace_back();
       layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
       layout_binding.descriptorCount = image_sampler.array_size;
@@ -312,6 +311,7 @@ Shader::create_descriptor_set_layouts() -> void
 
     for (const auto& [binding, image_sampler] :
          shader_descriptor_set.separate_textures) {
+
       auto& layout_binding = layout_bindings.emplace_back();
       layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
       layout_binding.descriptorCount = image_sampler.array_size;
@@ -364,6 +364,8 @@ Shader::create_descriptor_set_layouts() -> void
 
     for (const auto& [binding_and_set, image_sampler] :
          shader_descriptor_set.storage_images) {
+      static constexpr auto max_set = std::numeric_limits<Core::u32>::max();
+      Core::u32 binding = binding_and_set & max_set;
       auto& layout_binding = layout_bindings.emplace_back();
       layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
       layout_binding.descriptorCount = image_sampler.array_size;
@@ -371,9 +373,7 @@ Shader::create_descriptor_set_layouts() -> void
       layout_binding.pImmutableSamplers = nullptr;
 
       // Name a variable which has the value 0xFFFFFFFF
-      static constexpr auto max_set = std::numeric_limits<Core::u32>::max();
 
-      Core::u32 binding = binding_and_set & max_set;
       layout_binding.binding = binding;
 
       Core::ensure(!shader_descriptor_set.uniform_buffers.contains(binding),

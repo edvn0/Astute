@@ -26,7 +26,7 @@ shadow;
 struct PointLight
 {
   vec3 pos;
-  float multiplier;
+  float intensity;
   vec3 radiance;
   float min_radius;
   float radius;
@@ -44,7 +44,7 @@ point_lights;
 struct SpotLight
 {
   vec3 pos;
-  float multiplier;
+  float intensity;
   vec3 direction;
   float angle_attenuation;
   vec3 radiance;

@@ -48,9 +48,9 @@ main()
   gl_Position = renderer.view_projection * computed;
 
   mat3 local_normals = mat3(transpose(inverse(model)));
-  fragment_normal = local_normals * normalize(normal);
-  fragment_tangents = local_normals * normalize(tangents);
-  fragment_bitangents = local_normals * normalize(bitangents);
+  fragment_normal = normalize(local_normals * normalize(normal));
+  fragment_tangents = normalize(local_normals * normalize(tangents));
+  fragment_bitangents = normalize(local_normals * normalize(bitangents));
   fragment_uvs = uvs;
 
   world_space_fragment_position = computed.xyz;

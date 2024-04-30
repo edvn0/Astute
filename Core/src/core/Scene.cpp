@@ -16,41 +16,56 @@ Scene::Scene(const std::string_view name_view)
   auto entity = registry.create();
   auto& [mesh] = registry.emplace<MeshComponent>(entity);
   mesh = Core::make_ref<Graphics::StaticMesh>(
-    Core::make_ref<Graphics::MeshAsset>("Assets/meshes/cerb/scene.gltf"));
+    Core::make_ref<Graphics::MeshAsset>("Assets/meshes/cerb/cerberus.gltf"));
 
   auto& transform = registry.emplace<TransformComponent>(entity);
   transform.translation = { 0, 0, 0 };
 
   auto cube_mesh = Core::make_ref<Graphics::StaticMesh>(
-    Core::make_ref<Graphics::MeshAsset>("Assets/meshes/cube.obj"));
+    Core::make_ref<Graphics::MeshAsset>("Assets/meshes/cube/cube.gltf"));
   auto entity2 = registry.create();
   registry.emplace<MeshComponent>(entity2, cube_mesh);
   auto& transform2 = registry.emplace<TransformComponent>(entity2);
   transform2.translation = { 0, 5, 0 };
   // Floor is big!
-  transform2.scale = { 10, 1, 10 };
+  transform2.scale = { 5, 1, 5 };
 
-  for (auto i = 0; i < 100; i++) {
+  // small cube on top with some offset
+  auto entity3 = registry.create();
+  registry.emplace<MeshComponent>(entity3, cube_mesh);
+  auto& transform3 = registry.emplace<TransformComponent>(entity3);
+  transform3.translation = { 0, 0, 0 };
+
+  for (auto i = 0; i < 3; i++) {
     auto light = registry.create();
     registry.emplace<MeshComponent>(light, cube_mesh);
     auto& t = registry.emplace<TransformComponent>(light);
     auto& light_data = registry.emplace<PointLightComponent>(light);
     t.scale *= 0.1;
-    t.translation = Random::random_in_rectangle(-50, 50);
-    t.translation.y *= 3;
+    t.translation = Random::random_in_rectangle(-2, 2);
+    t.translation.y = -Random::random(2.0, 5.0);
     light_data.radiance = Random::random_colour();
+    light_data.intensity = Random::random(0.5, 1.0);
+    light_data.light_size = Random::random(0.1, 1.0);
+    light_data.min_radius = Random::random(1.0, 5.0);
+    light_data.radius = Random::random(0.1, 1.0);
+    light_data.falloff = Random::random(0.1, 0.5);
   }
 
-  for (auto i = 0; i < 100; i++) {
+  for (auto i = 0; i < 3; i++) {
     auto light = registry.create();
     auto& t = registry.emplace<TransformComponent>(light);
     registry.emplace<MeshComponent>(light, cube_mesh);
     t.scale *= 0.1;
 
-    t.translation = Random::random_in_rectangle(-50, 50);
-
+    t.translation = Random::random_in_rectangle(-2, 2);
+    t.translation.y = -Random::random(2.0, 5.0);
     auto& light_data = registry.emplace<SpotLightComponent>(light);
     light_data.radiance = Random::random_colour();
+    light_data.angle = Random::random(30.0, 90.0);
+    light_data.range = Random::random(0.1, 1.0);
+    light_data.angle_attenuation = Random::random(1.0, 5.0);
+    light_data.intensity = Random::random(0.5, 1.0);
   }
 }
 
@@ -60,20 +75,31 @@ Scene::on_update_editor(f64 ts) -> void
   static f64 rotation = 0;
   rotation += 0.1 * ts;
   glm::vec3 begin{ 0 };
-  begin.x = 10 * glm::cos(rotation);
-  begin.y = -10;
-  begin.z = 10 * glm::sin(rotation);
+  begin.x = 30 * glm::cos(rotation);
+  begin.y = -30;
+  begin.z = 30 * glm::sin(rotation);
 
   light_environment.sun_position = begin;
 
-  light_environment.colour_and_intensity = { 0.6, 0.1, 0.7, 1 };
-  light_environment.specular_colour_and_intensity = { 0.2, 0.9, 0, 1 };
+  // Colour based on rotation
+  light_environment.colour_and_intensity = { 0.5, 0.5, 0.5, 1 };
+  light_environment.colour_and_intensity.r = glm::abs(glm::sin(rotation));
+  light_environment.colour_and_intensity.g = glm::abs(glm::cos(rotation));
+
+  light_environment.specular_colour_and_intensity = { 0.1, 0.1, 0.1, 1 };
+  light_environment.specular_colour_and_intensity.r =
+    glm::abs(glm::sin(rotation));
+  light_environment.specular_colour_and_intensity.b =
+    glm::abs(glm::cos(rotation));
 
   light_environment.spot_lights.clear();
   light_environment.point_lights.clear();
 
   [&]() {
+    static auto prev_count = 15U;
     auto count = 0U;
+
+    light_environment.point_lights.reserve(prev_count + 1);
 
     for (auto&& [entity, transform, point_light] :
          registry.view<TransformComponent, PointLightComponent>().each()) {
@@ -88,10 +114,17 @@ Scene::on_update_editor(f64 ts) -> void
       light.radius = point_light.radius;
       count++;
     }
+
+    if (count != prev_count) {
+      prev_count = count;
+    }
   }();
 
   [&]() {
+    static auto prev_count = 15U;
     auto count = 0;
+    light_environment.spot_lights.reserve(prev_count + 1);
+
     for (auto&& [entity, transform, spot_light] :
          registry.view<TransformComponent, SpotLightComponent>().each()) {
       auto& light = light_environment.spot_lights.emplace_back();
@@ -105,6 +138,10 @@ Scene::on_update_editor(f64 ts) -> void
       light.soft_shadows = spot_light.soft_shadows;
       light.falloff = spot_light.falloff;
       count++;
+    }
+
+    if (count != prev_count) {
+      prev_count = count;
     }
   }();
 }
