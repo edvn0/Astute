@@ -63,12 +63,11 @@ DeferredRenderPass::destruct_impl() -> void
 auto
 DeferredRenderPass::on_resize(const Core::Extent& ext) -> void
 {
-  RenderPass::for_each([&](const auto, auto& val) {
-    auto&& [deferred_framebuffer,
-            deferred_shader,
-            deferred_pipeline,
-            deferred_material] = val;
-    deferred_framebuffer =
+  auto&& [deferred_framebuffer,
+          deferred_shader,
+          deferred_pipeline,
+          deferred_material] = get_data();
+  deferred_framebuffer =
     Core::make_scope<Framebuffer>(Framebuffer::Configuration{
       .size = get_renderer().get_size(),
       .colour_attachment_formats = { VK_FORMAT_R32G32B32A32_SFLOAT, },
@@ -76,17 +75,17 @@ DeferredRenderPass::on_resize(const Core::Extent& ext) -> void
       .immediate_construction = false,
       .name = "Deferred",
     });
-    deferred_framebuffer->add_resolve_for_colour(0);
-    deferred_framebuffer->create_framebuffer_fully();
+  deferred_framebuffer->add_resolve_for_colour(0);
+  deferred_framebuffer->create_framebuffer_fully();
 
-    deferred_shader = Shader::compile_graphics_scoped(
-      "Assets/shaders/deferred.vert", "Assets/shaders/deferred.frag");
-    deferred_pipeline =
+  deferred_shader = Shader::compile_graphics_scoped(
+    "Assets/shaders/deferred.vert", "Assets/shaders/deferred.frag");
+  deferred_pipeline =
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
       .framebuffer = deferred_framebuffer.get(),
       .shader = deferred_shader.get(),
       .sample_count = VK_SAMPLE_COUNT_4_BIT,
-      .cull_mode = VK_CULL_MODE_NONE,
+      .cull_mode = VK_CULL_MODE_BACK_BIT,
       .depth_comparator = VK_COMPARE_OP_LESS,
       .override_vertex_attributes = {
           {  },
@@ -96,18 +95,17 @@ DeferredRenderPass::on_resize(const Core::Extent& ext) -> void
         },
     });
 
-    deferred_material = Core::make_scope<Material>(Material::Configuration{
-      .shader = deferred_shader.get(),
-    });
-
-    auto& input_render_pass = get_renderer().get_render_pass("MainGeometry");
-    deferred_material->set("gPositionMap",
-                           input_render_pass.get_colour_attachment(0));
-    deferred_material->set("gNormalMap",
-                           input_render_pass.get_colour_attachment(1));
-    deferred_material->set("gAlbedoSpecMap",
-                           input_render_pass.get_colour_attachment(2));
+  deferred_material = Core::make_scope<Material>(Material::Configuration{
+    .shader = deferred_shader.get(),
   });
+
+  auto& input_render_pass = get_renderer().get_render_pass("MainGeometry");
+  deferred_material->set("gPositionMap",
+                         input_render_pass.get_colour_attachment(0));
+  deferred_material->set("gNormalMap",
+                         input_render_pass.get_colour_attachment(1));
+  deferred_material->set("gAlbedoSpecMap",
+                         input_render_pass.get_colour_attachment(2));
 }
 
 } // namespace Engine::Graphics

@@ -50,25 +50,12 @@ struct AssimpLogStream : public Assimp::LogStream
 };
 
 static constexpr Core::u32 mesh_import_flags =
-  aiProcess_CalcTangentSpace | // Create binormals/tangents just in case
-  aiProcess_Triangulate |      // Make sure we're triangles
-  aiProcess_SortByPType |      // Split meshes by primitive type
-  aiProcess_GenNormals |       // Make sure we have legit normals
-  aiProcess_GenUVCoords |      // Convert UVs if required
-                               //		aiProcess_OptimizeGraph |
-  aiProcess_OptimizeMeshes |   // Batch draws where possible
-  aiProcess_JoinIdenticalVertices | aiProcess_FlipUVs |
-  aiProcess_LimitBoneWeights | // If more than N (=4) bone weights, discard
-                               // least influencing bones and renormalise sum to
-                               // 1
-  aiProcess_ValidateDataStructure | // Validation
-  aiProcess_GlobalScale; // e.g. convert cm to m for fbx import (and other
-                         // formats where cm is native)
+  aiProcess_ConvertToLeftHanded | aiProcessPreset_TargetRealtime_Fast;
 
 namespace Utils {
 
 glm::mat4
-Mat4FromAIMatrix4x4(const aiMatrix4x4& matrix)
+mat4_from_assimp_matrix4(const aiMatrix4x4& matrix)
 {
   glm::mat4 result;
   // the a,b,c,d in assimp is the row ; the 1,2,3,4 is the column
@@ -102,7 +89,7 @@ MeshAsset::MeshAsset(const std::string& file_name)
   info("Loading mesh: {0}", file_name.c_str());
 
   importer = Core::make_scope<Assimp::Importer>();
-  // imported->SetPropertyBool(AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, false);
+  importer->SetPropertyFloat(AI_CONFIG_GLOBAL_SCALE_FACTOR_KEY, 100.0F);
 
   const aiScene* scene = importer->ReadFile(file_name, mesh_import_flags);
   if (!scene) {
@@ -141,39 +128,54 @@ MeshAsset::MeshAsset(const std::string& file_name)
     auto& aabb = submesh.bounding_box;
     aabb.min = { FLT_MAX, FLT_MAX, FLT_MAX };
     aabb.max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
-    for (auto i = 0ULL; i < mesh->mNumVertices; i++) {
-      Vertex vertex;
-      vertex.position = { mesh->mVertices[i].x,
-                          mesh->mVertices[i].y,
-                          mesh->mVertices[i].z };
-      vertex.normals = { mesh->mNormals[i].x,
-                         mesh->mNormals[i].y,
-                         mesh->mNormals[i].z };
-      aabb.min.x = glm::min(vertex.position.x, aabb.min.x);
-      aabb.min.y = glm::min(vertex.position.y, aabb.min.y);
-      aabb.min.z = glm::min(vertex.position.z, aabb.min.z);
-      aabb.max.x = glm::max(vertex.position.x, aabb.max.x);
-      aabb.max.y = glm::max(vertex.position.y, aabb.max.y);
-      aabb.max.z = glm::max(vertex.position.z, aabb.max.z);
 
-      if (mesh->HasTangentsAndBitangents()) {
+    const auto count = mesh->mNumVertices;
+
+    const auto vertices_span = std::span{ mesh->mVertices, count };
+    const auto normals_span = std::span{ mesh->mNormals, count };
+    const auto tangents_span = std::span{ mesh->mTangents, count };
+    const auto bitangents_span = std::span{ mesh->mBitangents, count };
+    const auto uvs_span = std::span{ mesh->mTextureCoords, count };
+    const auto index_span = std::span{ mesh->mFaces, mesh->mNumFaces };
+
+    const auto has_normals = mesh->HasNormals();
+    const auto has_tangents = mesh->HasTangentsAndBitangents();
+    const auto has_uvs = mesh->HasTextureCoords(0);
+
+    for (auto i = 0; i < mesh->mNumVertices; i++) {
+      Vertex vertex{};
+      vertex.position = {
+        vertices_span[i].x,
+        vertices_span[i].y,
+        vertices_span[i].z,
+      };
+      vertex.normals = {
+        has_normals ? normals_span[i].x : 0.0F,
+        has_normals ? normals_span[i].y : 0.0F,
+        has_normals ? normals_span[i].z : 0.0F,
+      };
+
+      aabb.update_min_max(vertex.position);
+
+      if (has_tangents) {
         vertex.tangent = {
-          mesh->mTangents[i].x,
-          mesh->mTangents[i].y,
-          mesh->mTangents[i].z,
+          tangents_span[i].x,
+          tangents_span[i].y,
+          tangents_span[i].z,
         };
         vertex.bitangent = {
-          mesh->mBitangents[i].x,
-          mesh->mBitangents[i].y,
-          mesh->mBitangents[i].z,
+          bitangents_span[i].x,
+          bitangents_span[i].y,
+          bitangents_span[i].z,
         };
       }
 
-      if (mesh->HasTextureCoords(0))
+      if (has_uvs) {
         vertex.uvs = {
-          mesh->mTextureCoords[0][i].x,
-          mesh->mTextureCoords[0][i].y,
+          uvs_span[0][i].x,
+          uvs_span[0][i].y,
         };
+      }
 
       vertices.push_back(vertex);
     }
@@ -181,9 +183,9 @@ MeshAsset::MeshAsset(const std::string& file_name)
     // Indices
     for (auto i = 0; i < mesh->mNumFaces; i++) {
       Index index = {
-        mesh->mFaces[i].mIndices[0],
-        mesh->mFaces[i].mIndices[1],
-        mesh->mFaces[i].mIndices[2],
+        .V1 = index_span[i].mIndices[0],
+        .V2 = index_span[i].mIndices[1],
+        .V3 = index_span[i].mIndices[2],
       };
       indices.push_back(index);
 
@@ -198,16 +200,12 @@ MeshAsset::MeshAsset(const std::string& file_name)
   for (const auto& submesh : submeshes) {
     AABB transformed_submesh_aabb = submesh.bounding_box;
     glm::vec3 min = glm::vec3(submesh.transform *
-                              glm::vec4(transformed_submesh_aabb.min, 1.0f));
+                              glm::vec4(transformed_submesh_aabb.min, 1.0F));
     glm::vec3 max = glm::vec3(submesh.transform *
-                              glm::vec4(transformed_submesh_aabb.max, 1.0f));
+                              glm::vec4(transformed_submesh_aabb.max, 1.0F));
 
-    bounding_box.min.x = glm::min(bounding_box.min.x, min.x);
-    bounding_box.min.y = glm::min(bounding_box.min.y, min.y);
-    bounding_box.min.z = glm::min(bounding_box.min.z, min.z);
-    bounding_box.max.x = glm::max(bounding_box.max.x, max.x);
-    bounding_box.max.y = glm::max(bounding_box.max.y, max.y);
-    bounding_box.max.z = glm::max(bounding_box.max.z, max.z);
+    bounding_box.update_min_max(min);
+    bounding_box.update_min_max(max);
   }
 
   if (!scene->HasMaterials()) {
@@ -227,15 +225,15 @@ MeshAsset::MeshAsset(const std::string& file_name)
     float shininess{};
     float metalness{};
     if (ai_material->Get(AI_MATKEY_SHININESS, shininess) != aiReturn_SUCCESS) {
-      shininess = 80.0f;
+      shininess = 80.0F;
     }
 
     if (ai_material->Get(AI_MATKEY_REFLECTIVITY, metalness) !=
         aiReturn_SUCCESS) {
-      metalness = 0.0f;
+      metalness = 0.0F;
     }
 
-    float roughness = 1.0f - glm::sqrt(shininess / 100.0f);
+    auto roughness = 1.0F - glm::sqrt(shininess / 100.0F);
 
     bool hasAlbedoMap = ai_material->GetTexture(
                           aiTextureType_DIFFUSE, 0, &aiTexPath) == AI_SUCCESS;
@@ -259,7 +257,7 @@ MeshAsset::MeshAsset(const std::string& file_name)
 
       if (texture) {
         materials.at(i)->set("albedo_map", texture);
-        materials.at(i)->set("mat_pc.albedo_colour", glm::vec3(1.0f));
+        materials.at(i)->set("mat_pc.albedo_colour", glm::vec3(1.0F));
       } else {
         fallback = true;
       }
@@ -267,7 +265,7 @@ MeshAsset::MeshAsset(const std::string& file_name)
 
     if (fallback) {
       materials.at(i)->set("albedo_map", white_texture);
-      materials.at(i)->set("mat_pc.albedo_colour", glm::vec3(1.0f));
+      materials.at(i)->set("mat_pc.albedo_colour", glm::vec3(1.0F));
     }
 
     // Normal maps
@@ -277,10 +275,13 @@ MeshAsset::MeshAsset(const std::string& file_name)
     if (hasNormalMap) {
       Core::Ref<Image> texture;
       if (auto aiTexEmbedded = scene->GetEmbeddedTexture(aiTexPath.C_Str())) {
-        Core::DataBuffer buffer{ aiTexEmbedded->mWidth *
-                                 aiTexEmbedded->mHeight * 4 };
-        buffer.write(aiTexEmbedded->pcData,
-                     aiTexEmbedded->mWidth * aiTexEmbedded->mHeight * 4);
+        Core::DataBuffer buffer{
+          aiTexEmbedded->mWidth * aiTexEmbedded->mHeight * 4,
+        };
+        buffer.write(std::span{
+          aiTexEmbedded->pcData,
+          aiTexEmbedded->mWidth * aiTexEmbedded->mHeight * 4,
+        });
         texture = Image::load_from_memory(
           aiTexEmbedded->mWidth, aiTexEmbedded->mHeight, std::move(buffer));
       } else {
@@ -313,8 +314,10 @@ MeshAsset::MeshAsset(const std::string& file_name)
       if (auto aiTexEmbedded = scene->GetEmbeddedTexture(aiTexPath.C_Str())) {
         Core::DataBuffer buffer{ aiTexEmbedded->mWidth *
                                  aiTexEmbedded->mHeight * 4 };
-        buffer.write(aiTexEmbedded->pcData,
-                     aiTexEmbedded->mWidth * aiTexEmbedded->mHeight * 4);
+        buffer.write(std::span{
+          aiTexEmbedded->pcData,
+          aiTexEmbedded->mWidth * aiTexEmbedded->mHeight * 4,
+        });
         texture = Image::load_from_memory(
           aiTexEmbedded->mWidth, aiTexEmbedded->mHeight, std::move(buffer));
       } else {
@@ -381,7 +384,7 @@ MeshAsset::MeshAsset(const std::string& file_name)
 
     if (fallback) {
       materials.at(i)->set("roughness_map", white_texture);
-      materials.at(i)->set("mat_pc.roughness.Roughness", roughness);
+      materials.at(i)->set("mat_pc.roughness", roughness);
     }
 
     i++;
@@ -397,20 +400,33 @@ MeshAsset::traverse_nodes(aiNode* node,
                           const glm::mat4& parent_transform,
                           Core::u32 level) -> void
 {
-  glm::mat4 localTransform = Utils::Mat4FromAIMatrix4x4(node->mTransformation);
-  glm::mat4 transform = parent_transform * localTransform;
+  if (node == nullptr) {
+    return;
+  }
+
+  info("Node: {0} Level: {1}", node->mName.C_Str(), level);
+
+  glm::mat4 local_transform =
+    Utils::mat4_from_assimp_matrix4(node->mTransformation);
+  glm::mat4 transform = parent_transform * local_transform;
   ai_node_map[node].resize(node->mNumMeshes);
   for (Core::u32 i = 0; i < node->mNumMeshes; i++) {
     Core::u32 mesh = node->mMeshes[i];
     auto& submesh = submeshes[mesh];
     submesh.node_name = node->mName.C_Str();
     submesh.transform = transform;
-    submesh.local_transform = localTransform;
+    submesh.local_transform = local_transform;
     ai_node_map[node][i] = mesh;
   }
 
-  for (Core::u32 i = 0; i < node->mNumChildren; i++)
-    traverse_nodes(node->mChildren[i], transform, level + 1);
+  const auto span = std::span{ node->mChildren, node->mNumChildren };
+  for (const auto& child : span) {
+    if (!child) {
+      continue;
+    }
+
+    traverse_nodes(child, transform, level + 1);
+  }
 }
 
 StaticMesh::StaticMesh(Core::Ref<MeshAsset> asset)

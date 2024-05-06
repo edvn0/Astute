@@ -32,6 +32,17 @@ struct AABB
     , max(in_max)
   {
   }
+
+  auto update_min_max(const glm::vec3& new_position) -> void
+  {
+    min.x = glm::min(new_position.x, min.x);
+    min.y = glm::min(new_position.y, min.y);
+    min.z = glm::min(new_position.z, min.z);
+
+    max.x = glm::max(new_position.x, max.x);
+    max.y = glm::max(new_position.y, max.y);
+    max.z = glm::max(new_position.z, max.z);
+  }
 };
 
 struct Index

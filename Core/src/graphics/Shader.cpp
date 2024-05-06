@@ -225,6 +225,11 @@ Shader::allocate_descriptor_set(Core::u32 set) const
     return result;
   }
 
+  if (set >= reflection_data.shader_descriptor_sets.size()) {
+    error("Shader {0} does not contain descriptor set {1}", name, set);
+    return result;
+  }
+
   VkDescriptorSetAllocateInfo allocation_info = {};
   allocation_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
   allocation_info.descriptorSetCount = 1;

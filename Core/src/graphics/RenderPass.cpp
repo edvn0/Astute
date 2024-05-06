@@ -29,7 +29,7 @@ RenderPass::bind(CommandBuffer& command_buffer) -> void
   vkCmdBindPipeline(
     command_buffer.get_command_buffer(),
     VK_PIPELINE_BIND_POINT_GRAPHICS,
-    std::get<Core::Scope<GraphicsPipeline>>(*pass)->get_pipeline());
+    std::get<Core::Scope<GraphicsPipeline>>(pass)->get_pipeline());
 }
 
 auto

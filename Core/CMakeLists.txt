@@ -46,6 +46,7 @@ add_library(Core STATIC
     include/graphics/render_passes/Deferred.hpp
     include/graphics/render_passes/MainGeometry.hpp
     include/graphics/render_passes/Shadow.hpp
+    include/graphics/render_passes/Predepth.hpp
     include/pch/CorePCH.hpp
     include/ui/UI.hpp
     src/core/Application.cpp
@@ -80,6 +81,7 @@ add_library(Core STATIC
     src/graphics/render_passes/Deferred.cpp
     src/graphics/render_passes/MainGeometry.cpp
     src/graphics/render_passes/Shadow.cpp
+    src/graphics/render_passes/Predepth.cpp
     src/ui/UI.cpp
 )
 target_include_directories(Core PUBLIC include ${CMAKE_SOURCE_DIR}/Library/imgui ${CMAKE_SOURCE_DIR}/Library/glm ${CMAKE_SOURCE_DIR}/Library/src PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/Library/assimp/include)

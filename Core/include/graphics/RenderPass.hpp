@@ -28,18 +28,18 @@ public:
   {
     destruct_impl();
 
-    pass.clear();
+    pass = {};
   }
 
   auto get_colour_attachment(Core::u32) const -> const Core::Ref<Image>&;
   auto get_depth_attachment() const -> const Core::Ref<Image>&;
   auto get_framebuffer() -> decltype(auto)
   {
-    return std::get<Core::Scope<Framebuffer>>(*pass);
+    return std::get<Core::Scope<Framebuffer>>(pass);
   }
   auto get_framebuffer() const -> const auto&
   {
-    return std::get<Core::Scope<Framebuffer>>(*pass);
+    return std::get<Core::Scope<Framebuffer>>(pass);
   }
 
   struct BlitProperties
@@ -60,10 +60,8 @@ protected:
   virtual auto bind(CommandBuffer& command_buffer) -> void;
   virtual auto unbind(CommandBuffer& command_buffer) -> void;
   auto generate_and_update_descriptor_write_sets(Material&) -> VkDescriptorSet;
-  auto get_data() -> auto& { return *pass; }
+  auto get_data() -> auto& { return pass; }
   auto get_renderer() -> Renderer& { return renderer; }
-
-  auto for_each(auto&& func) { pass.for_each(func); }
 
 private:
   Renderer& renderer;
@@ -71,7 +69,7 @@ private:
                                  Core::Scope<Shader>,
                                  Core::Scope<GraphicsPipeline>,
                                  Core::Scope<Material>>;
-  Core::FrameBasedCollection<RenderTuple> pass{};
+  RenderTuple pass{};
 
   friend class Renderer;
 };

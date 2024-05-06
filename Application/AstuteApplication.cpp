@@ -5,6 +5,10 @@
 #include "core/Scene.hpp"
 #include "graphics/Window.hpp"
 
+static constexpr auto for_each_in_tuple = [](auto&& tuple, auto&& func) {
+  std::apply([&func](auto&&... args) { (func(args), ...); }, tuple);
+};
+
 auto
 map_to_renderer_config(Application::Configuration config)
   -> Renderer::Configuration
@@ -19,14 +23,16 @@ AstuteApplication::~AstuteApplication() = default;
 AstuteApplication::AstuteApplication(Application::Configuration config)
   : Application(config)
   , renderer(new Renderer{ map_to_renderer_config(config), &get_window() })
-  , camera(new EditorCamera{ 45.0F,
+  , camera(new EditorCamera{ 79.0F,
                              static_cast<f32>(config.size.width),
                              static_cast<f32>(config.size.height),
-                             0.1F,
+                             0.8F,
                              1000.0F })
-  , scene(std::make_shared<Engine::Core::Scene>(config.scene_name)){
-
-  };
+  , scene(std::make_shared<Engine::Core::Scene>(config.scene_name))
+{
+  auto& scene_widget = std::get<0>(widgets);
+  scene_widget = Engine::Core::make_scope<Widgets::SceneWidget>();
+};
 
 auto
 AstuteApplication::update(f64 ts) -> void
@@ -48,6 +54,8 @@ AstuteApplication::update(f64 ts) -> void
       // TODO: Implement simulate mode
       break;
   }
+
+  for_each_in_tuple(widgets, [ts](auto& widget) { widget->update(ts); });
 }
 
 auto
@@ -120,6 +128,8 @@ AstuteApplication::interface() -> void
   });
 
   ImGui::PopStyleVar();
+
+  for_each_in_tuple(widgets, [](auto& widget) { widget->interface(); });
 }
 
 auto
@@ -134,6 +144,9 @@ AstuteApplication::handle_events(Event& event) -> void
     return false;
   });
 
+  for_each_in_tuple(widgets,
+                    [&event](auto& widget) { widget->handle_events(event); });
+
   camera->on_event(event);
 };
 
@@ -143,15 +156,24 @@ AstuteApplication::on_resize(const Extent& ext) -> void
   Application::on_resize(ext);
   renderer->on_resize(ext);
 
+  for_each_in_tuple(widgets, [ext](auto& widget) { widget->on_resize(ext); });
+
   if (auto* editor = dynamic_cast<EditorCamera*>(camera.get())) {
     editor->set_viewport_size(ext);
   }
 }
 
 auto
+AstuteApplication::construct() -> void
+{
+  for_each_in_tuple(widgets, [](auto& widget) { widget->construct(); });
+}
+
+auto
 AstuteApplication::destruct() -> void
 {
   renderer->destruct();
+  for_each_in_tuple(widgets, [](auto& widget) { widget->destruct(); });
 
   scene.reset();
   renderer.reset();

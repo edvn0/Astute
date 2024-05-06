@@ -37,7 +37,7 @@ private:
   VkPipelineLayout layout{ VK_NULL_HANDLE };
   const VkSampleCountFlagBits sample_count{ VK_SAMPLE_COUNT_1_BIT };
   const VkCullModeFlags cull_mode{ VK_CULL_MODE_NONE };
-  const VkFrontFace face_mode{ VK_FRONT_FACE_CLOCKWISE };
+  const VkFrontFace face_mode{ VK_FRONT_FACE_COUNTER_CLOCKWISE };
   const VkCompareOp depth_comparator{ VK_COMPARE_OP_GREATER_OR_EQUAL };
   const Core::f32 clear_depth_value{ 0.0F };
   const std::optional<std::vector<VkVertexInputAttributeDescription>>

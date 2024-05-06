@@ -15,6 +15,7 @@
 
 #include "graphics/render_passes/Deferred.hpp"
 #include "graphics/render_passes/MainGeometry.hpp"
+#include "graphics/render_passes/Predepth.hpp"
 #include "graphics/render_passes/Shadow.hpp"
 
 #include <ranges>
@@ -24,6 +25,7 @@ namespace Engine::Graphics {
 
 static constexpr std::array render_pass_order{
   "Shadow",
+  "Predepth",
   "MainGeometry",
   "Deferred",
 };
@@ -121,6 +123,7 @@ Renderer::Renderer(Configuration config, const Window* window)
   render_passes["Shadow"] =
     Core::make_scope<ShadowRenderPass>(*this, config.shadow_pass_size);
   render_passes["Deferred"] = Core::make_scope<DeferredRenderPass>(*this);
+  render_passes["Predepth"] = Core::make_scope<PredepthRenderPass>(*this);
 
   for (const auto& k : render_pass_order) {
     render_passes.at(k)->construct();
@@ -356,6 +359,8 @@ Renderer::flush_draw_lists() -> void
 
   // Shadow pass
   render_passes.at("Shadow")->execute(*command_buffer);
+  // Shadow pass
+  render_passes.at("Predepth")->execute(*command_buffer);
   // Geometry pass
   render_passes.at("MainGeometry")->execute(*command_buffer);
   // Deferred

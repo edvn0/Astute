@@ -37,6 +37,14 @@ MainGeometryRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 
   main_geometry_material->update_descriptor_write_sets(renderer_desc_set);
 
+  static constexpr float depthBiasConstant = 1.25f;
+  static constexpr float depthBiasSlope = 1.75f;
+
+  vkCmdSetDepthBias(command_buffer.get_command_buffer(),
+                    depthBiasConstant,
+                    0.0f,
+                    depthBiasSlope);
+
   for (auto&& [key, command] : get_renderer().draw_commands) {
     auto&& [mesh, submesh_index, instance_count] = command;
 
@@ -97,12 +105,11 @@ MainGeometryRenderPass::destruct_impl() -> void
 auto
 MainGeometryRenderPass::on_resize(const Core::Extent& ext) -> void
 {
-  RenderPass::for_each([&](const auto key, auto& val) {
-    auto&& [main_geometry_framebuffer,
-            main_geometry_shader,
-            main_geometry_pipeline,
-            main_geometry_material] = val;
-    main_geometry_framebuffer =
+  auto&& [main_geometry_framebuffer,
+          main_geometry_shader,
+          main_geometry_pipeline,
+          main_geometry_material] = get_data();
+  main_geometry_framebuffer =
     Core::make_scope<Framebuffer>(Framebuffer::Configuration{
       .size = ext,
       .colour_attachment_formats = {
@@ -110,30 +117,29 @@ MainGeometryRenderPass::on_resize(const Core::Extent& ext) -> void
           VK_FORMAT_R32G32B32A32_SFLOAT,
           VK_FORMAT_R32G32B32A32_SFLOAT,
       },
-      .depth_attachment_format = VK_FORMAT_D24_UNORM_S8_UINT,
       .sample_count = VK_SAMPLE_COUNT_4_BIT,
+      .dependent_images = { {3, get_renderer().get_render_pass("Predepth").get_depth_attachment(), }, },
       .depth_clear_value = 0,
       .name = "MainGeometry",
     });
-    main_geometry_shader = Shader::compile_graphics_scoped(
-      "Assets/shaders/main_geometry.vert", "Assets/shaders/main_geometry.frag");
-    main_geometry_pipeline =
-      Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
-        .framebuffer{ main_geometry_framebuffer.get() },
-        .shader{ main_geometry_shader.get() },
-        .sample_count{ VK_SAMPLE_COUNT_4_BIT },
-        .cull_mode{ VK_CULL_MODE_BACK_BIT },
-        .face_mode{ VK_FRONT_FACE_CLOCKWISE },
-        .depth_comparator{ VK_COMPARE_OP_GREATER_OR_EQUAL },
-      });
-    main_geometry_material = Core::make_scope<Material>(Material::Configuration{
-      .shader = main_geometry_shader.get(),
+  main_geometry_shader = Shader::compile_graphics_scoped(
+    "Assets/shaders/main_geometry.vert", "Assets/shaders/main_geometry.frag");
+  main_geometry_pipeline =
+    Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
+      .framebuffer{ main_geometry_framebuffer.get() },
+      .shader{ main_geometry_shader.get() },
+      .sample_count{ VK_SAMPLE_COUNT_4_BIT },
+      .cull_mode{ VK_CULL_MODE_BACK_BIT },
+      .face_mode{ VK_FRONT_FACE_COUNTER_CLOCKWISE },
+      .depth_comparator{ VK_COMPARE_OP_EQUAL },
     });
-
-    main_geometry_material->set(
-      "shadow_map",
-      get_renderer().get_render_pass("Shadow").get_depth_attachment());
+  main_geometry_material = Core::make_scope<Material>(Material::Configuration{
+    .shader = main_geometry_shader.get(),
   });
+
+  main_geometry_material->set(
+    "shadow_map",
+    get_renderer().get_render_pass("Shadow").get_depth_attachment());
 }
 
 } // namespace Engine::Graphics

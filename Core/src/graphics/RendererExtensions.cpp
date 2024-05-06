@@ -35,9 +35,9 @@ begin_renderpass(const CommandBuffer& command_buffer,
 
   VkViewport viewport = {};
   viewport.x = 0.0F;
-  viewport.y = 0.0F;
+  viewport.y = static_cast<float>(height);
   viewport.width = static_cast<float>(width);
-  viewport.height = static_cast<float>(height);
+  viewport.height = -static_cast<float>(height);
   viewport.minDepth = 1.0F;
   viewport.maxDepth = 0.0F;
 

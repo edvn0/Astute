@@ -121,6 +121,7 @@ public:
                float far_plane,
                const EditorCamera* previous_camera = nullptr);
   void init(const EditorCamera* previous_camera = nullptr);
+  ~EditorCamera() override = default;
 
   void focus(const glm::vec3& focus_point) final;
   void on_update(float time_step) final;

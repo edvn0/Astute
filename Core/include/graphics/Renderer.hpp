@@ -190,6 +190,7 @@ private:
   friend class DeferredRenderPass;
   friend class MainGeometryRenderPass;
   friend class ShadowRenderPass;
+  friend class PredepthRenderPass;
 };
 
 }

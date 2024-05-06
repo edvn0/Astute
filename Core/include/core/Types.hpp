@@ -156,6 +156,11 @@ struct Padded
 };
 
 using PaddedBool = Padded<bool, 3>;
+static_assert(sizeof(PaddedBool) == 4);
+static_assert(alignof(PaddedBool) == 1);
+
 using PaddedU32 = Padded<Core::u32, 12>;
+static_assert(sizeof(PaddedU32) == 16);
+static_assert(alignof(PaddedU32) == 4);
 
 } // namespace Core

@@ -1,73 +1,46 @@
 #include "pch/CorePCH.hpp"
 
-#include "graphics/Renderer.hpp"
+#include "graphics/render_passes/Predepth.hpp"
 
-#include "core/Application.hpp"
 #include "core/Logger.hpp"
 #include "core/Scene.hpp"
 
+#include "core/Application.hpp"
 #include "graphics/DescriptorResource.hpp"
+#include "graphics/Framebuffer.hpp"
 #include "graphics/GPUBuffer.hpp"
+#include "graphics/GraphicsPipeline.hpp"
+#include "graphics/Image.hpp"
+#include "graphics/Material.hpp"
+#include "graphics/Renderer.hpp"
+#include "graphics/Shader.hpp"
 #include "graphics/Swapchain.hpp"
 #include "graphics/Window.hpp"
 
 #include "graphics/RendererExtensions.hpp"
 
-#include "graphics/render_passes/Shadow.hpp"
-
 namespace Engine::Graphics {
 
 auto
-ShadowRenderPass::construct() -> void
+PredepthRenderPass::construct() -> void
 {
-  auto&& [shadow_framebuffer, shadow_shader, shadow_pipeline, shadow_material] =
-    get_data();
-  shadow_framebuffer =
-    Core::make_scope<Framebuffer>(Framebuffer::Configuration{
-      .size = {
-        size,
-        size,
-      },
-      .depth_attachment_format = VK_FORMAT_D32_SFLOAT,
-      .sample_count = VK_SAMPLE_COUNT_1_BIT,
-      .resizable = false,
-      .depth_clear_value = 0,
-      .name = "Shadow",
-    });
-  shadow_shader = Shader::compile_graphics_scoped("Assets/shaders/shadow.vert",
-                                                  "Assets/shaders/empty.frag");
-  shadow_pipeline =
-    Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
-      .framebuffer = shadow_framebuffer.get(),
-      .shader = shadow_shader.get(),
-      .sample_count = VK_SAMPLE_COUNT_1_BIT,
-      .cull_mode = VK_CULL_MODE_BACK_BIT,
-      .face_mode = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-      .depth_comparator = VK_COMPARE_OP_GREATER,
-      .override_vertex_attributes = { {
-        { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
-      } },
-    });
-
-  shadow_material = Core::make_scope<Material>(Material::Configuration{
-    .shader = shadow_shader.get(),
-  });
+  on_resize(get_renderer().get_size());
 }
 
 auto
-ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
+PredepthRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 {
-  const auto& [shadow_framebuffer,
-               shadow_shader,
-               shadow_pipeline,
-               shadow_material] = get_data();
+  const auto& [predepth_framebuffer,
+               predepth_shader,
+               predepth_pipeline,
+               predepth_material] = get_data();
 
   auto descriptor_set =
-    generate_and_update_descriptor_write_sets(*shadow_material);
+    generate_and_update_descriptor_write_sets(*predepth_material);
 
   vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
                           VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          shadow_pipeline->get_layout(),
+                          predepth_pipeline->get_layout(),
                           0,
                           1,
                           &descriptor_set,
@@ -82,7 +55,7 @@ ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                     0.0f,
                     depthBiasSlope);
 
-  for (const auto& [key, command] : get_renderer().shadow_draw_commands) {
+  for (const auto& [key, command] : get_renderer().draw_commands) {
     const auto& [mesh, submesh_index, instance_count] = command;
 
     const auto& mesh_asset = mesh->get_mesh_asset();
@@ -122,11 +95,46 @@ ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 }
 
 auto
-ShadowRenderPass::on_resize(const Core::Extent& ext) -> void
+PredepthRenderPass::destruct_impl() -> void
 {
-  auto&& [framebuffer, shader, pipeline, material] = get_data();
-  framebuffer->on_resize(ext);
-  pipeline->on_resize(ext);
+}
+
+auto
+PredepthRenderPass::on_resize(const Core::Extent& ext) -> void
+{
+  auto&& [predepth_framebuffer,
+          predepth_shader,
+          predepth_pipeline,
+          predepth_material] = get_data();
+  predepth_framebuffer =
+    Core::make_scope<Framebuffer>(Framebuffer::Configuration{
+      .size = get_renderer().get_size(),
+      .colour_attachment_formats = {},
+      .depth_attachment_format = VK_FORMAT_D32_SFLOAT,
+      .sample_count = VK_SAMPLE_COUNT_4_BIT,
+      .immediate_construction = false,
+      .name = "Predepth",
+    });
+  predepth_framebuffer->create_framebuffer_fully();
+
+  predepth_shader = Shader::compile_graphics_scoped(
+    "Assets/shaders/predepth.vert", "Assets/shaders/empty.frag");
+  predepth_pipeline =
+    Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
+      .framebuffer = predepth_framebuffer.get(),
+      .shader = predepth_shader.get(),
+      .sample_count = VK_SAMPLE_COUNT_4_BIT,
+      .cull_mode = VK_CULL_MODE_BACK_BIT,
+      .face_mode = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+      .depth_comparator = VK_COMPARE_OP_GREATER,
+      .override_vertex_attributes = { {
+        { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
+      } },
+    });
+
+  predepth_material = Core::make_scope<Material>(Material::Configuration{
+    .shader = predepth_shader.get(),
+  });
 }
 
 } // namespace Engine::Graphics

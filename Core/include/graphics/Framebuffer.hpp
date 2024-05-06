@@ -46,6 +46,9 @@ public:
   }
   auto get_depth_attachment() const -> const Core::Ref<Image>&
   {
+    if (resolved_depth_attachment) {
+      return resolved_depth_attachment;
+    }
     return depth_attachment;
   }
   auto get_renderpass() -> VkRenderPass { return renderpass; }
@@ -66,6 +69,7 @@ public:
   auto get_name() const -> const std::string& { return name; }
 
   auto add_resolve_for_colour(Core::u32) -> void;
+  auto add_resolve_for_depth() -> void;
   auto create_framebuffer_fully() -> void;
 
 private:
@@ -90,6 +94,10 @@ private:
   std::vector<Core::Ref<Image>> resolved_attachments;
   std::vector<std::pair<VkAttachmentDescription2, VkAttachmentReference2>>
     resolved_render_pass_attachments;
+
+  Core::Ref<Image> resolved_depth_attachment;
+  std::optional<std::pair<VkAttachmentDescription2, VkAttachmentReference2>>
+    resolved_depth_attachment_desc{ std::nullopt };
 
   VkFramebuffer framebuffer{ nullptr };
   VkRenderPass renderpass{ nullptr };

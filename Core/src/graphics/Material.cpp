@@ -91,6 +91,11 @@ Material::generate_and_update_descriptor_write_sets() -> VkDescriptorSet
 
   auto allocated = shader->allocate_descriptor_set(1);
 
+  if (allocated.descriptor_sets.empty()) {
+    error("Failed to allocate descriptor set for material");
+    return VK_NULL_HANDLE;
+  }
+
   descriptor_sets.get() = allocated;
 
   for (auto& [index, write] : current_writes) {
