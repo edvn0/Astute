@@ -36,6 +36,7 @@ Material::set(const std::string_view name, const Core::Ref<Image>& image)
   }
   const auto* resource = find_resource_by_name(name);
   if (!resource) {
+    error("Could not find {} as a uniform.", name);
     return false;
   }
 

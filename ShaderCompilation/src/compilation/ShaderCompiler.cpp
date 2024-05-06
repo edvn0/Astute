@@ -147,27 +147,27 @@ struct ShaderCompiler::Impl
 auto
 ShaderCompiler::compile_graphics(
   const std::filesystem::path& vertex_shader_path,
-  const std::filesystem::path& fragment_shader_path)
-  -> Core::Ref<Graphics::Shader>
+  const std::filesystem::path& fragment_shader_path,
+  bool force_recompile) -> Core::Ref<Graphics::Shader>
 {
   std::string vertex_path_key = vertex_shader_path.string();
   std::string fragment_path_key = fragment_shader_path.string();
 
   // Check and read vertex shader source file from cache
   auto& vertex_file = file_cache[vertex_path_key];
-  if (vertex_file.empty()) {
+  if (force_recompile || vertex_file.empty()) {
     vertex_file = read_file(vertex_shader_path);
   }
 
   // Check and read fragment shader source file from cache
   auto& fragment_file = file_cache[fragment_path_key];
-  if (fragment_file.empty()) {
+  if (force_recompile || fragment_file.empty()) {
     fragment_file = read_file(fragment_shader_path);
   }
 
   // Check and compile vertex shader from cache
   auto& compiled_vertex_shader = compiled_cache[vertex_path_key];
-  if (compiled_vertex_shader.empty()) {
+  if (force_recompile || compiled_vertex_shader.empty()) {
     auto preprocessed_vertex_shader = preprocess_shader(impl->compiler,
                                                         impl->options,
                                                         vertex_path_key,
@@ -182,7 +182,7 @@ ShaderCompiler::compile_graphics(
 
   // Check and compile fragment shader from cache
   auto& compiled_fragment_shader = compiled_cache[fragment_path_key];
-  if (compiled_fragment_shader.empty()) {
+  if (force_recompile || compiled_fragment_shader.empty()) {
     auto preprocessed_fragment_shader =
       preprocess_shader(impl->compiler,
                         impl->options,
@@ -261,27 +261,27 @@ ShaderCompiler::compile_compute(
 auto
 ShaderCompiler::compile_graphics_scoped(
   const std::filesystem::path& vertex_shader_path,
-  const std::filesystem::path& fragment_shader_path)
-  -> Core::Scope<Graphics::Shader>
+  const std::filesystem::path& fragment_shader_path,
+  bool force_recompile) -> Core::Scope<Graphics::Shader>
 {
   std::string vertex_path_key = vertex_shader_path.string();
   std::string fragment_path_key = fragment_shader_path.string();
 
   // Check and read vertex shader source file from cache
   auto& vertex_file = file_cache[vertex_path_key];
-  if (vertex_file.empty()) {
+  if (force_recompile || vertex_file.empty()) {
     vertex_file = read_file(vertex_shader_path);
   }
 
   // Check and read fragment shader source file from cache
   auto& fragment_file = file_cache[fragment_path_key];
-  if (fragment_file.empty()) {
+  if (force_recompile || fragment_file.empty()) {
     fragment_file = read_file(fragment_shader_path);
   }
 
   // Check and compile vertex shader from cache
   auto& compiled_vertex_shader = compiled_cache[vertex_path_key];
-  if (compiled_vertex_shader.empty()) {
+  if (force_recompile || compiled_vertex_shader.empty()) {
     auto preprocessed_vertex_shader = preprocess_shader(impl->compiler,
                                                         impl->options,
                                                         vertex_path_key,
@@ -296,7 +296,7 @@ ShaderCompiler::compile_graphics_scoped(
 
   // Check and compile fragment shader from cache
   auto& compiled_fragment_shader = compiled_cache[fragment_path_key];
-  if (compiled_fragment_shader.empty()) {
+  if (force_recompile || compiled_fragment_shader.empty()) {
     auto preprocessed_fragment_shader =
       preprocess_shader(impl->compiler,
                         impl->options,

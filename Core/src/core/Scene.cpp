@@ -7,19 +7,30 @@
 
 #include "graphics/Renderer.hpp"
 
+#include <ranges>
+
 namespace Engine::Core {
 
 Scene::Scene(const std::string_view name_view)
   : name(name_view)
 {
+  auto gun =
+    Core::make_ref<Graphics::MeshAsset>("Assets/meshes/cerb/cerberus.gltf");
+  auto make_gun = [&]() -> auto& {
+    auto entity = registry.create();
+    auto& [mesh] = registry.emplace<MeshComponent>(entity);
+    mesh = Core::make_ref<Graphics::StaticMesh>(gun);
 
-  auto entity = registry.create();
-  auto& [mesh] = registry.emplace<MeshComponent>(entity);
-  mesh = Core::make_ref<Graphics::StaticMesh>(
-    Core::make_ref<Graphics::MeshAsset>("Assets/meshes/cerb/cerberus.gltf"));
+    auto& transform = registry.emplace<TransformComponent>(entity);
+    transform.translation = { 0, 0, 0 };
+    return transform;
+  };
 
-  auto& transform = registry.emplace<TransformComponent>(entity);
-  transform.translation = { 0, 0, 0 };
+  for (auto i : std::ranges::views::iota(0, 100)) {
+    auto& transform = make_gun();
+    transform.translation = Random::random_in_rectangle(-30, 30);
+    transform.translation.y = Random::random(-5.0, 5.0);
+  }
 
   auto cube_mesh = Core::make_ref<Graphics::StaticMesh>(
     Core::make_ref<Graphics::MeshAsset>("Assets/meshes/cube/cube.gltf"));
@@ -43,7 +54,7 @@ Scene::Scene(const std::string_view name_view)
     auto& light_data = registry.emplace<PointLightComponent>(light);
     t.scale *= 0.1;
     t.translation = Random::random_in_rectangle(-2, 2);
-    t.translation.y = -Random::random(2.0, 5.0);
+    t.translation.y = -Random::random(-4.0, -2.0);
     light_data.radiance = Random::random_colour();
     light_data.intensity = Random::random(0.5, 1.0);
     light_data.light_size = Random::random(0.1, 1.0);
@@ -59,7 +70,7 @@ Scene::Scene(const std::string_view name_view)
     t.scale *= 0.1;
 
     t.translation = Random::random_in_rectangle(-2, 2);
-    t.translation.y = -Random::random(2.0, 5.0);
+    t.translation.y = -Random::random(-4.0, -2.0);
     auto& light_data = registry.emplace<SpotLightComponent>(light);
     light_data.radiance = Random::random_colour();
     light_data.angle = Random::random(30.0, 90.0);
@@ -75,9 +86,10 @@ Scene::on_update_editor(f64 ts) -> void
   static f64 rotation = 0;
   rotation += 0.1 * ts;
   glm::vec3 begin{ 0 };
-  begin.x = 30 * glm::cos(rotation);
-  begin.y = -30;
-  begin.z = 30 * glm::sin(rotation);
+  static constexpr auto radius = 2.0F;
+  begin.x = radius * glm::cos(rotation);
+  begin.y = -radius;
+  begin.z = radius * glm::sin(rotation);
 
   light_environment.sun_position = begin;
 

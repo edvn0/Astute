@@ -94,6 +94,7 @@ AstuteApplication::interface() -> void
     UI::image<f32>(*renderer->get_shadow_output_image(),
                    {
                      .extent = { w, h },
+                     .flipped = true,
                    });
   });
 
@@ -112,7 +113,7 @@ AstuteApplication::interface() -> void
     ImGui::InputFloat("Top", &top);
     ImGui::InputFloat("Near", &near);
     ImGui::InputFloat("Far", &far);
-    auto projection = glm::ortho(left, right, bottom, top, far, near);
+    auto projection = glm::ortho(left, right, bottom, top, near, far);
 #else
     static f32 fov{ 45 };
     static f32 aspect{ 1 };

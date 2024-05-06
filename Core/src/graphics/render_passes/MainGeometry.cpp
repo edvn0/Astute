@@ -113,9 +113,10 @@ MainGeometryRenderPass::on_resize(const Core::Extent& ext) -> void
     Core::make_scope<Framebuffer>(Framebuffer::Configuration{
       .size = ext,
       .colour_attachment_formats = {
-          VK_FORMAT_R32G32B32A32_SFLOAT,
-          VK_FORMAT_R32G32B32A32_SFLOAT,
-          VK_FORMAT_R32G32B32A32_SFLOAT,
+          VK_FORMAT_R32G32B32A32_SFLOAT, // world pos
+          VK_FORMAT_R32G32B32A32_SFLOAT, // normals
+          VK_FORMAT_R32G32B32A32_SFLOAT, // albedo + specular strength
+          VK_FORMAT_R32G32B32A32_SFLOAT, // shadow position
       },
       .sample_count = VK_SAMPLE_COUNT_4_BIT,
       .dependent_images = { {3, get_renderer().get_render_pass("Predepth").get_depth_attachment(), }, },
@@ -136,10 +137,6 @@ MainGeometryRenderPass::on_resize(const Core::Extent& ext) -> void
   main_geometry_material = Core::make_scope<Material>(Material::Configuration{
     .shader = main_geometry_shader.get(),
   });
-
-  main_geometry_material->set(
-    "shadow_map",
-    get_renderer().get_render_pass("Shadow").get_depth_attachment());
 }
 
 } // namespace Engine::Graphics

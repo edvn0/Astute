@@ -20,3 +20,6 @@
 [submodule "Library/assimp"]
 	path = Library/assimp
 	url = git@github.com:assimp/assimp.git
+[submodule "Library/filewatch"]
+	path = Library/filewatch
+	url = git@github.com:ThomasMonkman/filewatch.git

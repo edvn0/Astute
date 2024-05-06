@@ -2,6 +2,11 @@
 
 #include "graphics/RenderPass.hpp"
 
+namespace filewatch {
+template<typename T>
+class FileWatch;
+}
+
 namespace Engine::Graphics {
 
 class DeferredRenderPass final : public RenderPass
@@ -18,6 +23,9 @@ public:
 protected:
   auto destruct_impl() -> void override;
   auto execute_impl(CommandBuffer&) -> void override;
+
+private:
+  Core::Scope<filewatch::FileWatch<std::string>> watch;
 };
 
 } // namespace Engine::Graphics

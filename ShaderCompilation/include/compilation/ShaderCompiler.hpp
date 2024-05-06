@@ -60,7 +60,8 @@ public:
   ~ShaderCompiler();
 
   auto compile_graphics(const std::filesystem::path& vertex_shader_path,
-                        const std::filesystem::path& fragment_shader_path)
+                        const std::filesystem::path& fragment_shader_path,
+                        bool force_recompile = false)
     -> Core::Ref<Graphics::Shader>;
 
   auto compile_compute(const std::filesystem::path& compute_shader_path)
@@ -68,8 +69,8 @@ public:
 
   auto compile_graphics_scoped(
     const std::filesystem::path& vertex_shader_path,
-    const std::filesystem::path& fragment_shader_path)
-    -> Core::Scope<Graphics::Shader>;
+    const std::filesystem::path& fragment_shader_path,
+    bool force_recompile = false) -> Core::Scope<Graphics::Shader>;
   auto compile_compute_scoped(const std::filesystem::path& compute_shader_path)
     -> Core::Scope<Graphics::Shader>;
 

@@ -177,6 +177,8 @@ Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
     auto& shadow_render_pass = get_render_pass("Shadow");
     auto& main_geom = get_render_pass("MainGeometry");
     auto& deferred = get_render_pass("Deferred");
+    auto& predepth = get_render_pass("Predepth");
+    predepth.on_resize(size);
     shadow_render_pass.on_resize(size);
     main_geom.on_resize(size);
     deferred.on_resize(size);
@@ -313,7 +315,7 @@ Renderer::submit_static_light(Core::Ref<StaticMesh>& static_mesh,
       submesh_transform[3][2],
     };
 
-    auto& command = point_light_draw_commands[key];
+    auto& command = draw_commands[key];
     command.static_mesh = static_mesh;
     command.submesh_index = 0;
     command.instance_count++;

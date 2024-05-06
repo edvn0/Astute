@@ -19,12 +19,75 @@
 
 #include "graphics/RendererExtensions.hpp"
 
+#include <FileWatch.hpp>
+
+template<>
+struct std::formatter<filewatch::Event>
+  : public std::formatter<std::string_view>
+{
+  auto format(const filewatch::Event& type, std::format_context& ctx) const
+  {
+    return std::format_to(ctx.out(), "{}", to_string(type));
+  }
+
+private:
+  static constexpr auto to_string(auto type) -> std::string_view
+  {
+    switch (type) {
+      case filewatch::Event::added:
+        return "Added";
+      case filewatch::Event::removed:
+        return "Removed";
+      case filewatch::Event::modified:
+        return "Modified";
+      case filewatch::Event::renamed_old:
+        return "RenamedOld";
+      case filewatch::Event::renamed_new:
+        return "RenamedNew";
+    }
+    return "Missing";
+  }
+};
+
 namespace Engine::Graphics {
 
 auto
 DeferredRenderPass::construct() -> void
 {
   on_resize(get_renderer().get_size());
+
+  watch = Core::make_scope<filewatch::FileWatch<std::string>>(
+    "Assets/shaders/deferred.frag",
+    [this](const auto& path, const filewatch::Event change_type) {
+      Device::the().wait();
+      info("Path {} had an event of type: '{}'", path, change_type);
+      auto&& [deferred_framebuffer,
+              deferred_shader,
+              deferred_pipeline,
+              deferred_material] = get_data();
+
+      auto maybe_deferred_shader = Shader::compile_graphics_scoped(
+        "Assets/shaders/deferred.vert", "Assets/shaders/deferred.frag", true);
+      if (!maybe_deferred_shader)
+        return;
+
+      std::unique_lock lock{ RenderPass::get_mutex() };
+
+      deferred_pipeline =
+    Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
+      .framebuffer = deferred_framebuffer.get(),
+      .shader = deferred_shader.get(),
+      .sample_count = VK_SAMPLE_COUNT_4_BIT,
+      .cull_mode = VK_CULL_MODE_BACK_BIT,
+      .depth_comparator = VK_COMPARE_OP_LESS,
+      .override_vertex_attributes = {
+          {  },
+        },
+      .override_instance_attributes = {
+          {  },
+        },
+    });
+    });
 }
 
 auto
@@ -58,6 +121,7 @@ DeferredRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 auto
 DeferredRenderPass::destruct_impl() -> void
 {
+  watch.reset();
 }
 
 auto
@@ -100,12 +164,17 @@ DeferredRenderPass::on_resize(const Core::Extent& ext) -> void
   });
 
   auto& input_render_pass = get_renderer().get_render_pass("MainGeometry");
-  deferred_material->set("gPositionMap",
+  deferred_material->set("position_map",
                          input_render_pass.get_colour_attachment(0));
-  deferred_material->set("gNormalMap",
+  deferred_material->set("normal_map",
                          input_render_pass.get_colour_attachment(1));
-  deferred_material->set("gAlbedoSpecMap",
+  deferred_material->set("albedo_specular_map",
                          input_render_pass.get_colour_attachment(2));
+  deferred_material->set("shadow_position_map",
+                         input_render_pass.get_colour_attachment(3));
+  deferred_material->set(
+    "shadow_map",
+    get_renderer().get_render_pass("Shadow").get_depth_attachment());
 }
 
 } // namespace Engine::Graphics

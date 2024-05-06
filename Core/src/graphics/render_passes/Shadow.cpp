@@ -31,7 +31,6 @@ ShadowRenderPass::construct() -> void
       .depth_attachment_format = VK_FORMAT_D32_SFLOAT,
       .sample_count = VK_SAMPLE_COUNT_1_BIT,
       .resizable = false,
-      .depth_clear_value = 0,
       .name = "Shadow",
     });
   shadow_shader = Shader::compile_graphics_scoped("Assets/shaders/shadow.vert",

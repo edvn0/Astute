@@ -84,7 +84,15 @@ add_library(Core STATIC
     src/graphics/render_passes/Predepth.cpp
     src/ui/UI.cpp
 )
-target_include_directories(Core PUBLIC include ${CMAKE_SOURCE_DIR}/Library/imgui ${CMAKE_SOURCE_DIR}/Library/glm ${CMAKE_SOURCE_DIR}/Library/src PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/Library/assimp/include)
+target_include_directories(Core PUBLIC include
+    ${CMAKE_SOURCE_DIR}/Library/imgui
+    ${CMAKE_SOURCE_DIR}/Library/glm
+    ${CMAKE_SOURCE_DIR}/Library/src
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/Library/assimp/include
+    ${CMAKE_SOURCE_DIR}/Library/filewatch
+)
 target_link_libraries(Core PUBLIC ShaderCompilation glfw Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator PRIVATE imgui glm EnTT::EnTT stbimage::stbimage assimp)
 
 target_precompile_headers(Core PRIVATE include/pch/CorePCH.hpp)

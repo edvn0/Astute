@@ -62,6 +62,7 @@ protected:
   auto generate_and_update_descriptor_write_sets(Material&) -> VkDescriptorSet;
   auto get_data() -> auto& { return pass; }
   auto get_renderer() -> Renderer& { return renderer; }
+  auto get_mutex() -> auto& { return render_pass_mutex; }
 
 private:
   Renderer& renderer;
@@ -71,6 +72,7 @@ private:
                                  Core::Scope<Material>>;
   RenderTuple pass{};
 
+  static inline std::mutex render_pass_mutex;
   friend class Renderer;
 };
 

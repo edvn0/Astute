@@ -467,11 +467,12 @@ to_shader_type(const std::filesystem::path& path)
 
 auto
 Shader::compile_graphics(const std::filesystem::path& vertex_path,
-                         const std::filesystem::path& fragment_path)
-  -> Core::Ref<Shader>
+                         const std::filesystem::path& fragment_path,
+                         bool force_recompile) -> Core::Ref<Shader>
 {
   Core::ensure(compiler != nullptr, "ShaderCompiler is not initialized!");
-  return compiler->compile_graphics(vertex_path, fragment_path);
+  return compiler->compile_graphics(
+    vertex_path, fragment_path, force_recompile);
 }
 
 auto
@@ -484,11 +485,12 @@ Shader::compile_compute(const std::filesystem::path& compute_path)
 
 auto
 Shader::compile_graphics_scoped(const std::filesystem::path& vertex_path,
-                                const std::filesystem::path& fragment_path)
-  -> Core::Scope<Shader>
+                                const std::filesystem::path& fragment_path,
+                                bool force_recompile) -> Core::Scope<Shader>
 {
   Core::ensure(compiler != nullptr, "ShaderCompiler is not initialized!");
-  return compiler->compile_graphics_scoped(vertex_path, fragment_path);
+  return compiler->compile_graphics_scoped(
+    vertex_path, fragment_path, force_recompile);
 }
 
 auto

@@ -107,12 +107,14 @@ public:
   [[nodiscard]] auto has_descriptor_set(Core::u32 set) const -> bool;
 
   static auto compile_graphics(const std::filesystem::path&,
-                               const std::filesystem::path&)
+                               const std::filesystem::path&,
+                               bool force_recompile = false)
     -> Core::Ref<Shader>;
   static auto compile_compute(const std::filesystem::path&)
     -> Core::Ref<Shader>;
   static auto compile_graphics_scoped(const std::filesystem::path&,
-                                      const std::filesystem::path&)
+                                      const std::filesystem::path&,
+                                      bool force_recompile = false)
     -> Core::Scope<Shader>;
   static auto compile_compute_scoped(const std::filesystem::path&)
     -> Core::Scope<Shader>;
