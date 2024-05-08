@@ -69,6 +69,11 @@ public:
   auto create_secondary_command_buffer() -> VkCommandBuffer;
   auto reset_command_pools() -> void;
 
+  auto supports(std::string_view extension) const -> bool
+  {
+    return extension_support.contains(extension.data());
+  }
+
 private:
   auto deinitialise() -> void;
 
@@ -87,6 +92,7 @@ private:
   VkCommandPool graphics_command_pool;
   VkCommandPool compute_command_pool;
 
+  std::unordered_set<std::string> extension_support;
   std::unordered_map<QueueType, QueueInformation> queue_support;
 };
 

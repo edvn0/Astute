@@ -14,6 +14,7 @@
 #include "graphics/RendererExtensions.hpp"
 
 #include "graphics/render_passes/Deferred.hpp"
+#include "graphics/render_passes/LightCulling.hpp"
 #include "graphics/render_passes/MainGeometry.hpp"
 #include "graphics/render_passes/Predepth.hpp"
 #include "graphics/render_passes/Shadow.hpp"
@@ -23,22 +24,18 @@
 
 namespace Engine::Graphics {
 
-static constexpr std::array render_pass_order{
-  "Shadow",
-  "Predepth",
-  "MainGeometry",
-  "Deferred",
-};
-
 auto
 Renderer::generate_and_update_descriptor_write_sets(Material& material)
   -> VkDescriptorSet
 {
-  static std::array<IShaderBindable*, 4> structure_identifiers = {
+  static std::array<IShaderBindable*, 7> structure_identifiers = {
     &renderer_ubo,
     &shadow_ubo,
     &point_light_ubo,
     &spot_light_ubo,
+    &visible_point_lights_ssbo,
+    &visible_spot_lights_ssbo,
+    &screen_data_ubo,
   };
   const auto& shader = material.get_shader();
 
@@ -118,6 +115,15 @@ Renderer::Renderer(Configuration config, const Window* window)
       .primary = true,
     });
 
+  std::unordered_map<RendererTechnique, std::vector<std::string>>
+    technique_construction_order;
+  technique_construction_order[RendererTechnique::Deferred] = {
+    "Shadow",
+    "Predepth",
+    "MainGeometry",
+    "Deferred",
+  };
+
   render_passes["MainGeometry"] =
     Core::make_scope<MainGeometryRenderPass>(*this);
   render_passes["Shadow"] =
@@ -125,7 +131,19 @@ Renderer::Renderer(Configuration config, const Window* window)
   render_passes["Deferred"] = Core::make_scope<DeferredRenderPass>(*this);
   render_passes["Predepth"] = Core::make_scope<PredepthRenderPass>(*this);
 
-  for (const auto& k : render_pass_order) {
+  for (const auto& k :
+       technique_construction_order.at(RendererTechnique::Deferred)) {
+    render_passes.at(k)->construct();
+  }
+
+  technique_construction_order[RendererTechnique::ForwardPlus] = {
+    "LightCulling",
+  };
+
+  render_passes["LightCulling"] =
+    Core::make_scope<LightCullingRenderPass>(*this, light_culling_work_groups);
+  for (const auto& k :
+       technique_construction_order.at(RendererTechnique::ForwardPlus)) {
     render_passes.at(k)->construct();
   }
 
@@ -143,11 +161,25 @@ Renderer::Renderer(Configuration config, const Window* window)
   static constexpr auto white_data = 0xFFFFFFFF;
   data_buffer.write(&white_data, sizeof(Core::u32), 0U);
 
-  white_texture = Image::load_from_memory(1, 1, data_buffer);
+  white_texture = Image::load_from_memory(
+    1, 1, data_buffer, { .path = "white-default-texture" });
 
   Core::u32 black_data{ 0 };
   data_buffer.write(&black_data, sizeof(Core::u32), 0U);
-  black_texture = Image::load_from_memory(1, 1, data_buffer);
+  black_texture = Image::load_from_memory(
+    1, 1, data_buffer, { .path = "black-default-texture" });
+
+  const glm::uvec2 viewportSize{ size.width, size.height };
+
+  constexpr uint32_t TILE_SIZE = 16u;
+  glm::uvec2 size = viewportSize;
+  size += TILE_SIZE - viewportSize % TILE_SIZE;
+  light_culling_work_groups = { size / TILE_SIZE, 1 };
+
+  visible_point_lights_ssbo.resize(light_culling_work_groups.x *
+                                   light_culling_work_groups.y * 4 * 1024);
+  visible_spot_lights_ssbo.resize(light_culling_work_groups.x *
+                                  light_culling_work_groups.y * 4 * 1024);
 }
 
 Renderer::~Renderer() = default;
@@ -182,6 +214,18 @@ Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
     shadow_render_pass.on_resize(size);
     main_geom.on_resize(size);
     deferred.on_resize(size);
+
+    const glm::uvec2 viewportSize{ size.width, size.height };
+
+    constexpr uint32_t TILE_SIZE = 16u;
+    glm::uvec2 size = viewportSize;
+    size += TILE_SIZE - viewportSize % TILE_SIZE;
+    light_culling_work_groups = { size / TILE_SIZE, 1 };
+
+    visible_point_lights_ssbo.resize(light_culling_work_groups.x *
+                                     light_culling_work_groups.y * 4 * 1024);
+    visible_spot_lights_ssbo.resize(light_culling_work_groups.x *
+                                    light_culling_work_groups.y * 4 * 1024);
   }
 
   const auto& light_environment = scene.get_light_environment();
@@ -225,6 +269,25 @@ Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
 
   update_lights(point_light_ubo, light_environment.point_lights);
   update_lights(spot_light_ubo, light_environment.spot_lights);
+
+  // Visible spot lights
+  auto& screen_data = screen_data_ubo.get_data();
+  screen_data.full_resolution = glm::vec2{ size.width, size.height };
+  screen_data.half_resolution = glm::vec2{ size.width / 2, size.height / 2 };
+  screen_data.inv_resolution =
+    glm::vec2{ 1.0f / size.width, 1.0f / size.height };
+
+  float depth_linearize_mul = -projection[3][2];
+  float depth_linearize_add = projection[2][2];
+  if (depth_linearize_mul * depth_linearize_add < 0) {
+    depth_linearize_add = -depth_linearize_add;
+  }
+  screen_data.depth_constants = { depth_linearize_mul, depth_linearize_add };
+  screen_data.near_plane = camera.camera.get_near_clip();
+  screen_data.far_plane = camera.camera.get_far_clip();
+  screen_data.tile_count_x = light_culling_work_groups.x;
+  // screen_data.time =
+  screen_data_ubo.update();
 }
 
 auto
@@ -361,12 +424,20 @@ Renderer::flush_draw_lists() -> void
 
   // Shadow pass
   render_passes.at("Shadow")->execute(*command_buffer);
-  // Shadow pass
+  // Prepdepth pass
   render_passes.at("Predepth")->execute(*command_buffer);
-  // Geometry pass
-  render_passes.at("MainGeometry")->execute(*command_buffer);
-  // Deferred
-  render_passes.at("Deferred")->execute(*command_buffer);
+
+  if (technique == RendererTechnique::Deferred) {
+    render_passes.at("LightCulling")->execute(*compute_command_buffer, true);
+    // Geometry pass
+    render_passes.at("MainGeometry")->execute(*command_buffer);
+    // Deferred
+    render_passes.at("Deferred")->execute(*command_buffer);
+  } else if (technique == RendererTechnique::ForwardPlus) {
+    render_passes.at("LightCulling")->execute(*compute_command_buffer, true);
+    render_passes.at("ForwardPlusGeometry")->execute(*command_buffer);
+    render_passes.at("Composite")->execute(*command_buffer);
+  }
 
   compute_command_buffer->end();
   compute_command_buffer->submit();

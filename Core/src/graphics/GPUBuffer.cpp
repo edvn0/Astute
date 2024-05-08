@@ -84,9 +84,7 @@ GPUBuffer::construct_buffer() -> void
 
   auto usage = is_uniform ? Usage::AUTO_PREFER_HOST : Usage::AUTO_PREFER_DEVICE;
   auto creation = Creation::MAPPED_BIT;
-  if (is_uniform) {
-    creation |= Creation::HOST_ACCESS_RANDOM_BIT;
-  }
+  creation |= Creation::HOST_ACCESS_RANDOM_BIT;
 
   allocation = allocator.allocate_buffer(buffer,
                                          allocation_info,

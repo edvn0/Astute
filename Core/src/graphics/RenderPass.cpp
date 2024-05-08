@@ -9,6 +9,24 @@
 namespace Engine::Graphics {
 
 auto
+RenderPass::execute(CommandBuffer& command_buffer, bool is_compute) -> void
+{
+#ifdef ASTUTE_DEBUG
+  if (!is_valid()) {
+    return;
+  }
+#endif
+
+  bind(command_buffer);
+  if (is_compute) {
+    execute_compute_impl(command_buffer);
+  } else {
+    execute_impl(command_buffer);
+  }
+  unbind(command_buffer);
+}
+
+auto
 RenderPass::get_colour_attachment(Core::u32 index) const
   -> const Core::Ref<Image>&
 {
@@ -16,26 +34,32 @@ RenderPass::get_colour_attachment(Core::u32 index) const
 }
 
 auto
-RenderPass::get_depth_attachment() const -> const Core::Ref<Image>&
+RenderPass::get_depth_attachment(const bool resolved) const
+  -> const Core::Ref<Image>&
 {
-  return get_framebuffer()->get_depth_attachment();
+  return get_framebuffer()->get_depth_attachment(resolved);
 }
 
 auto
 RenderPass::bind(CommandBuffer& command_buffer) -> void
 {
-  RendererExtensions::begin_renderpass(command_buffer, *get_framebuffer());
+  const auto& pipeline = std::get<Core::Scope<IPipeline>>(pass);
+  if (pipeline->get_bind_point() == VK_PIPELINE_BIND_POINT_GRAPHICS) {
+    RendererExtensions::begin_renderpass(command_buffer, *get_framebuffer());
+  }
 
-  vkCmdBindPipeline(
-    command_buffer.get_command_buffer(),
-    VK_PIPELINE_BIND_POINT_GRAPHICS,
-    std::get<Core::Scope<GraphicsPipeline>>(pass)->get_pipeline());
+  vkCmdBindPipeline(command_buffer.get_command_buffer(),
+                    pipeline->get_bind_point(),
+                    pipeline->get_pipeline());
 }
 
 auto
 RenderPass::unbind(CommandBuffer& command_buffer) -> void
 {
-  RendererExtensions::end_renderpass(command_buffer);
+  const auto& pipeline = std::get<Core::Scope<IPipeline>>(pass);
+  if (pipeline->get_bind_point() == VK_PIPELINE_BIND_POINT_GRAPHICS) {
+    RendererExtensions::end_renderpass(command_buffer);
+  }
 }
 
 auto

@@ -4,6 +4,7 @@
 #include "graphics/Device.hpp"
 #include "graphics/Framebuffer.hpp"
 #include "graphics/GraphicsPipeline.hpp"
+#include "graphics/Image.hpp"
 #include "graphics/Shader.hpp"
 
 #include "graphics/Vertex.hpp"
@@ -71,14 +72,16 @@ GraphicsPipeline::create_pipeline() -> void
     throw std::runtime_error("Failed to get shader modules");
   }
 
-  // Use specialization constants to pass number of samples to the shader (used
-  // for MSAA resolve)
   VkSpecializationMapEntry specialization_entry{};
   specialization_entry.constantID = 0;
   specialization_entry.offset = 0;
   specialization_entry.size = sizeof(uint32_t);
 
+#ifndef ASTUTE_PERFORMANCE
   Core::u32 specialisation_data = sample_count;
+#else
+  Core::u32 specialisation_data = 1;
+#endif
 
   VkSpecializationInfo specialisation_info{};
   specialisation_info.mapEntryCount = 1;
@@ -160,7 +163,12 @@ GraphicsPipeline::create_pipeline() -> void
   rasterization_info.lineWidth = 1.0f;
   rasterization_info.cullMode = cull_mode;
   rasterization_info.frontFace = face_mode;
-  rasterization_info.depthBiasEnable = VK_TRUE;
+  if (framebuffer && framebuffer->has_depth_attachment()) {
+    rasterization_info.depthBiasEnable =
+      framebuffer->get_depth_attachment()->format == VK_FORMAT_D32_SFLOAT
+        ? VK_FALSE
+        : VK_TRUE;
+  }
   rasterization_info.depthBiasConstantFactor = 0.0f;
   rasterization_info.depthBiasClamp = 0.0f;
   rasterization_info.depthBiasSlopeFactor = 0.0f;

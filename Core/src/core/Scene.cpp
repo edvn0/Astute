@@ -16,18 +16,23 @@ Scene::Scene(const std::string_view name_view)
 {
   auto gun =
     Core::make_ref<Graphics::MeshAsset>("Assets/meshes/cerb/cerberus.gltf");
-  auto make_gun = [&]() -> auto& {
+  auto make_gun = [](auto& registry, auto& pistol) -> auto& {
     auto entity = registry.create();
     auto& [mesh] = registry.emplace<MeshComponent>(entity);
-    mesh = Core::make_ref<Graphics::StaticMesh>(gun);
+    mesh = Core::make_ref<Graphics::StaticMesh>(pistol);
 
     auto& transform = registry.emplace<TransformComponent>(entity);
     transform.translation = { 0, 0, 0 };
+    transform.scale = {
+      0.01,
+      0.01,
+      0.01,
+    };
     return transform;
   };
 
   for (auto i : std::ranges::views::iota(0, 100)) {
-    auto& transform = make_gun();
+    auto& transform = make_gun(registry, gun);
     transform.translation = Random::random_in_rectangle(-30, 30);
     transform.translation.y = Random::random(-5.0, 5.0);
   }
@@ -58,8 +63,8 @@ Scene::Scene(const std::string_view name_view)
     light_data.radiance = Random::random_colour();
     light_data.intensity = Random::random(0.5, 1.0);
     light_data.light_size = Random::random(0.1, 1.0);
-    light_data.min_radius = Random::random(1.0, 5.0);
-    light_data.radius = Random::random(0.1, 1.0);
+    light_data.min_radius = Random::random(1.0, 20.0);
+    light_data.radius = Random::random(0.1, 30.0);
     light_data.falloff = Random::random(0.1, 0.5);
   }
 
@@ -159,8 +164,8 @@ Scene::on_update_editor(f64 ts) -> void
 }
 
 auto
-Scene::on_render_editor(Graphics::Renderer& renderer, const Camera& camera)
-  -> void
+Scene::on_render_editor(Graphics::Renderer& renderer,
+                        const Camera& camera) -> void
 {
   renderer.begin_scene(*this,
                        {

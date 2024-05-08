@@ -111,6 +111,12 @@ Application::run() -> i32
     }
 
     Graphics::DescriptorResource::the().end_frame();
+
+    std::scoped_lock lock(post_frame_mutex);
+    for (auto& func : post_frame_funcs) {
+      func();
+    }
+    post_frame_funcs.clear();
   }
 
   interface_system.reset();

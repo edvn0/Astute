@@ -44,9 +44,10 @@ public:
   {
     return depth_attachment != nullptr;
   }
-  auto get_depth_attachment() const -> const Core::Ref<Image>&
+  auto get_depth_attachment(bool resolved = false) const
+    -> const Core::Ref<Image>&
   {
-    if (resolved_depth_attachment) {
+    if (resolved_depth_attachment && resolved) {
       return resolved_depth_attachment;
     }
     return depth_attachment;
@@ -96,8 +97,9 @@ private:
     resolved_render_pass_attachments;
 
   Core::Ref<Image> resolved_depth_attachment;
-  std::optional<std::pair<VkAttachmentDescription2, VkAttachmentReference2>>
-    resolved_depth_attachment_desc{ std::nullopt };
+  std::optional<VkAttachmentDescription2> resolved_depth_attachment_desc{
+    std::nullopt
+  };
 
   VkFramebuffer framebuffer{ nullptr };
   VkRenderPass renderpass{ nullptr };

@@ -2,11 +2,11 @@
 
 #include "graphics/Forward.hpp"
 
-#include <vulkan/vulkan.h>
+#include "graphics/Pipeline.hpp"
 
 namespace Engine::Graphics {
 
-class GraphicsPipeline
+class GraphicsPipeline : public IPipeline
 {
 public:
   struct Configuration
@@ -25,12 +25,16 @@ public:
   };
 
   explicit GraphicsPipeline(const Configuration&);
-  ~GraphicsPipeline();
+  ~GraphicsPipeline() override;
 
-  auto on_resize(const Core::Extent&) -> void;
+  auto on_resize(const Core::Extent&) -> void override;
 
-  auto get_pipeline() const -> VkPipeline { return pipeline; }
-  auto get_layout() const -> VkPipelineLayout { return layout; }
+  auto get_pipeline() const -> VkPipeline override { return pipeline; }
+  auto get_layout() const -> VkPipelineLayout override { return layout; }
+  auto get_bind_point() const -> VkPipelineBindPoint override
+  {
+    return VK_PIPELINE_BIND_POINT_GRAPHICS;
+  }
 
 private:
   VkPipeline pipeline{ VK_NULL_HANDLE };

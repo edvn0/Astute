@@ -28,8 +28,8 @@ Material::Material(Configuration config)
 }
 
 auto
-Material::set(const std::string_view name, const Core::Ref<Image>& image)
-  -> bool
+Material::set(const std::string_view name,
+              const Core::Ref<Image>& image) -> bool
 {
   if (!image) {
     return false;
@@ -41,22 +41,22 @@ Material::set(const std::string_view name, const Core::Ref<Image>& image)
   }
 
   const auto as_string = std::string{ name };
+#ifdef ASTUTE_DEBUG
   if (images.contains(as_string)) {
     error("Could not map new image into type '{}'", as_string);
     return false;
   }
+#endif
 
   images[as_string] = image;
 
   write_descriptors.for_each([&](const auto&, auto& container) {
-    if (!container.contains(resource->get_register())) {
-      auto& desc = container[resource->get_register()];
-      desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      desc.descriptorCount = 1;
-      desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-      desc.dstBinding = resource->get_register();
-      desc.pImageInfo = &images[as_string]->descriptor_info;
-    }
+    auto& desc = container[resource->get_register()];
+    desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    desc.descriptorCount = 1;
+    desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    desc.dstBinding = resource->get_register();
+    desc.pImageInfo = &images[as_string]->descriptor_info;
   });
 
   return true;
@@ -133,8 +133,9 @@ Material::find_resource_by_name(const std::string_view name) const
 }
 
 auto
-Material::set(const std::string_view name, const void* data, Core::usize size)
-  -> void
+Material::set(const std::string_view name,
+              const void* data,
+              Core::usize size) -> void
 {
   const auto& shader_buffers = shader->get_reflection_data().constant_buffers;
   const Engine::Reflection::ShaderUniform* found = nullptr;

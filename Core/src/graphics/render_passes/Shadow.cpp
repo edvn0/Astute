@@ -28,7 +28,7 @@ ShadowRenderPass::construct() -> void
         size,
         size,
       },
-      .depth_attachment_format = VK_FORMAT_D32_SFLOAT,
+      .depth_attachment_format = VK_FORMAT_D16_UNORM,
       .sample_count = VK_SAMPLE_COUNT_1_BIT,
       .resizable = false,
       .name = "Shadow",
@@ -65,7 +65,7 @@ ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
     generate_and_update_descriptor_write_sets(*shadow_material);
 
   vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
-                          VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          shadow_pipeline->get_bind_point(),
                           shadow_pipeline->get_layout(),
                           0,
                           1,

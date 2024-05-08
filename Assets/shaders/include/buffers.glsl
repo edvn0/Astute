@@ -61,4 +61,29 @@ layout(std140, set = 0, binding = 3) uniform SpotLightUBO
 }
 spot_lights;
 
+layout(std140, set = 0, binding = 4) buffer VisiblePointLightSSBO
+{
+  int indices[MAX_LIGHT_COUNT];
+}
+visible_point_lights;
+
+layout(std140, set = 0, binding = 5) buffer VisibleSpotLightSSBO
+{
+  int indices[MAX_LIGHT_COUNT];
+}
+visible_spot_lights;
+
+layout(std140, set = 0, binding = 6) uniform ScreenDataUBO
+{
+  vec2 full_resolution;
+  vec2 half_resolution;
+  vec2 inv_resolution;
+  vec2 depth_constants;
+  float near_plane;
+  float far_plane;
+  float time;
+  uint tile_count_x;
+}
+screen_data;
+
 #endif

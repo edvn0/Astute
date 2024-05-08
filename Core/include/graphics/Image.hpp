@@ -103,6 +103,9 @@ public:
                                const Configuration& = {}) -> Core::Ref<Image>;
   static auto resolve_msaa(const Image&, const CommandBuffer* = nullptr)
     -> Core::Scope<Image>;
+  static auto reference_resolve_msaa(const Image&,
+                                     const CommandBuffer* = nullptr)
+    -> Core::Ref<Image>;
 };
 
 } // namespace Engine::Graphics

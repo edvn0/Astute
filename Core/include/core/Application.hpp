@@ -57,6 +57,12 @@ public:
     deferred_destruction.emplace_back(std::move(func));
   }
 
+  static auto submit_post_frame_function(std::function<void()>&& func) -> void
+  {
+    std::scoped_lock lock(post_frame_mutex);
+    post_frame_funcs.emplace_back(std::move(func));
+  }
+
 protected:
   auto get_statistics() const -> const Statistics& { return statistics; }
   auto get_statistics() -> Statistics& { return statistics; }
@@ -70,6 +76,8 @@ private:
   Statistics statistics{};
 
   static inline std::vector<std::function<void()>> deferred_destruction{};
+  static inline std::vector<std::function<void()>> post_frame_funcs{};
+  static inline std::mutex post_frame_mutex{};
 
   Scope<Graphics::Window> window;
   Scope<Graphics::InterfaceSystem> interface_system;

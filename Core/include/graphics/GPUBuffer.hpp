@@ -243,6 +243,19 @@ public:
 
   ~UniformBufferObject() override = default;
 
+  auto resize(Core::usize new_size) -> void
+  {
+    buffer = Core::make_scope<GPUBuffer>(BufferType, new_size);
+    Core::DataBuffer zero{ new_size };
+    zero.fill_zero();
+    buffer->write(zero.raw(), new_size);
+    descriptor_info = VkDescriptorBufferInfo{
+      .buffer = buffer->get_buffer(),
+      .offset = 0,
+      .range = new_size,
+    };
+  }
+
   auto size() const -> Core::usize override { return buffer->get_size(); }
   auto get_buffer() const -> VkBuffer override { return buffer->get_buffer(); }
 

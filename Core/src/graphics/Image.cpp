@@ -83,8 +83,14 @@ create_image(Core::u32 width,
     alloc_props.flags = RequiredFlags::LAZILY_ALLOCATED_BIT;
   }
 
+  alloc_props.priority = 1.0F;
+
   allocation =
     allocator.allocate_image(image, allocation_info, imageInfo, alloc_props);
+
+  trace("Created image '{}', Vulkan pointer: {}",
+        additional_name_data,
+        (const void*)image);
 }
 
 void
@@ -307,8 +313,9 @@ copy_buffer_to_image(VkBuffer buffer,
 }
 
 auto
-create_view(VkImage& image, VkFormat format, VkImageAspectFlags aspect_mask)
-  -> VkImageView
+create_view(VkImage& image,
+            VkFormat format,
+            VkImageAspectFlags aspect_mask) -> VkImageView
 {
   VkImageViewCreateInfo view_create_info{};
   view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -533,22 +540,33 @@ Image::load_from_memory(Core::u32 width,
 }
 
 auto
-Image::resolve_msaa(const Image& source, const CommandBuffer* command_buffer)
-  -> Core::Scope<Image>
+Image::resolve_msaa(const Image& source,
+                    const CommandBuffer* command_buffer) -> Core::Scope<Image>
 {
+  static constexpr auto is_depth_format = [](VkFormat format) -> bool {
+    return format == VK_FORMAT_D32_SFLOAT ||
+           format == VK_FORMAT_D32_SFLOAT_S8_UINT ||
+           format == VK_FORMAT_D24_UNORM_S8_UINT;
+  };
+
   Core::Scope<Image> image = Core::make_scope<Image>();
-  create_image(source.extent.width,
-               source.extent.height,
-               1,
-               VK_SAMPLE_COUNT_1_BIT,
-               source.format,
-               VK_IMAGE_TILING_OPTIMAL,
-               VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                 VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-               image->image,
-               image->allocation,
-               image->allocation_info,
-               "ResolveMSAA");
+  create_image(
+    source.extent.width,
+    source.extent.height,
+    1,
+    VK_SAMPLE_COUNT_1_BIT,
+    source.format,
+    VK_IMAGE_TILING_OPTIMAL,
+    is_depth_format(source.format)
+      ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
+          VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+          VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+      : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+          VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+    image->image,
+    image->allocation,
+    image->allocation_info,
+    "ResolveMSAA");
   image->view = create_view(image->image, source.format, source.aspect_mask);
   image->sampler = create_sampler(VK_FILTER_LINEAR,
                                   VK_SAMPLER_ADDRESS_MODE_REPEAT,
@@ -556,7 +574,7 @@ Image::resolve_msaa(const Image& source, const CommandBuffer* command_buffer)
   image->sample_count = VK_SAMPLE_COUNT_1_BIT;
   image->extent = source.extent;
   image->format = source.format;
-  image->layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  image->layout = source.layout;
   image->aspect_mask = source.aspect_mask;
 
   auto& descriptor_info = image->descriptor_info;
@@ -570,7 +588,7 @@ Image::resolve_msaa(const Image& source, const CommandBuffer* command_buffer)
                           source.aspect_mask);
 
   transition_image_layout(source.image,
-                          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                          source.layout,
                           VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                           source.aspect_mask);
 
@@ -625,6 +643,15 @@ Image::resolve_msaa(const Image& source, const CommandBuffer* command_buffer)
                           source.layout,
                           source.aspect_mask);
   return image;
+}
+
+auto
+Image::reference_resolve_msaa(const Image& source,
+                              const CommandBuffer* command_buffer)
+  -> Core::Ref<Image>
+{
+  auto resolved = resolve_msaa(source, command_buffer);
+  return Core::Ref<Image>(resolved.release());
 }
 
 } // namespace Engine::Graphic

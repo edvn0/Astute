@@ -26,7 +26,7 @@ AstuteApplication::AstuteApplication(Application::Configuration config)
   , camera(new EditorCamera{ 79.0F,
                              static_cast<f32>(config.size.width),
                              static_cast<f32>(config.size.height),
-                             0.8F,
+                             0.01F,
                              1000.0F })
   , scene(std::make_shared<Engine::Core::Scene>(config.scene_name))
 {

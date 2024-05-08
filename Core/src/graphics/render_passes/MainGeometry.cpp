@@ -69,7 +69,7 @@ MainGeometryRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 
     std::array desc_sets{ renderer_desc_set, material_descriptor_set };
     vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
-                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            main_geometry_pipeline->get_bind_point(),
                             main_geometry_pipeline->get_layout(),
                             0,
                             static_cast<Core::u32>(desc_sets.size()),
@@ -119,7 +119,7 @@ MainGeometryRenderPass::on_resize(const Core::Extent& ext) -> void
           VK_FORMAT_R32G32B32A32_SFLOAT, // shadow position
       },
       .sample_count = VK_SAMPLE_COUNT_4_BIT,
-      .dependent_images = { {3, get_renderer().get_render_pass("Predepth").get_depth_attachment(), }, },
+      .dependent_images = { {3, get_renderer().get_render_pass("Predepth").get_depth_attachment(false), }, },
       .depth_clear_value = 0,
       .name = "MainGeometry",
     });

@@ -39,7 +39,7 @@ PredepthRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
     generate_and_update_descriptor_write_sets(*predepth_material);
 
   vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
-                          VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          predepth_pipeline->get_bind_point(),
                           predepth_pipeline->get_layout(),
                           0,
                           1,
@@ -110,11 +110,12 @@ PredepthRenderPass::on_resize(const Core::Extent& ext) -> void
     Core::make_scope<Framebuffer>(Framebuffer::Configuration{
       .size = get_renderer().get_size(),
       .colour_attachment_formats = {},
-      .depth_attachment_format = VK_FORMAT_D32_SFLOAT,
+      .depth_attachment_format = VK_FORMAT_D16_UNORM,
       .sample_count = VK_SAMPLE_COUNT_4_BIT,
       .immediate_construction = false,
       .name = "Predepth",
     });
+  predepth_framebuffer->add_resolve_for_depth();
   predepth_framebuffer->create_framebuffer_fully();
 
   predepth_shader = Shader::compile_graphics_scoped(

@@ -29,7 +29,9 @@ add_library(Core STATIC
     include/graphics/Forward.hpp
     include/graphics/Framebuffer.hpp
     include/graphics/GPUBuffer.hpp
+    include/graphics/Pipeline.hpp
     include/graphics/GraphicsPipeline.hpp
+    include/graphics/ComputePipeline.hpp
     include/graphics/Image.hpp
     include/graphics/Instance.hpp
     include/graphics/InterfaceSystem.hpp
@@ -46,6 +48,7 @@ add_library(Core STATIC
     include/graphics/render_passes/Deferred.hpp
     include/graphics/render_passes/MainGeometry.hpp
     include/graphics/render_passes/Shadow.hpp
+    include/graphics/render_passes/LightCulling.hpp
     include/graphics/render_passes/Predepth.hpp
     include/pch/CorePCH.hpp
     include/ui/UI.hpp
@@ -65,6 +68,7 @@ add_library(Core STATIC
     src/graphics/Framebuffer.cpp
     src/graphics/GPUBuffer.cpp
     src/graphics/GraphicsPipeline.cpp
+    src/graphics/ComputePipeline.cpp
     src/graphics/Image.cpp
     src/graphics/ImageUtilities.cpp
     src/graphics/Instance.cpp
@@ -81,6 +85,7 @@ add_library(Core STATIC
     src/graphics/render_passes/Deferred.cpp
     src/graphics/render_passes/MainGeometry.cpp
     src/graphics/render_passes/Shadow.cpp
+    src/graphics/render_passes/LightCulling.cpp
     src/graphics/render_passes/Predepth.cpp
     src/ui/UI.cpp
 )
@@ -98,3 +103,12 @@ target_link_libraries(Core PUBLIC ShaderCompilation glfw Vulkan::Vulkan GPUOpen:
 target_precompile_headers(Core PRIVATE include/pch/CorePCH.hpp)
 
 target_compile_definitions(Core PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_definitions(Core PRIVATE ASTUTE_DEBUG)
+endif()
+
+# Add ASTUTE_PERFORMANCE as a preprocessor definition to enable performance tracking IF ASTUTE_PERFORMANCE is defined
+if(ASTUTE_PERFORMANCE)
+    target_compile_definitions(Core PRIVATE ASTUTE_PERFORMANCE)
+endif()

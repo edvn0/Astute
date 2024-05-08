@@ -15,19 +15,14 @@ layout(constant_id = 0) const int NUM_SAMPLES = 4;
 layout(location = 0) out vec4 final_fragment_colour;
 
 const vec3 ambient = vec3(0.15F);
-
 float
 project_shadows(vec3 lightDir);
-
 float
 projectShadow(vec4 shadowCoord, vec2 off);
-
 float
 filterPCF(vec4 sc);
-
 vec4
 resolve(sampler2DMS tex, ivec2 uv);
-
 void
 calculate_lighting_for(vec3 L,
                        vec3 N,
@@ -36,14 +31,12 @@ calculate_lighting_for(vec3 L,
                        float atten,
                        vec3 radiance,
                        out vec3 result);
-
 vec3
 calculate_lighting(vec3 pos,
                    vec3 normal,
                    vec4 albedo,
                    uint point_light_count,
                    uint spot_light_count);
-
 vec3
 tonemap_aces(vec3 color);
 
@@ -51,44 +44,44 @@ void
 main()
 {
   const float inverse_num_samples = 1.0F / float(NUM_SAMPLES);
-
   ivec2 attDim = textureSize(position_map);
   ivec2 UV = ivec2(input_uvs * attDim);
   uint count_point_lights = point_lights.count;
   uint count_spot_lights = spot_lights.count;
 
-  // Ambient part
+  // Resolve G-buffer
   vec4 alb = resolve(albedo_specular_map, UV);
+  vec3 frag_colour = vec3(0.0);
+  vec3 ambient_light = alb.rgb * ambient;
 
-  vec3 frag_colour = vec3(0.1);
+  // Calculate lighting for every MSAA sample
+  vec3 average_pos = resolve(position_map, UV).xyz;
+  vec3 average_normal = resolve(normal_map, UV).xyz;
+  vec4 average_albedo = resolve(albedo_specular_map, UV);
+  frag_colour += calculate_lighting(average_pos,
+                                    average_normal,
+                                    average_albedo,
+                                    count_point_lights,
+                                    count_spot_lights);
 
-  // Calualte lighting for every MSAA sample
-  for (int i = 0; i < NUM_SAMPLES; i++) {
-    vec3 pos = texelFetch(position_map, UV, i).rgb;
-    vec3 normal = texelFetch(normal_map, UV, i).rgb;
-    vec4 albedo = texelFetch(albedo_specular_map, UV, i);
+  // Calculate shadows and apply directional light
+  vec3 directional_light_dir =
+    normalize(shadow.sun_position - renderer.camera_position);
+  vec3 directional_light_color = vec3(1.0, 1.0, 1.0); // Assuming white sunlight
+  float directional_intensity = 1.0;                  // Adjust as needed
 
-    frag_colour += calculate_lighting(
-      pos, normal, albedo, count_point_lights, count_spot_lights);
-  }
+  vec4 shadow_map_pos = resolve(shadow_position_map, UV);
+  vec4 shadow_coord = shadow_map_pos / shadow_map_pos.w;
+  shadow_coord = shadow_coord * 2.0 - vec4(1.0);
+  float average_shadow_factor = project_shadows(shadow_coord.xyz);
 
-  float average_shadow_factor = 0.0F;
-  for (int i = 0; i < NUM_SAMPLES; i++) {
-    vec4 shadow_pos = texelFetch(shadow_position_map, UV, i);
+  vec3 direct_light =
+    max(dot(directional_light_dir, resolve(normal_map, UV).xyz), 0.0) *
+    directional_light_color * directional_intensity;
+  vec3 total_light = ambient_light + (1.0 - average_shadow_factor) *
+                                       (frag_colour + direct_light);
 
-    // Calculate shadow factor
-    float shadow_factor = project_shadows(shadow_pos.xyz / shadow_pos.w);
-    average_shadow_factor += shadow_factor;
-  }
-  average_shadow_factor = average_shadow_factor * inverse_num_samples;
-
-  vec3 ambient_light = alb.rgb * 0.15;
-  vec3 direct_light = frag_colour * inverse_num_samples;
-  frag_colour = ambient_light + (1.0F - average_shadow_factor) * direct_light;
-
-  // frag_colour = vec3((1.0F - average_shadow_factor));
-
-  vec3 mapped = tonemap_aces(frag_colour);
+  vec3 mapped = tonemap_aces(total_light);
   vec3 gamma_corrected = pow(mapped, vec3(1.0 / 2.2));
   final_fragment_colour = vec4(gamma_corrected, 1.0);
 }

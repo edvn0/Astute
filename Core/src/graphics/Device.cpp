@@ -7,8 +7,8 @@
 namespace Engine::Graphics {
 
 auto
-Device::is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface)
-  -> bool
+Device::is_device_suitable(VkPhysicalDevice device,
+                           VkSurfaceKHR surface) -> bool
 {
   Core::i32 graphics_family_index = -1;
   Core::i32 present_family_index = -1;
@@ -75,6 +75,22 @@ Device::is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface)
     }
   }
 
+  auto extension_count = 0u;
+  vkEnumerateDeviceExtensionProperties(
+    device, nullptr, &extension_count, nullptr);
+  std::vector<VkExtensionProperties> available_extensions(extension_count);
+  vkEnumerateDeviceExtensionProperties(
+    device, nullptr, &extension_count, available_extensions.data());
+
+  bool extensionFound = false;
+  for (const auto& ext : available_extensions) {
+    if (std::string(ext.extensionName) ==
+        VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME) {
+      extensionFound = true;
+      break;
+    }
+  }
+
   // Check for aniostropy support
   VkPhysicalDeviceFeatures supported_features;
   vkGetPhysicalDeviceFeatures(device, &supported_features);
@@ -102,6 +118,23 @@ Device::is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface)
   }
 
   return is_suitable;
+}
+
+bool
+check_memory_priority_support(VkPhysicalDevice device)
+{
+  VkPhysicalDeviceFeatures2 base_features{};
+  VkPhysicalDeviceMemoryPriorityFeaturesEXT memory_priority_features{};
+
+  base_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+  memory_priority_features.sType =
+    VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PRIORITY_FEATURES_EXT;
+
+  base_features.pNext = &memory_priority_features;
+
+  vkGetPhysicalDeviceFeatures2(device, &base_features);
+
+  return memory_priority_features.memoryPriority == VK_TRUE;
 }
 
 Device::Device(VkSurfaceKHR surf)
@@ -166,6 +199,18 @@ Device::create_device(VkSurfaceKHR surface) -> void
     }
   }
 
+  uint32_t extension_count{ 0 };
+  vkEnumerateDeviceExtensionProperties(
+    physical(), nullptr, &extension_count, nullptr);
+
+  std::vector<VkExtensionProperties> availableExtensions(extension_count);
+  vkEnumerateDeviceExtensionProperties(
+    physical(), nullptr, &extension_count, availableExtensions.data());
+
+  for (const auto& ext : availableExtensions) {
+    extension_support.emplace(std::string{ ext.extensionName });
+  }
+
   if (!vk_physical_device) {
     throw Core::CouldNotSelectPhysicalException{
       "Failed to find a suitable GPU",
@@ -184,6 +229,10 @@ Device::create_device(VkSurfaceKHR surface) -> void
 
   std::vector<const char*> device_extensions;
   device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+  if (check_memory_priority_support(vk_physical_device)) {
+    device_extensions.push_back(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME);
+  }
+  device_extensions.push_back(VK_KHR_SHADER_NON_SEMANTIC_INFO_EXTENSION_NAME);
 
   VkPhysicalDeviceFeatures device_features{};
   device_features.samplerAnisotropy = VK_TRUE;
@@ -192,11 +241,22 @@ Device::create_device(VkSurfaceKHR surface) -> void
   device_features.sampleRateShading = VK_TRUE;
   device_features.pipelineStatisticsQuery = VK_TRUE;
 
+  VkPhysicalDeviceFeatures2 device_features_2{};
+  VkPhysicalDeviceMemoryPriorityFeaturesEXT memory_priority_features{};
+  memory_priority_features.sType =
+    VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PRIORITY_FEATURES_EXT;
+  memory_priority_features.memoryPriority = VK_TRUE;
+
+  device_features_2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+  device_features_2.pNext = &memory_priority_features;
+  device_features_2.features = device_features;
+
   VkDeviceCreateInfo create_info{};
   create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
   create_info.pQueueCreateInfos = queue_infos.data();
   create_info.queueCreateInfoCount = static_cast<Core::u32>(queue_infos.size());
-  create_info.pEnabledFeatures = &device_features;
+  create_info.pNext = &device_features_2;
+  create_info.pEnabledFeatures = nullptr;
   create_info.enabledExtensionCount =
     static_cast<Core::u32>(device_extensions.size());
   create_info.ppEnabledExtensionNames = device_extensions.data();

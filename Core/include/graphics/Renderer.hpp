@@ -86,6 +86,12 @@ struct CommandKey
   auto operator<=>(const CommandKey&) const = default;
 };
 
+enum class RendererTechnique : Core::u8
+{
+  Deferred,
+  ForwardPlus
+};
+
 class Renderer
 {
 public:
@@ -147,6 +153,11 @@ public:
     return *render_passes.at(name);
   }
 
+  auto set_technique(RendererTechnique technique) -> void
+  {
+    this->technique = technique;
+  }
+
 private:
   Core::Extent size{ 0, 0 };
   Core::Extent old_size{ 0, 0 };
@@ -168,6 +179,13 @@ private:
   UniformBufferObject<ShadowUBO> shadow_ubo{};
   UniformBufferObject<PointLightUBO> point_light_ubo{};
   UniformBufferObject<SpotLightUBO> spot_light_ubo{};
+  UniformBufferObject<VisiblePointLightSSBO, GPUBufferType::Storage>
+    visible_point_lights_ssbo{};
+  UniformBufferObject<VisibleSpotLightSSBO, GPUBufferType::Storage>
+    visible_spot_lights_ssbo{};
+  UniformBufferObject<ScreenDataUBO> screen_data_ubo{};
+
+  glm::uvec3 light_culling_work_groups{};
 
   struct DrawCommand
   {
@@ -186,11 +204,14 @@ private:
   static inline Core::Ref<Image> white_texture;
   static inline Core::Ref<Image> black_texture;
 
+  RendererTechnique technique{ RendererTechnique::Deferred };
+
   friend class RenderPass;
   friend class DeferredRenderPass;
   friend class MainGeometryRenderPass;
   friend class ShadowRenderPass;
   friend class PredepthRenderPass;
+  friend class LightCullingRenderPass;
 };
 
 }

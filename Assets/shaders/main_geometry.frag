@@ -29,41 +29,51 @@ layout(push_constant) uniform Material
 }
 mat_pc;
 
+vec4
+compute_normal_from_map(mat3 tbn);
+
 void
 main()
 {
-  // Use renderer.camera_position and shadow.sun_position to generate some
-  // simple lighting
-  vec3 N = fragment_normal;
-  vec3 T = fragment_tangents;
-  vec3 B = fragment_bitangents;
-  mat3 TBN = mat3(T, B, N);
-  vec3 tnorm = normalize(
-    TBN * normalize(texture(normal_map, fragment_uvs).xyz * 2.0 - vec3(1.0)));
-  fragment_normals =
-    mat_pc.use_normal_map == 1 ? vec4(tnorm, 1.0) : vec4(N, 1.0);
+  vec3 N = normalize(fragment_normal); // Normalize to ensure it's unit length
+  vec3 T = normalize(fragment_tangents);
+  vec3 B = normalize(fragment_bitangents);
+  mat3 TBN = mat3(T, B, N); // Tangent, Bitangent, Normal matrix
+
+  if (mat_pc.use_normal_map == 1) {
+    fragment_normals = compute_normal_from_map(TBN);
+  } else {
+    fragment_normals =
+      vec4(N, 0.0); // Normals are not homogeneous, w should be 0
+  }
+
+  // Albedo texture combined with a base color
+  vec3 albedo_color =
+    texture(albedo_map, fragment_uvs).rgb * mat_pc.albedo_colour;
+  float specular_strength = texture(specular_map, fragment_uvs).r;
+  float roughness_value =
+    texture(roughness_map, fragment_uvs).r * mat_pc.roughness;
 
   fragment_albedo_spec.rgb =
-    mat_pc.albedo_colour * texture(albedo_map, fragment_uvs).xyz;
-  fragment_albedo_spec.a = texture(specular_map, fragment_uvs).r;
+    albedo_color +
+    mat_pc.emission * mat_pc.albedo_colour; // Emissive contribution
+  fragment_albedo_spec.a =
+    specular_strength *
+    roughness_value; // Specular strength combined with roughness
 
-  // Add directional light to fragment_albedo_spec
-  vec3 as_vec3 = vec3(world_space_fragment_position);
-  vec3 light_dir = normalize(shadow.sun_position - as_vec3);
-  float diff = max(dot(N, light_dir), 0.0);
-  vec3 diffuse = renderer.light_colour_intensity.xyz * diff *
-                 renderer.light_colour_intensity.w;
-
-  fragment_albedo_spec.rgb += diffuse;
-  // Specular directional light
-  vec3 reflect_dir = reflect(-light_dir, N);
-  float spec = pow(
-    max(dot(reflect_dir, normalize(renderer.camera_position - as_vec3)), 0.0),
-    32.0);
-  vec3 specular = renderer.specular_colour_intensity.xyz * spec *
-                  renderer.specular_colour_intensity.w;
-
-  fragment_albedo_spec.rgb += specular;
+  // World space position of the fragment
   fragment_position = vec4(world_space_fragment_position, 1.0);
-  fragment_shadow_position = shadow_space_fragment_position;
+
+  // Transform shadow space position to [0, 1] range
+  fragment_shadow_position = shadow_space_fragment_position * 0.5 + 0.5;
+}
+
+vec4
+compute_normal_from_map(mat3 tbn)
+{
+  vec3 normal_map_value = texture(normal_map, fragment_uvs).rgb;
+  normal_map_value =
+    normal_map_value * 2.0 - 1.0; // Convert from [0, 1] to [-1, 1]
+  return vec4(normalize(tbn * normal_map_value),
+              0.0); // w should be 0 because it's a direction vector
 }

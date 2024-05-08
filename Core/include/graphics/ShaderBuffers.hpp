@@ -74,4 +74,29 @@ struct SpotLightUBO
   static constexpr std::string_view name = "SpotLightUBO";
 };
 
+struct VisiblePointLightSSBO
+{
+  std::array<Core::i32, max_light_count> indices;
+  static constexpr std::string_view name = "VisiblePointLightSSBO";
+};
+
+struct VisibleSpotLightSSBO
+{
+  std::array<Core::i32, max_light_count> indices;
+  static constexpr std::string_view name = "VisibleSpotLightSSBO";
+};
+
+struct ScreenDataUBO
+{
+  glm::vec2 full_resolution{};
+  glm::vec2 half_resolution{};
+  glm::vec2 inv_resolution{};
+  glm::vec2 depth_constants{};
+  Core::f32 near_plane{};
+  Core::f32 far_plane{};
+  Core::f32 time{};
+  Core::u32 tile_count_x{};
+  static constexpr std::string_view name = "ScreenDataUBO";
+};
+
 } // namespace Engine::Graphics

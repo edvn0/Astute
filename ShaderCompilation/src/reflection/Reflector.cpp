@@ -9,11 +9,38 @@
 
 #include <SPIRV-Cross/spirv_cross.hpp>
 #include <SPIRV-Cross/spirv_glsl.hpp>
+#include <format>
 #include <ranges>
 #include <stdexcept>
+#include <variant>
 #include <vulkan/vulkan_core.h>
 
 #include "reflection/ReflectionData.hpp"
+
+template<class... Ts>
+struct overloaded : Ts...
+{
+  using Ts::operator()...;
+};
+template<class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+
+template<typename... Types>
+struct std::formatter<std::variant<Types...>> : std::formatter<std::string>
+{
+  auto format(const std::variant<Types...>& v, auto& ctx) const
+  {
+    return std::visit(
+      overloaded{
+        [&ctx](const auto& value) -> decltype(auto) {
+          using T = std::decay_t<decltype(value)>;
+          static constexpr auto formatter = std::formatter<T>{};
+          return formatter.format(value, ctx);
+        },
+      },
+      v);
+  }
+};
 
 namespace Engine::Reflection {
 
@@ -204,6 +231,48 @@ reflect_push_constants(
       buffer.uniforms[uniform_name] = ShaderUniform(
         uniform_name, spir_type_to_shader_uniform_type(type), size, offset);
     }
+  }
+}
+
+static auto
+reflect_specialization_constants(const spirv_cross::Compiler& compiler,
+                                 ReflectionData& output) -> void
+{
+  for (const auto& specialization_constant :
+       compiler.get_specialization_constants()) {
+    const auto& name = compiler.get_name(specialization_constant.id);
+    const auto& constant_id = specialization_constant.constant_id;
+    const auto& constant = compiler.get_constant(specialization_constant.id);
+    const auto& constant_type = compiler.get_type(constant.constant_type);
+    const auto& constant_name = compiler.get_name(constant_id);
+    auto& specialization = output.specialisation_constants[name];
+
+    switch (constant_type.basetype) {
+      case spirv_cross::SPIRType::Boolean:
+        specialization.value = static_cast<bool>(constant.scalar_i8());
+        break;
+      case spirv_cross::SPIRType::Int:
+        specialization.value = constant.scalar_i32();
+        break;
+      case spirv_cross::SPIRType::UInt:
+        specialization.value = constant.scalar_u64();
+        break;
+      case spirv_cross::SPIRType::Float:
+        specialization.value = constant.scalar_f32();
+        break;
+      default:
+        error("Unknown specialization constant type: {}",
+              (Core::u32)constant_type.basetype);
+        throw std::runtime_error("Unknown specialization constant type");
+    }
+
+    specialization.id = constant_id;
+    specialization.type = spir_type_to_shader_uniform_type(constant_type);
+
+    info("Specialization constant: {} {} = {}",
+         name,
+         constant_name,
+         specialization.value);
   }
 }
 
@@ -558,6 +627,7 @@ Reflector::reflect(std::vector<VkDescriptorSetLayout>& output,
     }
     Detail::reflect_push_constants(
       *compiler, resources.push_constant_buffers, reflection_data_output);
+    Detail::reflect_specialization_constants(*compiler, reflection_data_output);
   }
 }
 

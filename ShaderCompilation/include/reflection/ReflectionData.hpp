@@ -117,6 +117,21 @@ struct PushConstantRange
   VkShaderStageFlags shader_stage{};
 };
 
+struct SpecialisationConstant
+{
+  Core::u32 id{ 0 };
+  Core::u32 size{ 0 };
+  Core::u32 offset{ 0 };
+  ShaderUniformType type{ ShaderUniformType::None };
+  std::variant<bool, Core::i32, Core::u64, float> value{};
+
+  template<class T>
+  [[nodiscard]] auto get_value() const -> T
+  {
+    return std::get<T>(value);
+  }
+};
+
 struct ShaderDescriptorSet
 {
   std::unordered_map<Core::u32, UniformBuffer> uniform_buffers{};
@@ -175,6 +190,8 @@ struct ReflectionData
   std::vector<PushConstantRange> push_constant_ranges{};
   std::unordered_map<std::string, ShaderBuffer> constant_buffers{};
   std::unordered_map<std::string, ShaderResourceDeclaration> resources{};
+  std::unordered_map<std::string, SpecialisationConstant>
+    specialisation_constants{};
 };
 
 struct MaterialDescriptorSet
