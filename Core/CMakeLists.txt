@@ -27,6 +27,7 @@ add_library(Core STATIC
     include/graphics/DescriptorResource.hpp
     include/graphics/Device.hpp
     include/graphics/Forward.hpp
+    include/graphics/NewFramebuffer.hpp
     include/graphics/Framebuffer.hpp
     include/graphics/GPUBuffer.hpp
     include/graphics/Pipeline.hpp
@@ -66,6 +67,7 @@ add_library(Core STATIC
     src/graphics/DescriptorResource.cpp
     src/graphics/Device.cpp
     src/graphics/Framebuffer.cpp
+    src/graphics/NewFramebuffer.cpp
     src/graphics/GPUBuffer.cpp
     src/graphics/GraphicsPipeline.cpp
     src/graphics/ComputePipeline.cpp

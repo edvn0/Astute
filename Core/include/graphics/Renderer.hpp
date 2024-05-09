@@ -128,7 +128,7 @@ public:
   {
     return render_passes.at("Deferred")
       ->get_framebuffer()
-      ->get_resolved_colour_attachment(0)
+      ->get_colour_attachment(0)
       .get();
   }
 

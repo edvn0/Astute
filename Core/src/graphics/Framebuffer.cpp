@@ -10,10 +10,8 @@
 namespace Engine::Graphics {
 
 static constexpr auto depth_formats = std::array{
-  VK_FORMAT_D32_SFLOAT,
-  VK_FORMAT_D16_UNORM,
-  VK_FORMAT_D16_UNORM_S8_UINT,
-  VK_FORMAT_D24_UNORM_S8_UINT,
+  VK_FORMAT_D32_SFLOAT,         VK_FORMAT_D16_UNORM,
+  VK_FORMAT_D16_UNORM_S8_UINT,  VK_FORMAT_D24_UNORM_S8_UINT,
   VK_FORMAT_D32_SFLOAT_S8_UINT,
 };
 
@@ -629,7 +627,7 @@ Framebuffer::construct_blend_states() const
     color_blend_attachment.colorWriteMask =
       VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
       VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    color_blend_attachment.blendEnable = VK_FALSE;
+    color_blend_attachment.blendEnable = VK_TRUE;
     color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
     color_blend_attachment.dstColorBlendFactor =
       VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
@@ -637,6 +635,13 @@ Framebuffer::construct_blend_states() const
     color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
     color_blend_attachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
     color_blend_attachment.alphaBlendOp = VK_BLEND_OP_ADD;
+
+    color_blend_attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    color_blend_attachment.dstColorBlendFactor =
+      VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    color_blend_attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    color_blend_attachment.dstAlphaBlendFactor =
+      VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     color_blend_attachments.push_back(color_blend_attachment);
   }
 

@@ -54,5 +54,5 @@ main()
   fragment_uvs = uvs;
 
   world_space_fragment_position = computed.xyz;
-  shadow_space_fragment_position = shadow.view_projection * computed;
+  shadow_space_fragment_position = bias * shadow.view_projection * computed;
 }

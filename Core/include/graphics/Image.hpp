@@ -8,6 +8,7 @@
 #include <vulkan/vulkan.h>
 
 #include <string_view>
+#include <unordered_map>
 
 namespace Engine::Graphics {
 
@@ -63,6 +64,7 @@ public:
   VmaAllocation allocation{ nullptr };
   VmaAllocationInfo allocation_info{};
   VkImageView view{ nullptr };
+  std::unordered_map<Core::u32, VkImageView> layer_image_views{};
   VkSampler sampler{ nullptr };
   VkImageAspectFlags aspect_mask{ VK_IMAGE_ASPECT_COLOR_BIT };
   VkFormat format{ VK_FORMAT_UNDEFINED };
@@ -70,6 +72,10 @@ public:
   VkImageLayout layout{ VK_IMAGE_LAYOUT_UNDEFINED };
   VkDescriptorImageInfo descriptor_info{};
   VkExtent3D extent{};
+  VkImageUsageFlags usage;
+  Core::u32 layer_count{ 1 };
+  Core::u32 mip_count{ 1 };
+  std::string name;
 
   bool destroyed{ false };
 
@@ -81,6 +87,17 @@ public:
     }
   }
   Image() = default;
+  Image(Core::u32 width,
+        Core::u32 height,
+        Core::u32 mip_levels,
+        VkSampleCountFlagBits sc,
+        VkFormat fmt,
+        VkImageLayout lay,
+        Core::u32 layers,
+        VkImageTiling tiling,
+        VkImageUsageFlags usage,
+        const std::string_view additional_name_data = "");
+
   Image(const Image&) = delete;
   auto operator=(const Image&) -> Image& = delete;
   Image(Image&&) = delete;
@@ -90,6 +107,14 @@ public:
   auto hash() const -> Core::usize;
   auto destroy() -> void;
   auto get_descriptor_info() const -> const VkDescriptorImageInfo&;
+
+  auto get_layer_image_view(Core::u32 index) -> VkImageView
+  {
+    return layer_image_views.at(index);
+  }
+  auto create_specific_layer_image_views(
+    const std::span<const Core::u32> indices) -> void;
+  auto invalidate() -> void;
 
   struct Configuration
   {

@@ -8,6 +8,7 @@
 
 #include "graphics/DescriptorResource.hpp"
 #include "graphics/GPUBuffer.hpp"
+#include "graphics/NewFramebuffer.hpp"
 #include "graphics/Swapchain.hpp"
 #include "graphics/Window.hpp"
 
@@ -23,15 +24,14 @@ ShadowRenderPass::construct() -> void
   auto&& [shadow_framebuffer, shadow_shader, shadow_pipeline, shadow_material] =
     get_data();
   shadow_framebuffer =
-    Core::make_scope<Framebuffer>(Framebuffer::Configuration{
-      .size = {
-        size,
-        size,
-      },
-      .depth_attachment_format = VK_FORMAT_D16_UNORM,
-      .sample_count = VK_SAMPLE_COUNT_1_BIT,
-      .resizable = false,
-      .name = "Shadow",
+    Core::make_scope<V2::Framebuffer>(V2::FramebufferSpecification{
+      .width = size,
+      .height = size,
+      .clear_depth_on_load = true,
+      .attachments = { { VK_FORMAT_D32_SFLOAT } },
+      .samples = VK_SAMPLE_COUNT_1_BIT,
+      .no_resize = true,
+      .debug_name = "Shadow",
     });
   shadow_shader = Shader::compile_graphics_scoped("Assets/shaders/shadow.vert",
                                                   "Assets/shaders/empty.frag");
@@ -100,6 +100,7 @@ ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
         .transform_buffer;
     auto vb = transform_vertex_buffer->get_buffer();
     auto offset = get_renderer().mesh_transform_map.at(key).offset;
+    const auto& submesh = mesh_asset->get_submeshes().at(submesh_index);
 
     offsets = std::array{ VkDeviceSize{ offset } };
 
@@ -110,13 +111,13 @@ ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                          mesh_asset->get_index_buffer().get_buffer(),
                          0,
                          VK_INDEX_TYPE_UINT32);
-    vkCmdDrawIndexed(
-      command_buffer.get_command_buffer(),
-      static_cast<Core::u32>(mesh_asset->get_index_buffer().count()),
-      instance_count,
-      0,
-      0,
-      0);
+
+    vkCmdDrawIndexed(command_buffer.get_command_buffer(),
+                     submesh.index_count,
+                     instance_count,
+                     submesh.base_index,
+                     submesh.base_vertex,
+                     0);
   }
 }
 

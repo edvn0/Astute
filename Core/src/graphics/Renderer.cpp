@@ -11,6 +11,8 @@
 #include "graphics/Swapchain.hpp"
 #include "graphics/Window.hpp"
 
+#include "graphics/NewFramebuffer.hpp"
+
 #include "graphics/RendererExtensions.hpp"
 
 #include "graphics/render_passes/Deferred.hpp"
@@ -169,17 +171,28 @@ Renderer::Renderer(Configuration config, const Window* window)
   black_texture = Image::load_from_memory(
     1, 1, data_buffer, { .path = "black-default-texture" });
 
-  const glm::uvec2 viewportSize{ size.width, size.height };
+  const glm::uvec2 viewport_size{ size.width, size.height };
 
   constexpr uint32_t TILE_SIZE = 16u;
-  glm::uvec2 size = viewportSize;
-  size += TILE_SIZE - viewportSize % TILE_SIZE;
+  glm::uvec2 size = viewport_size;
+  size += TILE_SIZE - viewport_size % TILE_SIZE;
   light_culling_work_groups = { size / TILE_SIZE, 1 };
 
   visible_point_lights_ssbo.resize(light_culling_work_groups.x *
                                    light_culling_work_groups.y * 4 * 1024);
   visible_spot_lights_ssbo.resize(light_culling_work_groups.x *
                                   light_culling_work_groups.y * 4 * 1024);
+
+  V2::Framebuffer buf{
+    {
+      .scale = 1.0F,
+      .width = viewport_size.x,
+      .height = viewport_size.y,
+      .attachments = { { VK_FORMAT_R32G32B32A32_SFLOAT } },
+    },
+  };
+
+  info("Test");
 }
 
 Renderer::~Renderer() = default;
@@ -215,11 +228,11 @@ Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
     main_geom.on_resize(size);
     deferred.on_resize(size);
 
-    const glm::uvec2 viewportSize{ size.width, size.height };
+    const glm::uvec2 viewport_size{ size.width, size.height };
 
     constexpr uint32_t TILE_SIZE = 16u;
-    glm::uvec2 size = viewportSize;
-    size += TILE_SIZE - viewportSize % TILE_SIZE;
+    glm::uvec2 size = viewport_size;
+    size += TILE_SIZE - viewport_size % TILE_SIZE;
     light_culling_work_groups = { size / TILE_SIZE, 1 };
 
     visible_point_lights_ssbo.resize(light_culling_work_groups.x *
@@ -305,7 +318,9 @@ Renderer::submit_static_mesh(Core::Ref<StaticMesh>& static_mesh,
     const auto& material =
       source->get_materials().at(submesh_data[submesh_index].material_index);
 
-    CommandKey key{ &vertex_buffer, &index_buffer, material.get(), 0 };
+    CommandKey key{
+      &vertex_buffer, &index_buffer, material.get(), submesh_index
+    };
     auto& mesh_transform = mesh_transform_map[key].transforms.emplace_back();
     mesh_transform.transform_rows[0] = {
       submesh_transform[0][0],
@@ -328,13 +343,13 @@ Renderer::submit_static_mesh(Core::Ref<StaticMesh>& static_mesh,
 
     auto& command = draw_commands[key];
     command.static_mesh = static_mesh;
-    command.submesh_index = 0;
+    command.submesh_index = submesh_index;
     command.instance_count++;
 
     if (true /*mesh->casts_shadows()*/) {
       auto& shadow_command = shadow_draw_commands[key];
       shadow_command.static_mesh = static_mesh;
-      shadow_command.submesh_index = 0;
+      shadow_command.submesh_index = submesh_index;
       shadow_command.instance_count++;
       // shadow_command.material = shadow_material.get();
     }
@@ -380,7 +395,7 @@ Renderer::submit_static_light(Core::Ref<StaticMesh>& static_mesh,
 
     auto& command = draw_commands[key];
     command.static_mesh = static_mesh;
-    command.submesh_index = 0;
+    command.submesh_index = submesh_index;
     command.instance_count++;
   }
 }

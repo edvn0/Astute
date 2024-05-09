@@ -2,13 +2,15 @@
 
 #include "graphics/Forward.hpp"
 
+#include "graphics/IFramebuffer.hpp"
+
 using BufferBinding = Engine::Core::usize;
 using BufferOffset = Engine::Core::usize;
 
 namespace Engine::Graphics::RendererExtensions {
 
 auto
-begin_renderpass(const CommandBuffer&, const Framebuffer&) -> void;
+begin_renderpass(const CommandBuffer&, const IFramebuffer&) -> void;
 auto
 end_renderpass(const CommandBuffer&) -> void;
 auto
@@ -24,7 +26,7 @@ bind_index_buffer(const CommandBuffer&,
 
 auto
 explicitly_clear_framebuffer(const CommandBuffer&,
-                             const Framebuffer&,
+                             const IFramebuffer&,
                              bool clear_depth = true) -> void;
 
 }

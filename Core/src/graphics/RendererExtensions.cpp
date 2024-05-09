@@ -15,7 +15,7 @@ namespace Engine::Graphics::RendererExtensions {
 
 auto
 begin_renderpass(const CommandBuffer& command_buffer,
-                 const Framebuffer& framebuffer) -> void
+                 const IFramebuffer& framebuffer) -> void
 {
   VkRenderPassBeginInfo render_pass_begin_info = {};
   render_pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;

@@ -23,6 +23,15 @@ random_in_rectangle(Core::i32 min, Core::i32 max) -> glm::vec3
 }
 
 auto
+random_in(const AABB& aabb) -> glm::vec3
+{
+  auto x = random(aabb.min.x, aabb.max.x);
+  auto y = random(aabb.min.y, aabb.max.y);
+  auto z = random(aabb.min.z, aabb.max.z);
+  return { x, y, z };
+}
+
+auto
 random_colour() -> glm::vec4
 {
   static std::uniform_real_distribution distribution{ 0.0, 1.0 };

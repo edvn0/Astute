@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/AABB.hpp"
 #include "core/Types.hpp"
 
 #include <glm/glm.hpp>
@@ -17,6 +18,9 @@ random_in_rectangle(std::integral auto min, std::integral auto max) -> glm::vec3
   return random_in_rectangle(static_cast<Core::i32>(min),
                              static_cast<Core::i32>(max));
 }
+
+auto
+random_in(const AABB&) -> glm::vec3;
 
 auto
 random_colour() -> glm::vec4;

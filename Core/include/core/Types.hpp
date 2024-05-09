@@ -84,6 +84,16 @@ struct BasicExtent
     const auto casted = other.as<T>();
     return width == casted.width && height == casted.height;
   }
+
+  auto operator*(std::floating_point auto scale) const -> Core::BasicExtent<T>
+  {
+    return {
+      static_cast<T>(scale * width),
+      static_cast<T>(scale * height),
+    };
+  }
+
+  auto valid() const { return width != T{ 0 } || height != T{ 0 }; }
 };
 
 using Extent = BasicExtent<u32>;

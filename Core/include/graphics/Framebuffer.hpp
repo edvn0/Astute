@@ -2,12 +2,13 @@
 
 #include "core/Types.hpp"
 #include "graphics/Forward.hpp"
+#include "graphics/IFramebuffer.hpp"
 
 #include <vulkan/vulkan.h>
 
 namespace Engine::Graphics {
 
-class Framebuffer
+class Framebuffer : public IFramebuffer
 {
 public:
   struct Configuration
@@ -40,14 +41,13 @@ public:
   {
     return static_cast<Core::u32>(colour_attachments.size());
   }
-  auto has_depth_attachment() const -> bool
+  auto has_depth_attachment() const -> bool override
   {
     return depth_attachment != nullptr;
   }
-  auto get_depth_attachment(bool resolved = false) const
-    -> const Core::Ref<Image>&
+  auto get_depth_attachment() const -> const Core::Ref<Image>& override
   {
-    if (resolved_depth_attachment && resolved) {
+    if (resolved_depth_attachment) {
       return resolved_depth_attachment;
     }
     return depth_attachment;
@@ -72,6 +72,9 @@ public:
   auto add_resolve_for_colour(Core::u32) -> void;
   auto add_resolve_for_depth() -> void;
   auto create_framebuffer_fully() -> void;
+
+  auto invalidate() -> void override {}
+  auto release() -> void override {}
 
 private:
   Core::Extent size;

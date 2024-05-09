@@ -12,6 +12,7 @@
 #include "graphics/GraphicsPipeline.hpp"
 #include "graphics/Image.hpp"
 #include "graphics/Material.hpp"
+#include "graphics/NewFramebuffer.hpp"
 #include "graphics/Renderer.hpp"
 #include "graphics/Shader.hpp"
 #include "graphics/Swapchain.hpp"
@@ -59,28 +60,27 @@ DeferredRenderPass::construct() -> void
   watch = Core::make_scope<filewatch::FileWatch<std::string>>(
     "Assets/shaders/deferred.frag",
     [this](const auto& path, const filewatch::Event change_type) {
-      Core::Application::submit_post_frame_function(
-        [this, path, change_type]() {
-          info("Path {} had an event of type: '{}'", path, change_type);
-          auto&& [deferred_framebuffer,
-                  deferred_shader,
-                  deferred_pipeline,
-                  deferred_material] = get_data();
+      Core::Application::submit_post_frame_function([this,
+                                                     path,
+                                                     change_type]() {
+        info("Path {} had an event of type: '{}'", path, change_type);
+        auto&& [deferred_framebuffer,
+                deferred_shader,
+                deferred_pipeline,
+                deferred_material] = get_data();
 
-          auto maybe_deferred_shader =
-            Shader::compile_graphics_scoped("Assets/shaders/deferred.vert",
-                                            "Assets/shaders/deferred.frag",
-                                            true);
-          if (!maybe_deferred_shader)
-            return;
+        auto maybe_deferred_shader = Shader::compile_graphics_scoped(
+          "Assets/shaders/deferred.vert", "Assets/shaders/deferred.frag", true);
+        if (!maybe_deferred_shader)
+          return;
 
-          std::unique_lock lock{ RenderPass::get_mutex() };
+        std::unique_lock lock{ RenderPass::get_mutex() };
 
-          deferred_pipeline =
+        deferred_pipeline =
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
       .framebuffer = deferred_framebuffer.get(),
       .shader = deferred_shader.get(),
-      .sample_count = VK_SAMPLE_COUNT_4_BIT,
+      .sample_count = VK_SAMPLE_COUNT_1_BIT,
       .cull_mode = VK_CULL_MODE_BACK_BIT,
       .depth_comparator = VK_COMPARE_OP_LESS,
       .override_vertex_attributes = {
@@ -90,7 +90,11 @@ DeferredRenderPass::construct() -> void
           {  },
         },
     });
+
+        deferred_material = Core::make_scope<Material>(Material::Configuration{
+          .shader = deferred_shader.get(),
         });
+      });
     });
 }
 
@@ -113,7 +117,7 @@ DeferredRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                          input_render_pass.get_colour_attachment(3));
   deferred_material->set(
     "shadow_map",
-    get_renderer().get_render_pass("Shadow").get_depth_attachment(true));
+    get_renderer().get_render_pass("Shadow").get_depth_attachment());
 
   auto renderer_desc_set =
     get_renderer().generate_and_update_descriptor_write_sets(
@@ -149,15 +153,12 @@ DeferredRenderPass::on_resize(const Core::Extent& ext) -> void
           deferred_pipeline,
           deferred_material] = get_data();
   deferred_framebuffer =
-    Core::make_scope<Framebuffer>(Framebuffer::Configuration{
-      .size = get_renderer().get_size(),
-      .colour_attachment_formats = { VK_FORMAT_R32G32B32A32_SFLOAT, },
-      .sample_count = VK_SAMPLE_COUNT_4_BIT,
-      .immediate_construction = false,
-      .name = "Deferred",
+    Core::make_scope<V2::Framebuffer>(V2::FramebufferSpecification{
+      .width = ext.width,
+      .height = ext.height,
+      .attachments = { VK_FORMAT_R32G32B32A32_SFLOAT, },
+      .debug_name = "Deferred",
     });
-  deferred_framebuffer->add_resolve_for_colour(0);
-  deferred_framebuffer->create_framebuffer_fully();
 
   deferred_shader = Shader::compile_graphics_scoped(
     "Assets/shaders/deferred.vert", "Assets/shaders/deferred.frag");
@@ -165,7 +166,7 @@ DeferredRenderPass::on_resize(const Core::Extent& ext) -> void
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
       .framebuffer = deferred_framebuffer.get(),
       .shader = deferred_shader.get(),
-      .sample_count = VK_SAMPLE_COUNT_4_BIT,
+      .sample_count = VK_SAMPLE_COUNT_1_BIT,
       .cull_mode = VK_CULL_MODE_BACK_BIT,
       .depth_comparator = VK_COMPARE_OP_LESS,
       .override_vertex_attributes = {
@@ -192,7 +193,7 @@ DeferredRenderPass::setup_file_watcher(const std::string& shader_path)
 
 void
 DeferredRenderPass::handle_file_change(const std::string& path,
-                                     filewatch::Event change_type)
+                                       filewatch::Event change_type)
 {
   Core::Application::submit_post_frame_function([this, path, change_type]() {
     log_shader_change(path, change_type);
@@ -204,7 +205,7 @@ DeferredRenderPass::handle_file_change(const std::string& path,
 
 void
 DeferredRenderPass::log_shader_change(const std::string& path,
-                                    filewatch::Event change_type)
+                                      filewatch::Event change_type)
 {
   info("Shader path {} had an event of type: '{}'", path, change_type);
 }
@@ -237,7 +238,7 @@ DeferredRenderPass::recreate_pipeline()
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
       .framebuffer = deferred_framebuffer.get(),
       .shader = deferred_shader.get(),
-      .sample_count = VK_SAMPLE_COUNT_4_BIT,
+      .sample_count = VK_SAMPLE_COUNT_1_BIT,
       .cull_mode = VK_CULL_MODE_BACK_BIT,
       .depth_comparator = VK_COMPARE_OP_LESS,
       .override_vertex_attributes = {},

@@ -14,37 +14,19 @@ namespace Engine::Core {
 Scene::Scene(const std::string_view name_view)
   : name(name_view)
 {
-  auto gun =
-    Core::make_ref<Graphics::MeshAsset>("Assets/meshes/cerb/cerberus.gltf");
-  auto make_gun = [](auto& registry, auto& pistol) -> auto& {
-    auto entity = registry.create();
-    auto& [mesh] = registry.emplace<MeshComponent>(entity);
-    mesh = Core::make_ref<Graphics::StaticMesh>(pistol);
-
-    auto& transform = registry.emplace<TransformComponent>(entity);
-    transform.translation = { 0, 0, 0 };
-    transform.scale = {
-      0.01,
-      0.01,
-      0.01,
-    };
-    return transform;
-  };
-
-  for (auto i : std::ranges::views::iota(0, 100)) {
-    auto& transform = make_gun(registry, gun);
-    transform.translation = Random::random_in_rectangle(-30, 30);
-    transform.translation.y = Random::random(-5.0, 5.0);
-  }
-
   auto cube_mesh = Core::make_ref<Graphics::StaticMesh>(
     Core::make_ref<Graphics::MeshAsset>("Assets/meshes/cube/cube.gltf"));
-  auto entity2 = registry.create();
-  registry.emplace<MeshComponent>(entity2, cube_mesh);
-  auto& transform2 = registry.emplace<TransformComponent>(entity2);
+  auto sponza_mesh =
+    Graphics::StaticMesh::construct("Assets/meshes/sponza/sponza.obj");
+
+  auto sponza = registry.create();
+  registry.emplace<MeshComponent>(sponza, sponza_mesh);
+  auto& transform2 = registry.emplace<TransformComponent>(sponza);
   transform2.translation = { 0, 5, 0 };
+  transform2.rotation =
+    glm::rotate(glm::mat4{ 1.0F }, glm::radians(180.0F), glm::vec3{ 1, 0, 0 });
   // Floor is big!
-  transform2.scale = { 5, 1, 5 };
+  transform2.scale = { 0.01, 0.01, 0.01 };
 
   // small cube on top with some offset
   auto entity3 = registry.create();
@@ -52,14 +34,16 @@ Scene::Scene(const std::string_view name_view)
   auto& transform3 = registry.emplace<TransformComponent>(entity3);
   transform3.translation = { 0, 0, 0 };
 
-  for (auto i = 0; i < 3; i++) {
+  const auto& bounds = sponza_mesh->get_mesh_asset()->get_bounding_box();
+  const auto scaled = bounds.scaled(0.01);
+  for (auto i = 0; i < 300; i++) {
     auto light = registry.create();
     registry.emplace<MeshComponent>(light, cube_mesh);
     auto& t = registry.emplace<TransformComponent>(light);
     auto& light_data = registry.emplace<PointLightComponent>(light);
     t.scale *= 0.1;
-    t.translation = Random::random_in_rectangle(-2, 2);
-    t.translation.y = -Random::random(-4.0, -2.0);
+    t.translation = Random::random_in(scaled);
+    t.translation.y -= 5;
     light_data.radiance = Random::random_colour();
     light_data.intensity = Random::random(0.5, 1.0);
     light_data.light_size = Random::random(0.1, 1.0);
@@ -68,14 +52,14 @@ Scene::Scene(const std::string_view name_view)
     light_data.falloff = Random::random(0.1, 0.5);
   }
 
-  for (auto i = 0; i < 3; i++) {
+  for (auto i = 0; i < 300; i++) {
     auto light = registry.create();
     auto& t = registry.emplace<TransformComponent>(light);
     registry.emplace<MeshComponent>(light, cube_mesh);
     t.scale *= 0.1;
 
-    t.translation = Random::random_in_rectangle(-2, 2);
-    t.translation.y = -Random::random(-4.0, -2.0);
+    t.translation = Random::random_in(scaled);
+    t.translation.y -= 5;
     auto& light_data = registry.emplace<SpotLightComponent>(light);
     light_data.radiance = Random::random_colour();
     light_data.angle = Random::random(30.0, 90.0);
@@ -88,27 +72,24 @@ Scene::Scene(const std::string_view name_view)
 auto
 Scene::on_update_editor(f64 ts) -> void
 {
-  static f64 rotation = 0;
-  rotation += 0.1 * ts;
+  static f64 rotation = glm::radians(60.0F);
   glm::vec3 begin{ 0 };
-  static constexpr auto radius = 2.0F;
+  static constexpr auto radius = 10.0F;
   begin.x = radius * glm::cos(rotation);
   begin.y = -radius;
   begin.z = radius * glm::sin(rotation);
 
   light_environment.sun_position = begin;
 
-  // Colour based on rotation
-  light_environment.colour_and_intensity = { 0.5, 0.5, 0.5, 1 };
-  light_environment.colour_and_intensity.r = glm::abs(glm::sin(rotation));
-  light_environment.colour_and_intensity.g = glm::abs(glm::cos(rotation));
+  // Improved gradient for color based on rotation
+  // Using different frequencies and phases for color channels
+  light_environment.colour_and_intensity = {
+    0.5, 0.5, 0.5, 1
+  }; // Base intensity
 
-  light_environment.specular_colour_and_intensity = { 0.1, 0.1, 0.1, 1 };
-  light_environment.specular_colour_and_intensity.r =
-    glm::abs(glm::sin(rotation));
-  light_environment.specular_colour_and_intensity.b =
-    glm::abs(glm::cos(rotation));
-
+  light_environment.specular_colour_and_intensity = {
+    0.1, 0.1, 0.1, 1
+  }; // Base specular intensity
   light_environment.spot_lights.clear();
   light_environment.point_lights.clear();
 
@@ -164,8 +145,8 @@ Scene::on_update_editor(f64 ts) -> void
 }
 
 auto
-Scene::on_render_editor(Graphics::Renderer& renderer,
-                        const Camera& camera) -> void
+Scene::on_render_editor(Graphics::Renderer& renderer, const Camera& camera)
+  -> void
 {
   renderer.begin_scene(*this,
                        {

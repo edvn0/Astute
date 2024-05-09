@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/AABB.hpp"
 #include "core/Types.hpp"
 #include "graphics/Material.hpp"
 #include "graphics/Vertex.hpp"
@@ -16,34 +17,6 @@ class Importer;
 }
 
 namespace Engine::Graphics {
-
-struct AABB
-{
-  glm::vec3 min, max;
-
-  constexpr AABB()
-    : min(0.0f)
-    , max(0.0f)
-  {
-  }
-
-  constexpr AABB(const glm::vec3& in_min, const glm::vec3& in_max)
-    : min(in_min)
-    , max(in_max)
-  {
-  }
-
-  auto update_min_max(const glm::vec3& new_position) -> void
-  {
-    min.x = glm::min(new_position.x, min.x);
-    min.y = glm::min(new_position.y, min.y);
-    min.z = glm::min(new_position.z, min.z);
-
-    max.x = glm::max(new_position.x, max.x);
-    max.y = glm::max(new_position.y, max.y);
-    max.z = glm::max(new_position.z, max.z);
-  }
-};
 
 struct Index
 {
@@ -77,7 +50,7 @@ public:
 
   glm::mat4 transform{ 1.0f };
   glm::mat4 local_transform{ 1.0f };
-  AABB bounding_box;
+  Core::AABB bounding_box;
 
   std::string node_name;
   std::string mesh_name;
@@ -108,7 +81,7 @@ public:
   auto get_vertex_buffer() const -> const auto& { return *vertex_buffer; }
   auto get_index_buffer() const -> const auto& { return *index_buffer; }
 
-  const AABB& get_bounding_box() const { return bounding_box; }
+  const Core::AABB& get_bounding_box() const { return bounding_box; }
 
 private:
   void traverse_nodes(aiNode* node,
@@ -132,7 +105,7 @@ private:
   std::vector<Core::Scope<Material>> materials;
   std::unordered_map<Core::u32, std::vector<Triangle>> triangle_cache;
 
-  AABB bounding_box;
+  Core::AABB bounding_box;
 
   std::string file_path;
 
@@ -193,6 +166,8 @@ public:
     return mesh_asset->get_materials();
   }
   auto get_materials() -> auto& { return mesh_asset->get_materials(); }
+
+  static auto construct(std::string_view) -> Core::Ref<StaticMesh>;
 
 private:
   Core::Ref<MeshAsset> mesh_asset;

@@ -392,13 +392,12 @@ ShaderCompiler::ShaderCompiler(const ShaderCompilerConfiguration& conf)
   if (configuration.debug_information_level == DebugInformationLevel::Full) {
     impl->options.SetGenerateDebugInfo();
   }
-  // VUlkan 1.3 env
   impl->options.SetTargetEnvironment(shaderc_target_env_vulkan,
                                      shaderc_env_version_vulkan_1_3);
   if (configuration.warnings_as_errors) {
     impl->options.SetWarningsAsErrors();
   }
-  impl->options.SetInvertY(true);
+  // impl->options.SetInvertY(true);
   impl->options.SetTargetSpirv(shaderc_spirv_version_1_6);
   impl->options.SetSourceLanguage(shaderc_source_language_glsl);
   impl->options.SetForcedVersionProfile(460, shaderc_profile_none);

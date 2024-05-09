@@ -5,38 +5,17 @@
 layout(location = 0) in vec2 input_uvs;
 
 layout(set = 1, binding = 9) uniform sampler2D shadow_map;
-layout(set = 1, binding = 10) uniform sampler2DMS position_map;
-layout(set = 1, binding = 11) uniform sampler2DMS normal_map;
-layout(set = 1, binding = 12) uniform sampler2DMS albedo_specular_map;
-layout(set = 1, binding = 13) uniform sampler2DMS shadow_position_map;
+layout(set = 1, binding = 10) uniform sampler2D position_map;
+layout(set = 1, binding = 11) uniform sampler2D normal_map;
+layout(set = 1, binding = 12) uniform sampler2D albedo_specular_map;
+layout(set = 1, binding = 13) uniform sampler2D shadow_position_map;
 
 layout(constant_id = 0) const int NUM_SAMPLES = 4;
 
 layout(location = 0) out vec4 final_fragment_colour;
 
 const vec3 ambient = vec3(0.15F);
-float
-project_shadows(vec3 lightDir);
-float
-projectShadow(vec4 shadowCoord, vec2 off);
-float
-filterPCF(vec4 sc);
-vec4
-resolve(sampler2DMS tex, ivec2 uv);
-void
-calculate_lighting_for(vec3 L,
-                       vec3 N,
-                       vec3 V,
-                       vec4 albedo,
-                       float atten,
-                       vec3 radiance,
-                       out vec3 result);
-vec3
-calculate_lighting(vec3 pos,
-                   vec3 normal,
-                   vec4 albedo,
-                   uint point_light_count,
-                   uint spot_light_count);
+
 vec3
 tonemap_aces(vec3 color);
 
@@ -44,176 +23,30 @@ void
 main()
 {
   const float inverse_num_samples = 1.0F / float(NUM_SAMPLES);
-  ivec2 attDim = textureSize(position_map);
-  ivec2 UV = ivec2(input_uvs * attDim);
   uint count_point_lights = point_lights.count;
   uint count_spot_lights = spot_lights.count;
 
   // Resolve G-buffer
-  vec4 alb = resolve(albedo_specular_map, UV);
+  vec4 alb = texture(albedo_specular_map, input_uvs);
   vec3 frag_colour = vec3(0.0);
-  vec3 ambient_light = alb.rgb * ambient;
 
-  // Calculate lighting for every MSAA sample
-  vec3 average_pos = resolve(position_map, UV).xyz;
-  vec3 average_normal = resolve(normal_map, UV).xyz;
-  vec4 average_albedo = resolve(albedo_specular_map, UV);
-  frag_colour += calculate_lighting(average_pos,
-                                    average_normal,
-                                    average_albedo,
-                                    count_point_lights,
-                                    count_spot_lights);
+  vec3 position = texture(position_map, input_uvs).xyz;
+  vec3 normal = texture(normal_map, input_uvs).xyz;
+  vec3 L = normalize(shadow.sun_position); // Direcitonal
+  float diff = max(dot(normal, L), 0.0);
+  vec3 diffuse = diff * renderer.light_colour_intensity.xyz *
+                 renderer.light_colour_intensity.a;
 
-  // Calculate shadows and apply directional light
-  vec3 directional_light_dir =
-    normalize(shadow.sun_position - renderer.camera_position);
-  vec3 directional_light_color = vec3(1.0, 1.0, 1.0); // Assuming white sunlight
-  float directional_intensity = 1.0;                  // Adjust as needed
+  vec3 V = normalize(renderer.camera_position - position);
+  vec3 R = reflect(-L, normal);
 
-  vec4 shadow_map_pos = resolve(shadow_position_map, UV);
-  vec4 shadow_coord = shadow_map_pos / shadow_map_pos.w;
-  shadow_coord = shadow_coord * 2.0 - vec4(1.0);
-  float average_shadow_factor = project_shadows(shadow_coord.xyz);
+  float spec = pow(max(dot(V, R), 0.0), 32);
+  vec3 specular = spec * renderer.specular_colour_intensity.xyz *
+                  renderer.specular_colour_intensity.a * 1000;
 
-  vec3 direct_light =
-    max(dot(directional_light_dir, resolve(normal_map, UV).xyz), 0.0) *
-    directional_light_color * directional_intensity;
-  vec3 total_light = ambient_light + (1.0 - average_shadow_factor) *
-                                       (frag_colour + direct_light);
-
-  vec3 mapped = tonemap_aces(total_light);
+  vec3 mapped = tonemap_aces(specular + diffuse + alb.xyz);
   vec3 gamma_corrected = pow(mapped, vec3(1.0 / 2.2));
   final_fragment_colour = vec4(gamma_corrected, 1.0);
-}
-
-float
-project_shadows(vec3 lightDir)
-{
-  vec2 shadowCoord = lightDir.xy;
-  float depthFromLight = texture(shadow_map, shadowCoord).r;
-
-  if (depthFromLight < lightDir.z) {
-    // Fragment is in shadow
-    return ambient.x; // Adjust shadow strength as needed
-  } else {
-    // Fragment is lit
-    return 1.0;
-  }
-}
-
-float
-projectShadow(vec4 shadowCoord, vec2 off)
-{
-  float shadow = 1.0;
-  if (shadowCoord.z > -1.0 && shadowCoord.z < 1.0) {
-    float dist = texture(shadow_map, shadowCoord.st + off).r;
-    if (shadowCoord.w > 0.0 && dist < shadowCoord.z) {
-      shadow = ambient.x;
-    }
-  }
-  return shadow;
-}
-
-float
-filterPCF(vec4 sc)
-{
-  ivec2 texDim = textureSize(shadow_map, 0);
-  float scale = 1.5;
-  float dx = scale * 1.0 / float(texDim.x);
-  float dy = scale * 1.0 / float(texDim.y);
-
-  float shadowFactor = 0.0;
-  int count = 0;
-  int range = 1;
-
-  for (int x = -range; x <= range; x++) {
-    for (int y = -range; y <= range; y++) {
-      shadowFactor += projectShadow(sc, vec2(dx * x, dy * y));
-      count++;
-    }
-  }
-  return shadowFactor / count;
-}
-
-vec4
-resolve(sampler2DMS tex, ivec2 uv)
-{
-  vec4 result = vec4(0.0);
-  for (int i = 0; i < NUM_SAMPLES; i++) {
-    vec4 val = texelFetch(tex, uv, i);
-    result += val;
-  }
-  // Average resolved samples
-  return result / float(NUM_SAMPLES);
-}
-
-void
-calculate_lighting_for(vec3 L,
-                       vec3 N,
-                       vec3 V,
-                       vec4 albedo,
-                       float atten,
-                       vec3 radiance,
-                       out vec3 result)
-{
-  // Combine calculations into fewer lines to reduce complexity
-  vec3 R = reflect(-L, N);
-  float NdotL = max(dot(N, L), 0.0);
-  float NdotR = max(dot(R, V), 0.0);
-  result += radiance * albedo.rgb * NdotL * atten;
-  result += radiance * albedo.a * pow(NdotR, 8.0) * atten;
-}
-
-vec3
-calculate_lighting(vec3 pos,
-                   vec3 normal,
-                   vec4 albedo,
-                   uint point_light_count,
-                   uint spot_light_count)
-{
-  vec3 result = vec3(0.0);
-  vec3 N = normalize(normal);                         // Normalizing once
-  vec3 V = normalize(renderer.camera_position - pos); // Compute once, use many
-
-  // Precompute constants for attenuation formula
-  const float linearTerm = 0.09;
-  const float quadraticTerm = 0.032;
-
-  for (uint i = 0; i < point_light_count; ++i) {
-    vec3 L = point_lights.lights[i].pos - pos;
-    float dist = length(L);
-    if (dist > point_lights.lights[i].radius) {
-      continue;
-    }
-
-    L = normalize(L);
-    float atten = 1.0 / (1.0 + linearTerm * dist + quadraticTerm * dist * dist);
-
-    calculate_lighting_for(
-      L, N, V, albedo, atten, point_lights.lights[i].radiance, result);
-  }
-
-  for (uint i = 0; i < spot_light_count; ++i) {
-    vec3 L = spot_lights.lights[i].pos - pos;
-    float dist = length(L);
-    if (dist > spot_lights.lights[i].range) {
-      continue;
-    }
-
-    L = normalize(L);
-    float spot_effect = dot(-L, normalize(spot_lights.lights[i].direction));
-    if (spot_effect <= cos(radians(spot_lights.lights[i].angle + 10.0))) {
-      continue;
-    }
-
-    float atten = (1.0 / (dist * dist + 1.0)) *
-                  pow(spot_effect, spot_lights.lights[i].falloff);
-
-    calculate_lighting_for(
-      L, N, V, albedo, atten, spot_lights.lights[i].radiance, result);
-  }
-
-  return result;
 }
 
 const mat3 aces_m1 = mat3(0.59719,

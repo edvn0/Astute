@@ -12,6 +12,7 @@
 #include "graphics/GraphicsPipeline.hpp"
 #include "graphics/Image.hpp"
 #include "graphics/Material.hpp"
+#include "graphics/NewFramebuffer.hpp"
 #include "graphics/Renderer.hpp"
 #include "graphics/Shader.hpp"
 #include "graphics/Swapchain.hpp"
@@ -74,6 +75,7 @@ PredepthRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
         .transform_buffer;
     auto vb = transform_vertex_buffer->get_buffer();
     auto offset = get_renderer().mesh_transform_map.at(key).offset;
+    const auto& submesh = mesh_asset->get_submeshes().at(submesh_index);
 
     offsets = std::array{ VkDeviceSize{ offset } };
 
@@ -84,13 +86,12 @@ PredepthRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                          mesh_asset->get_index_buffer().get_buffer(),
                          0,
                          VK_INDEX_TYPE_UINT32);
-    vkCmdDrawIndexed(
-      command_buffer.get_command_buffer(),
-      static_cast<Core::u32>(mesh_asset->get_index_buffer().count()),
-      instance_count,
-      0,
-      0,
-      0);
+    vkCmdDrawIndexed(command_buffer.get_command_buffer(),
+                     submesh.index_count,
+                     instance_count,
+                     submesh.base_index,
+                     submesh.base_vertex,
+                     0);
   }
 }
 
@@ -107,16 +108,13 @@ PredepthRenderPass::on_resize(const Core::Extent& ext) -> void
           predepth_pipeline,
           predepth_material] = get_data();
   predepth_framebuffer =
-    Core::make_scope<Framebuffer>(Framebuffer::Configuration{
-      .size = get_renderer().get_size(),
-      .colour_attachment_formats = {},
-      .depth_attachment_format = VK_FORMAT_D16_UNORM,
-      .sample_count = VK_SAMPLE_COUNT_4_BIT,
-      .immediate_construction = false,
-      .name = "Predepth",
+    Core::make_scope<V2::Framebuffer>(V2::FramebufferSpecification{
+      .width = ext.width,
+      .height = ext.height,
+      .clear_depth_on_load = true,
+      .attachments = { VK_FORMAT_D32_SFLOAT },
+      .debug_name = "Predepth",
     });
-  predepth_framebuffer->add_resolve_for_depth();
-  predepth_framebuffer->create_framebuffer_fully();
 
   predepth_shader = Shader::compile_graphics_scoped(
     "Assets/shaders/predepth.vert", "Assets/shaders/empty.frag");
@@ -124,7 +122,7 @@ PredepthRenderPass::on_resize(const Core::Extent& ext) -> void
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
       .framebuffer = predepth_framebuffer.get(),
       .shader = predepth_shader.get(),
-      .sample_count = VK_SAMPLE_COUNT_4_BIT,
+      .sample_count = VK_SAMPLE_COUNT_1_BIT,
       .cull_mode = VK_CULL_MODE_BACK_BIT,
       .face_mode = VK_FRONT_FACE_COUNTER_CLOCKWISE,
       .depth_comparator = VK_COMPARE_OP_GREATER,

@@ -198,7 +198,7 @@ MeshAsset::MeshAsset(const std::string& file_name)
   traverse_nodes(scene->mRootNode);
 
   for (const auto& submesh : submeshes) {
-    AABB transformed_submesh_aabb = submesh.bounding_box;
+    Core::AABB transformed_submesh_aabb = submesh.bounding_box;
     glm::vec3 min = glm::vec3(submesh.transform *
                               glm::vec4(transformed_submesh_aabb.min, 1.0F));
     glm::vec3 max = glm::vec3(submesh.transform *
@@ -446,6 +446,13 @@ StaticMesh::set_submeshes(const std::vector<Core::u32>& new_submeshes)
     for (Core::u32 i = 0; i < old_submeshes.size(); i++)
       submeshes[i] = i;
   }
+}
+
+auto
+StaticMesh::construct(const std::string_view path) -> Core::Ref<StaticMesh>
+{
+  return Core::make_ref<StaticMesh>(
+    Core::make_ref<MeshAsset>(std::string{ path }));
 }
 
 } // namespace Engine::Graphics

@@ -200,8 +200,8 @@ GraphicsPipeline::create_pipeline() -> void
   VkPipelineColorBlendStateCreateInfo color_blend_info{};
   color_blend_info.sType =
     VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-  color_blend_info.logicOpEnable = VK_FALSE;
-  color_blend_info.logicOp = VK_LOGIC_OP_COPY;
+  color_blend_info.logicOpEnable = VK_TRUE;
+  color_blend_info.logicOp = VK_LOGIC_OP_AND;
 
   auto color_blend_states = framebuffer->construct_blend_states();
   color_blend_info.attachmentCount =

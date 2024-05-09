@@ -9,6 +9,7 @@
 #include "graphics/DescriptorResource.hpp"
 #include "graphics/GPUBuffer.hpp"
 #include "graphics/Image.hpp"
+#include "graphics/NewFramebuffer.hpp"
 #include "graphics/Swapchain.hpp"
 #include "graphics/Window.hpp"
 
@@ -37,14 +38,6 @@ MainGeometryRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 
   main_geometry_material->update_descriptor_write_sets(renderer_desc_set);
 
-  static constexpr float depthBiasConstant = 1.25f;
-  static constexpr float depthBiasSlope = 1.75f;
-
-  vkCmdSetDepthBias(command_buffer.get_command_buffer(),
-                    depthBiasConstant,
-                    0.0f,
-                    depthBiasSlope);
-
   for (auto&& [key, command] : get_renderer().draw_commands) {
     auto&& [mesh, submesh_index, instance_count] = command;
 
@@ -54,9 +47,9 @@ MainGeometryRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
         .transform_buffers.at(Core::Application::the().current_frame_index())
         .transform_buffer;
     auto offset = get_renderer().mesh_transform_map.at(key).offset;
+    const auto& submesh = mesh_asset->get_submeshes().at(submesh_index);
 
-    const auto& material = mesh->get_materials().at(
-      mesh_asset->get_submeshes().at(submesh_index).material_index);
+    const auto& material = mesh->get_materials().at(submesh.material_index);
     auto material_descriptor_set =
       material->generate_and_update_descriptor_write_sets();
 
@@ -87,13 +80,12 @@ MainGeometryRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                          push_constant_buffer.raw());
     }
 
-    vkCmdDrawIndexed(
-      command_buffer.get_command_buffer(),
-      static_cast<Core::u32>(mesh_asset->get_index_buffer().count()),
-      instance_count,
-      0,
-      0,
-      0);
+    vkCmdDrawIndexed(command_buffer.get_command_buffer(),
+                     submesh.index_count,
+                     instance_count,
+                     submesh.base_index,
+                     submesh.base_vertex,
+                     0);
   }
 }
 
@@ -110,18 +102,20 @@ MainGeometryRenderPass::on_resize(const Core::Extent& ext) -> void
           main_geometry_pipeline,
           main_geometry_material] = get_data();
   main_geometry_framebuffer =
-    Core::make_scope<Framebuffer>(Framebuffer::Configuration{
-      .size = ext,
-      .colour_attachment_formats = {
+    Core::make_scope<V2::Framebuffer>(V2::FramebufferSpecification{
+      .width = ext.width,
+      .height= ext.height,
+      .clear_depth_on_load = false,
+      .attachments = {
           VK_FORMAT_R32G32B32A32_SFLOAT, // world pos
           VK_FORMAT_R32G32B32A32_SFLOAT, // normals
           VK_FORMAT_R32G32B32A32_SFLOAT, // albedo + specular strength
           VK_FORMAT_R32G32B32A32_SFLOAT, // shadow position
+          VK_FORMAT_D32_SFLOAT, // depth
       },
-      .sample_count = VK_SAMPLE_COUNT_4_BIT,
-      .dependent_images = { {3, get_renderer().get_render_pass("Predepth").get_depth_attachment(false), }, },
-      .depth_clear_value = 0,
-      .name = "MainGeometry",
+      .samples = VK_SAMPLE_COUNT_1_BIT,
+      .existing_images = { {4, get_renderer().get_render_pass("Predepth").get_depth_attachment(), }, },
+      .debug_name = "MainGeometry",
     });
   main_geometry_shader = Shader::compile_graphics_scoped(
     "Assets/shaders/main_geometry.vert", "Assets/shaders/main_geometry.frag");
@@ -129,7 +123,7 @@ MainGeometryRenderPass::on_resize(const Core::Extent& ext) -> void
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
       .framebuffer{ main_geometry_framebuffer.get() },
       .shader{ main_geometry_shader.get() },
-      .sample_count{ VK_SAMPLE_COUNT_4_BIT },
+      .sample_count{ VK_SAMPLE_COUNT_1_BIT },
       .cull_mode{ VK_CULL_MODE_BACK_BIT },
       .face_mode{ VK_FRONT_FACE_COUNTER_CLOCKWISE },
       .depth_comparator{ VK_COMPARE_OP_EQUAL },

@@ -313,9 +313,8 @@ copy_buffer_to_image(VkBuffer buffer,
 }
 
 auto
-create_view(VkImage& image,
-            VkFormat format,
-            VkImageAspectFlags aspect_mask) -> VkImageView
+create_view(VkImage& image, VkFormat format, VkImageAspectFlags aspect_mask)
+  -> VkImageView
 {
   VkImageViewCreateInfo view_create_info{};
   view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -540,8 +539,8 @@ Image::load_from_memory(Core::u32 width,
 }
 
 auto
-Image::resolve_msaa(const Image& source,
-                    const CommandBuffer* command_buffer) -> Core::Scope<Image>
+Image::resolve_msaa(const Image& source, const CommandBuffer* command_buffer)
+  -> Core::Scope<Image>
 {
   static constexpr auto is_depth_format = [](VkFormat format) -> bool {
     return format == VK_FORMAT_D32_SFLOAT ||
@@ -652,6 +651,93 @@ Image::reference_resolve_msaa(const Image& source,
 {
   auto resolved = resolve_msaa(source, command_buffer);
   return Core::Ref<Image>(resolved.release());
+}
+
+static constexpr auto depth_formats = std::array{
+  VK_FORMAT_D32_SFLOAT,         VK_FORMAT_D16_UNORM,
+  VK_FORMAT_D16_UNORM_S8_UINT,  VK_FORMAT_D24_UNORM_S8_UINT,
+  VK_FORMAT_D32_SFLOAT_S8_UINT,
+};
+
+static constexpr auto is_depth_format = [](VkFormat format) {
+  for (const auto& fmt : depth_formats) {
+    if (format == fmt)
+      return true;
+  }
+  return false;
+};
+static constexpr auto to_aspect_mask = [](VkFormat fmt) {
+  if (is_depth_format(fmt)) {
+    VkImageAspectFlags depth_flag = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+    if (fmt == VK_FORMAT_D24_UNORM_S8_UINT ||
+        fmt == VK_FORMAT_D16_UNORM_S8_UINT ||
+        fmt == VK_FORMAT_D32_SFLOAT_S8_UINT) {
+      depth_flag |= VK_IMAGE_ASPECT_STENCIL_BIT;
+    }
+
+    return depth_flag;
+  }
+
+  return static_cast<VkImageAspectFlags>(VK_IMAGE_ASPECT_COLOR_BIT);
+};
+
+Image::
+Image(Core::u32 width,
+      Core::u32 height,
+      Core::u32 mip_levels,
+      VkSampleCountFlagBits sc,
+      VkFormat fmt,
+      VkImageLayout lay,
+      Core::u32 layers,
+      VkImageTiling tiling,
+      VkImageUsageFlags use,
+      const std::string_view additional_name_data)
+  : aspect_mask(to_aspect_mask(fmt))
+  , format(fmt)
+  , sample_count(sc)
+  , layout(lay)
+  , extent{ .width = width, .height = height, .depth = 1, }
+  , layer_count(layers),
+  usage(use),
+  mip_count(mip_levels)
+  , name(additional_name_data)
+{
+  invalidate();
+}
+
+auto
+Image::create_specific_layer_image_views(
+  const std::span<const Core::u32> indices) -> void
+{
+}
+
+auto
+Image::invalidate() -> void
+{
+  destroy();
+
+  create_image(extent.width,
+               extent.height,
+               1,
+               sample_count,
+               format,
+               VK_IMAGE_TILING_OPTIMAL,
+               usage,
+               image,
+               allocation,
+               allocation_info,
+               name + "-Colour Attachment MSAA");
+  view = create_view(image, format, aspect_mask);
+  sampler = create_sampler(VK_FILTER_LINEAR,
+                           VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                           VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK);
+
+  descriptor_info.imageLayout = layout;
+  descriptor_info.imageView = view;
+  descriptor_info.sampler = sampler;
+
+  destroyed = false;
 }
 
 } // namespace Engine::Graphic

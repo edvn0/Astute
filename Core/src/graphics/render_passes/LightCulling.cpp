@@ -38,7 +38,7 @@ LightCullingRenderPass::execute_compute_impl(CommandBuffer& command_buffer)
 
   light_culling_material->set(
     "predepth_map",
-    get_renderer().get_render_pass("Predepth").get_depth_attachment(true));
+    get_renderer().get_render_pass("Predepth").get_depth_attachment());
 
   auto descriptor_set =
     generate_and_update_descriptor_write_sets(*light_culling_material);

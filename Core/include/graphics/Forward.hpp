@@ -21,3 +21,7 @@ class Material;
 class RenderPass;
 
 }
+
+namespace Engine::Graphics::V2 {
+class Framebuffer;
+}

@@ -25,6 +25,7 @@ layout(push_constant) uniform Material
   float transparency;
   float roughness;
   float emission;
+
   uint use_normal_map;
 }
 mat_pc;
@@ -35,19 +36,16 @@ compute_normal_from_map(mat3 tbn);
 void
 main()
 {
-  vec3 N = normalize(fragment_normal); // Normalize to ensure it's unit length
+  vec3 N = normalize(fragment_normal);
   vec3 T = normalize(fragment_tangents);
   vec3 B = normalize(fragment_bitangents);
-  mat3 TBN = mat3(T, B, N); // Tangent, Bitangent, Normal matrix
-
+  mat3 TBN = mat3(T, B, N);
   if (mat_pc.use_normal_map == 1) {
     fragment_normals = compute_normal_from_map(TBN);
   } else {
-    fragment_normals =
-      vec4(N, 0.0); // Normals are not homogeneous, w should be 0
+    fragment_normals = vec4(N, 0.0);
   }
 
-  // Albedo texture combined with a base color
   vec3 albedo_color =
     texture(albedo_map, fragment_uvs).rgb * mat_pc.albedo_colour;
   float specular_strength = texture(specular_map, fragment_uvs).r;
@@ -55,25 +53,18 @@ main()
     texture(roughness_map, fragment_uvs).r * mat_pc.roughness;
 
   fragment_albedo_spec.rgb =
-    albedo_color +
-    mat_pc.emission * mat_pc.albedo_colour; // Emissive contribution
-  fragment_albedo_spec.a =
-    specular_strength *
-    roughness_value; // Specular strength combined with roughness
+    albedo_color + mat_pc.emission * mat_pc.albedo_colour;
+  fragment_albedo_spec.a = specular_strength * roughness_value;
 
-  // World space position of the fragment
   fragment_position = vec4(world_space_fragment_position, 1.0);
 
-  // Transform shadow space position to [0, 1] range
-  fragment_shadow_position = shadow_space_fragment_position * 0.5 + 0.5;
+  fragment_shadow_position = shadow_space_fragment_position;
 }
 
 vec4
 compute_normal_from_map(mat3 tbn)
 {
-  vec3 normal_map_value = texture(normal_map, fragment_uvs).rgb;
-  normal_map_value =
-    normal_map_value * 2.0 - 1.0; // Convert from [0, 1] to [-1, 1]
-  return vec4(normalize(tbn * normal_map_value),
-              0.0); // w should be 0 because it's a direction vector
+  vec3 normal_map_value =
+    normalize(texture(normal_map, fragment_uvs).rgb * 2.0 - vec3(1.0F));
+  return vec4(normalize(tbn * normal_map_value), 1.0);
 }
