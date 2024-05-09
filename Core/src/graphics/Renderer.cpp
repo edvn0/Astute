@@ -184,17 +184,6 @@ Renderer::Renderer(Configuration config, const Window* window)
                                    light_culling_work_groups.y * 4 * 1024);
   visible_spot_lights_ssbo.resize(light_culling_work_groups.x *
                                   light_culling_work_groups.y * 4 * 1024);
-
-  Framebuffer buf{
-    {
-      .scale = 1.0F,
-      .width = viewport_size.x,
-      .height = viewport_size.y,
-      .attachments = { { VK_FORMAT_R32G32B32A32_SFLOAT } },
-    },
-  };
-
-  info("Test");
 }
 
 Renderer::~Renderer() = default;
@@ -213,8 +202,8 @@ Renderer::destruct() -> void
 }
 
 auto
-Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
-  -> void
+Renderer::begin_scene(Core::Scene& scene,
+                      const SceneRendererCamera& camera) -> void
 {
   if (old_size != size) {
     Device::the().wait();

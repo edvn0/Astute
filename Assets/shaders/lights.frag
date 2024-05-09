@@ -33,8 +33,9 @@ compute_normal_from_map(mat3 tbn);
 void
 main()
 {
+  vec2 flipped_uvs = vec2(fragment_uvs.x, 1.0f - fragment_uvs.y);
   fragment_colour = vec4(mat_pc.emission * mat_pc.albedo_colour *
-                           texture(albedo_map, fragment_uvs).xyz,
+                           texture(albedo_map, flipped_uvs).xyz,
                          1.0f);
 }
 

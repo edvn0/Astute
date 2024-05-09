@@ -28,7 +28,7 @@ LightsRenderPass::construct() -> void
     .height = get_renderer().get_size().height,
     .clear_colour_on_load = false,
     .clear_depth_on_load = false,
-    .attachments = { { VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_D32_SFLOAT } },
+    .attachments = { { VK_FORMAT_R32G32B32A32_SFLOAT, VK_FORMAT_D32_SFLOAT } },
     .samples = VK_SAMPLE_COUNT_1_BIT,
     .existing_images = { {0, get_renderer().get_render_pass("Deferred").get_colour_attachment(0),}, { 1, get_renderer()
                              .get_render_pass("Predepth")
@@ -60,48 +60,52 @@ LightsRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                lights_pipeline,
                lights_material] = get_data();
 
-  auto descriptor_set =
+  auto renderer_desc_set =
     generate_and_update_descriptor_write_sets(*lights_material);
 
-  vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
-                          lights_pipeline->get_bind_point(),
-                          lights_pipeline->get_layout(),
-                          0,
-                          1,
-                          &descriptor_set,
-                          0,
-                          nullptr);
+  lights_material->update_descriptor_write_sets(renderer_desc_set);
 
-  for (const auto& [key, command] : get_renderer().lights_draw_commands) {
-    const auto& [mesh, submesh_index, instance_count] = command;
+  for (auto&& [key, command] : get_renderer().lights_draw_commands) {
+    auto&& [mesh, submesh_index, instance_count] = command;
 
     const auto& mesh_asset = mesh->get_mesh_asset();
-    auto vertex_buffers =
-      std::array{ mesh_asset->get_vertex_buffer().get_buffer() };
-    auto offsets = std::array<VkDeviceSize, 1>{ 0 };
-    vkCmdBindVertexBuffers(command_buffer.get_command_buffer(),
-                           0,
-                           1,
-                           vertex_buffers.data(),
-                           offsets.data());
-
     const auto& transform_vertex_buffer =
       get_renderer()
         .transform_buffers.at(Core::Application::the().current_frame_index())
         .transform_buffer;
-    auto vb = transform_vertex_buffer->get_buffer();
     auto offset = get_renderer().mesh_transform_map.at(key).offset;
     const auto& submesh = mesh_asset->get_submeshes().at(submesh_index);
 
-    offsets = std::array{ VkDeviceSize{ offset } };
+    const auto& material = mesh->get_materials().at(submesh.material_index);
+    auto material_descriptor_set =
+      material->generate_and_update_descriptor_write_sets();
 
-    vkCmdBindVertexBuffers(
-      command_buffer.get_command_buffer(), 1, 1, &vb, offsets.data());
+    RendererExtensions::bind_vertex_buffer(
+      command_buffer, mesh_asset->get_vertex_buffer(), 0);
+    RendererExtensions::bind_vertex_buffer(
+      command_buffer, *transform_vertex_buffer, 1, offset);
+    RendererExtensions::bind_index_buffer(command_buffer,
+                                          mesh_asset->get_index_buffer());
 
-    vkCmdBindIndexBuffer(command_buffer.get_command_buffer(),
-                         mesh_asset->get_index_buffer().get_buffer(),
+    std::array desc_sets{ renderer_desc_set, material_descriptor_set };
+    vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
+                            lights_pipeline->get_bind_point(),
+                            lights_pipeline->get_layout(),
+                            0,
+                            static_cast<Core::u32>(desc_sets.size()),
+                            desc_sets.data(),
+                            0,
+                            nullptr);
+
+    if (const auto& push_constant_buffer = material->get_constant_buffer();
+        push_constant_buffer) {
+      vkCmdPushConstants(command_buffer.get_command_buffer(),
+                         lights_pipeline->get_layout(),
+                         VK_SHADER_STAGE_ALL,
                          0,
-                         VK_INDEX_TYPE_UINT32);
+                         static_cast<Core::u32>(push_constant_buffer.size()),
+                         push_constant_buffer.raw());
+    }
 
     vkCmdDrawIndexed(command_buffer.get_command_buffer(),
                      submesh.index_count,
