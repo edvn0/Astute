@@ -11,7 +11,7 @@
 #include "graphics/Swapchain.hpp"
 #include "graphics/Window.hpp"
 
-#include "graphics/NewFramebuffer.hpp"
+#include "graphics/Framebuffer.hpp"
 
 #include "graphics/RendererExtensions.hpp"
 
@@ -183,7 +183,7 @@ Renderer::Renderer(Configuration config, const Window* window)
   visible_spot_lights_ssbo.resize(light_culling_work_groups.x *
                                   light_culling_work_groups.y * 4 * 1024);
 
-  V2::Framebuffer buf{
+  Framebuffer buf{
     {
       .scale = 1.0F,
       .width = viewport_size.x,

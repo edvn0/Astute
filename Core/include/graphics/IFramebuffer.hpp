@@ -22,6 +22,7 @@ public:
   virtual auto get_extent() const -> VkExtent2D = 0;
   virtual auto get_name() const -> const std::string& = 0;
   virtual auto get_clear_values() const -> const std::vector<VkClearValue>& = 0;
+  virtual auto get_colour_attachment_count() const -> Core::u32 = 0;
   virtual auto has_depth_attachment() const -> bool = 0;
   virtual auto construct_blend_states() const
     -> std::vector<VkPipelineColorBlendAttachmentState> = 0;

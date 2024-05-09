@@ -12,7 +12,6 @@
 #include "graphics/GraphicsPipeline.hpp"
 #include "graphics/Image.hpp"
 #include "graphics/Material.hpp"
-#include "graphics/NewFramebuffer.hpp"
 #include "graphics/Renderer.hpp"
 #include "graphics/Shader.hpp"
 #include "graphics/Swapchain.hpp"
@@ -35,6 +34,9 @@ PredepthRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                predepth_shader,
                predepth_pipeline,
                predepth_material] = get_data();
+
+  RendererExtensions::explicitly_clear_framebuffer(command_buffer,
+                                                   *predepth_framebuffer);
 
   auto descriptor_set =
     generate_and_update_descriptor_write_sets(*predepth_material);
@@ -107,14 +109,13 @@ PredepthRenderPass::on_resize(const Core::Extent& ext) -> void
           predepth_shader,
           predepth_pipeline,
           predepth_material] = get_data();
-  predepth_framebuffer =
-    Core::make_scope<V2::Framebuffer>(V2::FramebufferSpecification{
-      .width = ext.width,
-      .height = ext.height,
-      .clear_depth_on_load = true,
-      .attachments = { VK_FORMAT_D32_SFLOAT },
-      .debug_name = "Predepth",
-    });
+  predepth_framebuffer = Core::make_scope<Framebuffer>(FramebufferSpecification{
+    .width = ext.width,
+    .height = ext.height,
+    .clear_depth_on_load = false,
+    .attachments = { VK_FORMAT_D32_SFLOAT },
+    .debug_name = "Predepth",
+  });
 
   predepth_shader = Shader::compile_graphics_scoped(
     "Assets/shaders/predepth.vert", "Assets/shaders/empty.frag");

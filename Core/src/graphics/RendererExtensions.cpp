@@ -56,7 +56,7 @@ end_renderpass(const CommandBuffer& command_buffer) -> void
 
 auto
 explicitly_clear_framebuffer(const CommandBuffer& command_buffer,
-                             const Framebuffer& framebuffer,
+                             const IFramebuffer& framebuffer,
                              const bool clear_depth) -> void
 {
   const std::vector<VkClearValue>& fb_clear_values =

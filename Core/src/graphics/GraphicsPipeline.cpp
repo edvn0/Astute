@@ -165,7 +165,8 @@ GraphicsPipeline::create_pipeline() -> void
   rasterization_info.frontFace = face_mode;
   if (framebuffer && framebuffer->has_depth_attachment()) {
     rasterization_info.depthBiasEnable =
-      framebuffer->get_depth_attachment()->format == VK_FORMAT_D32_SFLOAT
+      framebuffer->get_depth_attachment()->configuration.format ==
+          VK_FORMAT_D32_SFLOAT
         ? VK_FALSE
         : VK_TRUE;
   }

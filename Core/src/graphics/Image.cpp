@@ -43,43 +43,36 @@ struct std::formatter<VkImageLayout> : public std::formatter<std::string_view>
 namespace Engine::Graphics {
 
 void
-create_image(Core::u32 width,
-             Core::u32 height,
-             Core::u32 mip_levels,
-             VkSampleCountFlagBits sample_count,
-             VkFormat format,
-             VkImageTiling tiling,
-             VkImageUsageFlags usage,
+create_image(const ImageConfiguration& config,
              VkImage& image,
              VmaAllocation& allocation,
-             VmaAllocationInfo& allocation_info,
-             const std::string_view additional_name_data)
+             VmaAllocationInfo& allocation_info)
 {
   VkImageCreateInfo imageInfo{};
   imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   imageInfo.imageType = VK_IMAGE_TYPE_2D;
-  imageInfo.extent.width = width;
-  imageInfo.extent.height = height;
+  imageInfo.extent.width = config.width;
+  imageInfo.extent.height = config.height;
   imageInfo.extent.depth = 1;
-  imageInfo.mipLevels = mip_levels;
-  imageInfo.arrayLayers = 1;
-  imageInfo.format = format;
-  imageInfo.tiling = tiling;
+  imageInfo.mipLevels = config.mip_levels;
+  imageInfo.arrayLayers = config.layers;
+  imageInfo.format = config.format;
+  imageInfo.tiling = config.tiling;
   imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  imageInfo.usage = usage;
-  imageInfo.samples = sample_count;
+  imageInfo.usage = config.usage;
+  imageInfo.samples = config.sample_count;
   imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
   Allocator allocator{
     std::format("Format-{}-SampleCount-{}-AdditionalData-{}",
-                to_string(format),
-                to_string(sample_count),
-                additional_name_data),
+                to_string(config.format),
+                to_string(config.sample_count),
+                config.additional_name_data),
   };
 
   AllocationProperties alloc_props{};
   alloc_props.usage = Usage::AUTO_PREFER_DEVICE;
-  if (sample_count != VK_SAMPLE_COUNT_1_BIT) {
+  if (config.sample_count != VK_SAMPLE_COUNT_1_BIT) {
     alloc_props.flags = RequiredFlags::LAZILY_ALLOCATED_BIT;
   }
 
@@ -89,7 +82,7 @@ create_image(Core::u32 width,
     allocator.allocate_image(image, allocation_info, imageInfo, alloc_props);
 
   trace("Created image '{}', Vulkan pointer: {}",
-        additional_name_data,
+        config.additional_name_data,
         (const void*)image);
 }
 
@@ -338,17 +331,20 @@ create_view(VkImage& image, VkFormat format, VkImageAspectFlags aspect_mask)
 }
 
 auto
-create_sampler(VkFilter filter,
-               VkSamplerAddressMode address_mode,
+create_sampler(VkFilter min_filter,
+               VkFilter mag_filter,
+               VkSamplerAddressMode u_address_mode,
+               VkSamplerAddressMode v_address_mode,
+               VkSamplerAddressMode w_address_mode,
                VkBorderColor border_color) -> VkSampler
 {
   VkSamplerCreateInfo sampler_info{};
   sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-  sampler_info.magFilter = filter;
-  sampler_info.minFilter = filter;
-  sampler_info.addressModeU = address_mode;
-  sampler_info.addressModeV = address_mode;
-  sampler_info.addressModeW = address_mode;
+  sampler_info.magFilter = min_filter;
+  sampler_info.minFilter = mag_filter;
+  sampler_info.addressModeU = u_address_mode;
+  sampler_info.addressModeV = v_address_mode;
+  sampler_info.addressModeW = w_address_mode;
   sampler_info.anisotropyEnable = VK_TRUE;
   sampler_info.maxAnisotropy = 16;
   sampler_info.borderColor = border_color;
@@ -364,6 +360,13 @@ create_sampler(VkFilter filter,
   VK_CHECK(
     vkCreateSampler(Device::the().device(), &sampler_info, nullptr, &sampler));
   return sampler;
+}
+
+auto
+create_sampler(VkFilter filter, VkSamplerAddressMode mode, VkBorderColor col)
+  -> VkSampler
+{
+  return create_sampler(filter, filter, mode, mode, mode, col);
 }
 
 auto
@@ -432,36 +435,14 @@ Image::load_from_memory(Core::u32 width,
                         const Core::DataBuffer& data_buffer,
                         const Configuration& config) -> Core::Ref<Image>
 {
-  Core::Ref<Image> image = Core::make_ref<Image>();
 
-  create_image(width,
-               height,
-               1,
-               config.sample_count,
-               VK_FORMAT_R8G8B8A8_UNORM,
-               VK_IMAGE_TILING_OPTIMAL,
-               VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                 VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
-                 VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-               image->image,
-               image->allocation,
-               image->allocation_info,
-               config.path);
-  image->sample_count = config.sample_count;
-  image->extent = { width, height, 1 };
-  image->format = VK_FORMAT_R8G8B8A8_UNORM;
-  image->layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-  image->aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT;
-  image->view = create_view(
-    image->image, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_ASPECT_COLOR_BIT);
-  image->sampler = create_sampler(VK_FILTER_LINEAR,
-                                  VK_SAMPLER_ADDRESS_MODE_REPEAT,
-                                  VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK);
-
-  auto& descriptor_info = image->descriptor_info;
-  descriptor_info.imageLayout = image->layout;
-  descriptor_info.imageView = image->view;
-  descriptor_info.sampler = image->sampler;
+  Core::Ref<Image> image = Core::make_ref<Image>(ImageConfiguration{
+    .width = width,
+    .height = height,
+    .sample_count = config.sample_count,
+    .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+             VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+  });
 
   Allocator allocator{ "Image" };
   VkBufferCreateInfo buffer_create_info{};
@@ -542,106 +523,7 @@ auto
 Image::resolve_msaa(const Image& source, const CommandBuffer* command_buffer)
   -> Core::Scope<Image>
 {
-  static constexpr auto is_depth_format = [](VkFormat format) -> bool {
-    return format == VK_FORMAT_D32_SFLOAT ||
-           format == VK_FORMAT_D32_SFLOAT_S8_UINT ||
-           format == VK_FORMAT_D24_UNORM_S8_UINT;
-  };
-
-  Core::Scope<Image> image = Core::make_scope<Image>();
-  create_image(
-    source.extent.width,
-    source.extent.height,
-    1,
-    VK_SAMPLE_COUNT_1_BIT,
-    source.format,
-    VK_IMAGE_TILING_OPTIMAL,
-    is_depth_format(source.format)
-      ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
-          VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-          VK_IMAGE_USAGE_TRANSFER_SRC_BIT
-      : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-          VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-    image->image,
-    image->allocation,
-    image->allocation_info,
-    "ResolveMSAA");
-  image->view = create_view(image->image, source.format, source.aspect_mask);
-  image->sampler = create_sampler(VK_FILTER_LINEAR,
-                                  VK_SAMPLER_ADDRESS_MODE_REPEAT,
-                                  VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK);
-  image->sample_count = VK_SAMPLE_COUNT_1_BIT;
-  image->extent = source.extent;
-  image->format = source.format;
-  image->layout = source.layout;
-  image->aspect_mask = source.aspect_mask;
-
-  auto& descriptor_info = image->descriptor_info;
-  descriptor_info.imageLayout = image->layout;
-  descriptor_info.imageView = image->view;
-  descriptor_info.sampler = image->sampler;
-
-  transition_image_layout(image->image,
-                          VK_IMAGE_LAYOUT_UNDEFINED,
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                          source.aspect_mask);
-
-  transition_image_layout(source.image,
-                          source.layout,
-                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                          source.aspect_mask);
-
-  if (command_buffer == nullptr) {
-    Device::the().execute_immediate(
-      [&source, &image](VkCommandBuffer cmd_buffer) {
-        VkImageResolve region{};
-        region.srcSubresource.aspectMask = source.aspect_mask;
-        region.srcSubresource.mipLevel = 0;
-        region.srcSubresource.baseArrayLayer = 0;
-        region.srcSubresource.layerCount = 1;
-        region.srcOffset = { 0, 0, 0 };
-        region.dstSubresource = region.srcSubresource;
-        region.dstOffset = { 0, 0, 0 };
-        region.extent = source.extent;
-
-        vkCmdResolveImage(cmd_buffer,
-                          source.image,
-                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                          image->image,
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                          1,
-                          &region);
-      });
-  } else {
-    VkImageResolve region{};
-    region.srcSubresource.aspectMask = source.aspect_mask;
-    region.srcSubresource.mipLevel = 0;
-    region.srcSubresource.baseArrayLayer = 0;
-    region.srcSubresource.layerCount = 1;
-    region.srcOffset = { 0, 0, 0 };
-    region.dstSubresource = region.srcSubresource;
-    region.dstOffset = { 0, 0, 0 };
-    region.extent = source.extent;
-
-    vkCmdResolveImage(command_buffer->get_command_buffer(),
-                      source.image,
-                      VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                      image->image,
-                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                      1,
-                      &region);
-  }
-
-  transition_image_layout(image->image,
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                          image->layout,
-                          source.aspect_mask);
-
-  transition_image_layout(source.image,
-                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                          source.layout,
-                          source.aspect_mask);
-  return image;
+  return nullptr;
 }
 
 auto
@@ -649,8 +531,7 @@ Image::reference_resolve_msaa(const Image& source,
                               const CommandBuffer* command_buffer)
   -> Core::Ref<Image>
 {
-  auto resolved = resolve_msaa(source, command_buffer);
-  return Core::Ref<Image>(resolved.release());
+  return nullptr;
 }
 
 static constexpr auto depth_formats = std::array{
@@ -682,27 +563,11 @@ static constexpr auto to_aspect_mask = [](VkFormat fmt) {
   return static_cast<VkImageAspectFlags>(VK_IMAGE_ASPECT_COLOR_BIT);
 };
 
-Image::
-Image(Core::u32 width,
-      Core::u32 height,
-      Core::u32 mip_levels,
-      VkSampleCountFlagBits sc,
-      VkFormat fmt,
-      VkImageLayout lay,
-      Core::u32 layers,
-      VkImageTiling tiling,
-      VkImageUsageFlags use,
-      const std::string_view additional_name_data)
-  : aspect_mask(to_aspect_mask(fmt))
-  , format(fmt)
-  , sample_count(sc)
-  , layout(lay)
-  , extent{ .width = width, .height = height, .depth = 1, }
-  , layer_count(layers),
-  usage(use),
-  mip_count(mip_levels)
-  , name(additional_name_data)
+Image::Image(const ImageConfiguration& conf)
+  : aspect_mask(to_aspect_mask(conf.format))
+  , configuration(conf)
 {
+  configuration.additional_name_data = "Colour Attachment MSAA";
   invalidate();
 }
 
@@ -717,23 +582,16 @@ Image::invalidate() -> void
 {
   destroy();
 
-  create_image(extent.width,
-               extent.height,
-               1,
-               sample_count,
-               format,
-               VK_IMAGE_TILING_OPTIMAL,
-               usage,
-               image,
-               allocation,
-               allocation_info,
-               name + "-Colour Attachment MSAA");
-  view = create_view(image, format, aspect_mask);
-  sampler = create_sampler(VK_FILTER_LINEAR,
-                           VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                           VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK);
+  create_image(configuration, image, allocation, allocation_info);
+  view = create_view(image, configuration.format, aspect_mask);
+  sampler = create_sampler(configuration.min_filter,
+                           configuration.mag_filter,
+                           configuration.address_mode_u,
+                           configuration.address_mode_v,
+                           configuration.address_mode_w,
+                           configuration.border_colour);
 
-  descriptor_info.imageLayout = layout;
+  descriptor_info.imageLayout = configuration.layout;
   descriptor_info.imageView = view;
   descriptor_info.sampler = sampler;
 

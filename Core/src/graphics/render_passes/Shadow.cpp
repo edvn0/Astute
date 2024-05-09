@@ -7,8 +7,8 @@
 #include "core/Scene.hpp"
 
 #include "graphics/DescriptorResource.hpp"
+#include "graphics/Framebuffer.hpp"
 #include "graphics/GPUBuffer.hpp"
-#include "graphics/NewFramebuffer.hpp"
 #include "graphics/Swapchain.hpp"
 #include "graphics/Window.hpp"
 
@@ -23,16 +23,15 @@ ShadowRenderPass::construct() -> void
 {
   auto&& [shadow_framebuffer, shadow_shader, shadow_pipeline, shadow_material] =
     get_data();
-  shadow_framebuffer =
-    Core::make_scope<V2::Framebuffer>(V2::FramebufferSpecification{
-      .width = size,
-      .height = size,
-      .clear_depth_on_load = true,
-      .attachments = { { VK_FORMAT_D32_SFLOAT } },
-      .samples = VK_SAMPLE_COUNT_1_BIT,
-      .no_resize = true,
-      .debug_name = "Shadow",
-    });
+  shadow_framebuffer = Core::make_scope<Framebuffer>(FramebufferSpecification{
+    .width = size,
+    .height = size,
+    .clear_depth_on_load = true,
+    .attachments = { { VK_FORMAT_D32_SFLOAT } },
+    .samples = VK_SAMPLE_COUNT_1_BIT,
+    .no_resize = true,
+    .debug_name = "Shadow",
+  });
   shadow_shader = Shader::compile_graphics_scoped("Assets/shaders/shadow.vert",
                                                   "Assets/shaders/empty.frag");
   shadow_pipeline =

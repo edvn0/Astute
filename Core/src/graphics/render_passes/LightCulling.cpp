@@ -77,11 +77,6 @@ LightCullingRenderPass::on_resize(const Core::Extent& ext) -> void
   light_culling_shader =
     Shader::compile_compute_scoped("Assets/shaders/light_culling.comp");
 
-  if (!light_culling_shader) {
-    error("Failed to compile light culling shader");
-    return;
-  }
-
   light_culling_pipeline =
     Core::make_scope<ComputePipeline>(ComputePipeline::Configuration{
       .shader = light_culling_shader.get(),

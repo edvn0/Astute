@@ -12,7 +12,6 @@
 #include "graphics/GraphicsPipeline.hpp"
 #include "graphics/Image.hpp"
 #include "graphics/Material.hpp"
-#include "graphics/NewFramebuffer.hpp"
 #include "graphics/Renderer.hpp"
 #include "graphics/Shader.hpp"
 #include "graphics/Swapchain.hpp"
@@ -153,7 +152,7 @@ DeferredRenderPass::on_resize(const Core::Extent& ext) -> void
           deferred_pipeline,
           deferred_material] = get_data();
   deferred_framebuffer =
-    Core::make_scope<V2::Framebuffer>(V2::FramebufferSpecification{
+    Core::make_scope<Framebuffer>(FramebufferSpecification{
       .width = ext.width,
       .height = ext.height,
       .attachments = { VK_FORMAT_R32G32B32A32_SFLOAT, },

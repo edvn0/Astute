@@ -16,18 +16,35 @@ auto to_string(VkFormat) -> std::string_view;
 auto to_string(VkImageLayout) -> std::string_view;
 auto to_string(VkSampleCountFlagBits) -> std::string_view;
 
+struct ImageConfiguration
+{
+  Core::u32 width{ 1024 };
+  Core::u32 height{ 768 };
+  Core::u32 mip_levels{ 1 };
+  VkSampleCountFlagBits sample_count{ VK_SAMPLE_COUNT_1_BIT };
+  VkFormat format{ VK_FORMAT_R8G8B8A8_UNORM };
+  VkImageTiling tiling{ VK_IMAGE_TILING_OPTIMAL };
+  VkImageLayout layout{ VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL };
+  VkImageUsageFlags usage{ VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                           VK_IMAGE_USAGE_SAMPLED_BIT |
+                           VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                           VK_IMAGE_USAGE_TRANSFER_DST_BIT };
+  Core::u32 layers{ 1 };
+  std::string_view additional_name_data{ "" };
+
+  VkFilter mag_filter{ VK_FILTER_LINEAR };
+  VkFilter min_filter{ VK_FILTER_LINEAR };
+  VkSamplerAddressMode address_mode_u{ VK_SAMPLER_ADDRESS_MODE_REPEAT };
+  VkSamplerAddressMode address_mode_v{ VK_SAMPLER_ADDRESS_MODE_REPEAT };
+  VkSamplerAddressMode address_mode_w{ VK_SAMPLER_ADDRESS_MODE_REPEAT };
+  VkBorderColor border_colour{ VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK };
+};
+
 void
-create_image(Core::u32 width,
-             Core::u32 height,
-             Core::u32 mip_levels,
-             VkSampleCountFlagBits sample_count,
-             VkFormat format,
-             VkImageTiling tiling,
-             VkImageUsageFlags usage,
-             VkImage& image,
-             VmaAllocation& allocation,
-             VmaAllocationInfo& allocation_info,
-             std::string_view additional_name_data = "");
+create_image(const ImageConfiguration&,
+             VkImage&,
+             VmaAllocation&,
+             VmaAllocationInfo&);
 
 auto
 transition_image_layout(
@@ -56,6 +73,12 @@ auto
 create_view(VkImage&, VkFormat, VkImageAspectFlags) -> VkImageView;
 
 auto create_sampler(VkFilter, VkSamplerAddressMode, VkBorderColor) -> VkSampler;
+auto create_sampler(VkFilter,
+                    VkFilter,
+                    VkSamplerAddressMode,
+                    VkSamplerAddressMode,
+                    VkSamplerAddressMode,
+                    VkBorderColor) -> VkSampler;
 
 class Image
 {
@@ -66,16 +89,9 @@ public:
   VkImageView view{ nullptr };
   std::unordered_map<Core::u32, VkImageView> layer_image_views{};
   VkSampler sampler{ nullptr };
-  VkImageAspectFlags aspect_mask{ VK_IMAGE_ASPECT_COLOR_BIT };
-  VkFormat format{ VK_FORMAT_UNDEFINED };
-  VkSampleCountFlagBits sample_count{ VK_SAMPLE_COUNT_1_BIT };
-  VkImageLayout layout{ VK_IMAGE_LAYOUT_UNDEFINED };
+  VkImageAspectFlags aspect_mask;
   VkDescriptorImageInfo descriptor_info{};
-  VkExtent3D extent{};
-  VkImageUsageFlags usage;
-  Core::u32 layer_count{ 1 };
-  Core::u32 mip_count{ 1 };
-  std::string name;
+  ImageConfiguration configuration;
 
   bool destroyed{ false };
 
@@ -87,16 +103,7 @@ public:
     }
   }
   Image() = default;
-  Image(Core::u32 width,
-        Core::u32 height,
-        Core::u32 mip_levels,
-        VkSampleCountFlagBits sc,
-        VkFormat fmt,
-        VkImageLayout lay,
-        Core::u32 layers,
-        VkImageTiling tiling,
-        VkImageUsageFlags usage,
-        const std::string_view additional_name_data = "");
+  Image(const ImageConfiguration&);
 
   Image(const Image&) = delete;
   auto operator=(const Image&) -> Image& = delete;
@@ -115,6 +122,14 @@ public:
   auto create_specific_layer_image_views(
     const std::span<const Core::u32> indices) -> void;
   auto invalidate() -> void;
+
+  auto get_mip_levels() const { return configuration.mip_levels; }
+  auto get_sample_count() const { return configuration.sample_count; }
+  auto get_format() const { return configuration.format; }
+  auto get_tiling() const { return configuration.tiling; }
+  auto get_layout() const { return configuration.layout; }
+  auto get_usage() const { return configuration.usage; }
+  auto get_layer_count() const { return configuration.layers; }
 
   struct Configuration
   {

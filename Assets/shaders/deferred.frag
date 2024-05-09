@@ -42,7 +42,7 @@ main()
 
   float spec = pow(max(dot(V, R), 0.0), 32);
   vec3 specular = spec * renderer.specular_colour_intensity.xyz *
-                  renderer.specular_colour_intensity.a * 1000;
+                  renderer.specular_colour_intensity.a * alb.a;
 
   vec3 mapped = tonemap_aces(specular + diffuse + alb.xyz);
   vec3 gamma_corrected = pow(mapped, vec3(1.0 / 2.2));

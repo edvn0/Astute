@@ -1,123 +1,175 @@
 #pragma once
 
-#include "core/Types.hpp"
-#include "graphics/Forward.hpp"
-#include "graphics/IFramebuffer.hpp"
-
 #include <vulkan/vulkan.h>
 
+#include "core/Types.hpp"
+#include "graphics/IFramebuffer.hpp"
+
+#include "graphics/Forward.hpp"
+
+#include <glm/glm.hpp>
+#include <unordered_map>
+
 namespace Engine::Graphics {
+
+class Framebuffer;
+
+enum class FramebufferBlendMode
+{
+  None = 0,
+  OneZero,
+  SrcAlphaOneMinusSrcAlpha,
+  Additive,
+  Zero_SrcColor
+};
+
+struct FramebufferTextureSpecification
+{
+  FramebufferTextureSpecification() = default;
+  explicit(false) FramebufferTextureSpecification(VkFormat fmt)
+    : format(fmt)
+  {
+  }
+
+  VkFormat format;
+  bool blend{ true };
+  FramebufferBlendMode blend_mode{
+    FramebufferBlendMode::SrcAlphaOneMinusSrcAlpha
+  };
+};
+
+struct FramebufferAttachmentSpecification
+{
+  FramebufferAttachmentSpecification() = default;
+  FramebufferAttachmentSpecification(
+    const std::initializer_list<FramebufferTextureSpecification>& input)
+    : attachments(input)
+  {
+  }
+
+  std::vector<FramebufferTextureSpecification> attachments;
+
+  auto begin() -> auto { return std::begin(attachments); }
+  auto end() -> auto { return std::end(attachments); }
+  auto begin() const -> auto { return std::cbegin(attachments); }
+  auto end() const -> auto { return std::cend(attachments); }
+
+  auto size() const { return attachments.size(); };
+
+  auto operator[](auto i) -> decltype(auto) { return attachments.at(i); }
+  auto operator[](auto i) const -> decltype(auto) { return attachments.at(i); }
+};
+
+struct FramebufferSpecification
+{
+  float scale = 1.0f;
+  Core::u32 width = 0;
+  Core::u32 height = 0;
+  glm::vec4 clear_colour = { 0.0f, 0.0f, 0.0f, 1.0f };
+  float depth_clear_value = 0.0f;
+  bool clear_colour_on_load = true;
+  bool clear_depth_on_load = true;
+
+  FramebufferAttachmentSpecification attachments;
+  VkSampleCountFlagBits samples{ VK_SAMPLE_COUNT_1_BIT };
+
+  bool no_resize = false;
+
+  bool blend = true;
+  FramebufferBlendMode blend_mode = FramebufferBlendMode::None;
+
+  bool transfer = false;
+
+  Core::Ref<Image> existing_image;
+  std::vector<Core::u32> existing_image_layers;
+
+  std::unordered_map<Core::u32, Core::Ref<Image>> existing_images;
+
+  Core::Ref<Framebuffer> existing_framebuffer;
+  std::string debug_name;
+};
 
 class Framebuffer : public IFramebuffer
 {
 public:
-  struct Configuration
-  {
-    const Core::Extent size;
-    const std::vector<VkFormat> colour_attachment_formats{};
-    const VkFormat depth_attachment_format{ VK_FORMAT_UNDEFINED };
-    const VkSampleCountFlagBits sample_count{ VK_SAMPLE_COUNT_1_BIT };
-    const bool resizable{ true };
-    const std::unordered_map<Core::u32, Core::Ref<Image>> dependent_images{};
-    const bool clear_colour_on_load{ true };
-    const bool immediate_construction{ true };
-    const Core::u32 depth_clear_value{ 0 };
-    const std::string name;
-  };
-  explicit Framebuffer(const Configuration&);
-
+  explicit Framebuffer(const FramebufferSpecification&);
   ~Framebuffer();
+  auto on_resize(const Core::Extent&, bool force) -> void;
+  auto on_resize(const Core::Extent& ext) -> void override
+  {
+    on_resize(ext, true);
+  }
+  auto add_resize_callback(const std::function<void(Framebuffer*)>&) -> void;
 
-  auto get_colour_attachment(Core::u32 index) const -> const Core::Ref<Image>&
+  auto get_name() const -> const std::string& { return config.debug_name; }
+  auto get_renderpass() -> VkRenderPass override { return renderpass; }
+  auto get_renderpass() const -> VkRenderPass override { return renderpass; }
+  auto get_framebuffer() -> VkFramebuffer override { return framebuffer; }
+  auto get_framebuffer() const -> VkFramebuffer override { return framebuffer; }
+  auto get_extent() -> VkExtent2D override
   {
-    return colour_attachments.at(index);
+    return {
+      size.width,
+      size.height,
+    };
   }
-  auto get_resolved_colour_attachment(Core::u32 index) const
-    -> const Core::Ref<Image>&
+  auto get_extent() const -> VkExtent2D override
   {
-    return resolved_attachments.at(index);
+    return {
+      size.width,
+      size.height,
+    };
   }
-  auto get_colour_attachment_count() const -> Core::u32
+  auto scaled_width() const
   {
-    return static_cast<Core::u32>(colour_attachments.size());
+    return static_cast<Core::u32>(size.width * config.scale);
   }
-  auto has_depth_attachment() const -> bool override
+  auto scaled_height() const
   {
-    return depth_attachment != nullptr;
+    return static_cast<Core::u32>(size.height * config.scale);
   }
-  auto get_depth_attachment() const -> const Core::Ref<Image>& override
+
+  auto get_colour_attachment(Core::u32 index = 0) const
+    -> const Core::Ref<Image>& override
   {
-    if (resolved_depth_attachment) {
-      return resolved_depth_attachment;
-    }
-    return depth_attachment;
+    return attachment_images.at(index);
   }
-  auto get_renderpass() -> VkRenderPass { return renderpass; }
-  auto get_renderpass() const -> VkRenderPass { return renderpass; }
-  auto get_framebuffer() -> VkFramebuffer { return framebuffer; }
-  auto get_framebuffer() const -> VkFramebuffer { return framebuffer; }
-  auto get_extent() -> VkExtent2D { return { size.width, size.height }; }
-  auto get_extent() const -> VkExtent2D { return { size.width, size.height }; }
-  auto get_clear_values() const -> const std::vector<VkClearValue>&
+  auto get_colour_attachment_count() const -> Core::u32 override
+  {
+    return attachment_images.size();
+  }
+  auto get_depth_attachment() const -> const Core::Ref<Image>& override;
+  auto invalidate() -> void override;
+  auto release() -> void override;
+
+  auto get_clear_values() const -> const std::vector<VkClearValue>& override
   {
     return clear_values;
   }
-  auto is_msaa() const -> bool { return sample_count != VK_SAMPLE_COUNT_1_BIT; }
+  auto has_depth_attachment() const -> bool override
+  {
+    return depth_attachment_image != nullptr;
+  }
   auto construct_blend_states() const
     -> std::vector<VkPipelineColorBlendAttachmentState>;
 
-  auto on_resize(const Core::Extent&) -> void;
-  auto get_name() const -> const std::string& { return name; }
-
-  auto add_resolve_for_colour(Core::u32) -> void;
-  auto add_resolve_for_depth() -> void;
-  auto create_framebuffer_fully() -> void;
-
-  auto invalidate() -> void override {}
-  auto release() -> void override {}
+  auto get_specification() const -> const FramebufferSpecification&;
 
 private:
+  FramebufferSpecification config;
   Core::Extent size;
-  const std::vector<VkFormat> colour_attachment_formats;
-  VkFormat depth_attachment_format;
-  const VkSampleCountFlagBits sample_count{ VK_SAMPLE_COUNT_1_BIT };
-  const bool resizable;
-  std::unordered_map<Core::u32, Core::Ref<Image>> dependent_images{};
-  const bool clear_colour_on_load{ true };
-  const Core::u32 depth_clear_value{ 0 };
-  const std::string name;
 
-  Core::i32 depth_attachment_index{ -1 };
+  std::vector<Core::Ref<Image>> attachment_images;
+  Core::Ref<Image> depth_attachment_image;
 
-  auto search_dependents_for_depth_format() -> const Image*;
+  auto create_depth_attachment_image(VkFormat) -> Core::Ref<Image>;
 
   std::vector<VkClearValue> clear_values;
-  std::vector<Core::Ref<Image>> colour_attachments;
-  Core::Ref<Image> depth_attachment;
 
-  std::vector<Core::Ref<Image>> resolved_attachments;
-  std::vector<std::pair<VkAttachmentDescription2, VkAttachmentReference2>>
-    resolved_render_pass_attachments;
-
-  Core::Ref<Image> resolved_depth_attachment;
-  std::optional<VkAttachmentDescription2> resolved_depth_attachment_desc{
-    std::nullopt
-  };
-
-  VkFramebuffer framebuffer{ nullptr };
   VkRenderPass renderpass{ nullptr };
+  VkFramebuffer framebuffer{ nullptr };
 
-  auto destroy() -> void;
-  auto create_colour_attachments() -> void;
-  auto create_depth_attachment() -> void;
-  auto create_renderpass() -> void;
-  void attach_depth_attachments(
-    std::vector<VkAttachmentDescription2>& attachments,
-    VkAttachmentReference2& depth_attachment_ref);
-  void attach_colour_attachments(
-    std::vector<VkAttachmentDescription2>& attachments,
-    std::vector<VkAttachmentReference2>& color_attachment_refs);
-  auto create_framebuffer() -> void;
+  std::vector<std::function<void(Framebuffer*)>> resize_callbacks;
 };
 
-} // namespace Engine::Graphics
+} // namespace Engine::Core

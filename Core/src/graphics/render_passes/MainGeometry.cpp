@@ -7,9 +7,9 @@
 
 #include "core/Application.hpp"
 #include "graphics/DescriptorResource.hpp"
+#include "graphics/Framebuffer.hpp"
 #include "graphics/GPUBuffer.hpp"
 #include "graphics/Image.hpp"
-#include "graphics/NewFramebuffer.hpp"
 #include "graphics/Swapchain.hpp"
 #include "graphics/Window.hpp"
 
@@ -102,7 +102,7 @@ MainGeometryRenderPass::on_resize(const Core::Extent& ext) -> void
           main_geometry_pipeline,
           main_geometry_material] = get_data();
   main_geometry_framebuffer =
-    Core::make_scope<V2::Framebuffer>(V2::FramebufferSpecification{
+    Core::make_scope<Framebuffer>(FramebufferSpecification{
       .width = ext.width,
       .height= ext.height,
       .clear_depth_on_load = false,
