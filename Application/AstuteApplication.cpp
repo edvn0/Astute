@@ -100,32 +100,39 @@ AstuteApplication::interface() -> void
 
   UI::scope("Shadow projection", [s = scene]() {
     auto& light_environment = s->get_light_environment();
-#ifndef ORTHO
-    static f32 left{ -10 };
-    static f32 right{ 10 };
-    static f32 bottom{ -10 };
-    static f32 top{ 10 };
-    static f32 near{ 3 };
-    static f32 far{ 90 };
-    ImGui::InputFloat("Left", &left);
-    ImGui::InputFloat("Right", &right);
-    ImGui::InputFloat("Bottom", &bottom);
-    ImGui::InputFloat("Top", &top);
-    ImGui::InputFloat("Near", &near);
-    ImGui::InputFloat("Far", &far);
-    auto projection = glm::ortho(left, right, bottom, top, near, far);
-#else
-    static f32 fov{ 45 };
-    static f32 aspect{ 1 };
-    static f32 near{ 0.1 };
-    static f32 far{ 100 };
-    ImGui::InputFloat("FOV", &fov);
-    ImGui::InputFloat("Aspect", &aspect);
-    ImGui::InputFloat("Near", &near);
-    ImGui::InputFloat("Far", &far);
-    auto projection = glm::perspective(glm::radians(fov), aspect, near, far);
-#endif
-    light_environment.shadow_projection = projection;
+    const std::string label =
+      light_environment.is_perspective ? "Perspective" : "Ortho";
+    const std::string inverse_label =
+      light_environment.is_perspective ? "Ortho" : "Perspective";
+    UI::coloured_text({ 0.1, 0.9, 0.6, 1.0 }, "Current chosen: {}", label);
+    ImGui::Checkbox(inverse_label.c_str(), &light_environment.is_perspective);
+    if (!light_environment.is_perspective) {
+      static f32 left{ -10 };
+      static f32 right{ 10 };
+      static f32 bottom{ -10 };
+      static f32 top{ 10 };
+      static f32 near{ 3 };
+      static f32 far{ 90 };
+      ImGui::InputFloat("Left", &left);
+      ImGui::InputFloat("Right", &right);
+      ImGui::InputFloat("Bottom", &bottom);
+      ImGui::InputFloat("Top", &top);
+      ImGui::InputFloat("Near", &near);
+      ImGui::InputFloat("Far", &far);
+      auto projection = glm::ortho(left, right, bottom, top, near, far);
+      light_environment.shadow_projection = projection;
+    } else {
+      static f32 fov{ 45 };
+      static f32 aspect{ 1 };
+      static f32 near{ 0.1 };
+      static f32 far{ 100 };
+      ImGui::InputFloat("FOV", &fov);
+      ImGui::InputFloat("Aspect", &aspect);
+      ImGui::InputFloat("Near", &near);
+      ImGui::InputFloat("Far", &far);
+      auto projection = glm::perspective(glm::radians(fov), aspect, near, far);
+      light_environment.shadow_projection = projection;
+    }
   });
 
   ImGui::PopStyleVar();

@@ -72,15 +72,6 @@ Scene::Scene(const std::string_view name_view)
 auto
 Scene::on_update_editor(f64 ts) -> void
 {
-  static f64 rotation = glm::radians(60.0F);
-  glm::vec3 begin{ 0 };
-  static constexpr auto radius = 10.0F;
-  begin.x = radius * glm::cos(rotation);
-  begin.y = -radius;
-  begin.z = radius * glm::sin(rotation);
-
-  light_environment.sun_position = begin;
-
   // Improved gradient for color based on rotation
   // Using different frequencies and phases for color channels
   light_environment.colour_and_intensity = {
@@ -148,6 +139,8 @@ auto
 Scene::on_render_editor(Graphics::Renderer& renderer, const Camera& camera)
   -> void
 {
+  light_environment.sun_position = { camera.get_position(), 1.0F };
+
   renderer.begin_scene(*this,
                        {
                          camera,

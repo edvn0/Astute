@@ -31,9 +31,10 @@ private:
   Core::Scope<filewatch::FileWatch<std::string>> watch;
 
   auto setup_file_watcher(const std::string& shader_path) -> void;
-  auto handle_file_change(const std::string& path,
-                          filewatch::Event change_type) -> void;
-  auto log_shader_change(const std::string& path, filewatch::Event change_type) -> void;
+  auto handle_file_change(const std::string& path, filewatch::Event change_type)
+    -> void;
+  auto log_shader_change(const std::string& path, filewatch::Event change_type)
+    -> void;
   auto reload_shader() -> void;
   auto recreate_pipeline() -> void;
 };

@@ -196,7 +196,7 @@ private:
 
   std::unordered_map<CommandKey, DrawCommand> draw_commands;
   std::unordered_map<CommandKey, DrawCommand> shadow_draw_commands;
-  std::unordered_map<CommandKey, DrawCommand> point_light_draw_commands;
+  std::unordered_map<CommandKey, DrawCommand> lights_draw_commands;
 
   std::vector<SubmeshTransformBuffer> transform_buffers;
   std::unordered_map<CommandKey, TransformMapData> mesh_transform_map;
@@ -212,6 +212,7 @@ private:
   friend class ShadowRenderPass;
   friend class PredepthRenderPass;
   friend class LightCullingRenderPass;
+  friend class LightsRenderPass;
 };
 
 }

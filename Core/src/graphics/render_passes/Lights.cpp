@@ -14,73 +14,65 @@
 
 #include "graphics/RendererExtensions.hpp"
 
-#include "graphics/render_passes/Shadow.hpp"
+#include "graphics/render_passes/Lights.hpp"
 
 namespace Engine::Graphics {
 
 auto
-ShadowRenderPass::construct() -> void
+LightsRenderPass::construct() -> void
 {
-  auto&& [shadow_framebuffer, shadow_shader, shadow_pipeline, shadow_material] =
+  auto&& [lights_framebuffer, lights_shader, lights_pipeline, lights_material] =
     get_data();
-  shadow_framebuffer = Core::make_scope<Framebuffer>(FramebufferSpecification{
-    .width = size,
-    .height = size,
-    .clear_depth_on_load = true,
-    .attachments = { { VK_FORMAT_D32_SFLOAT } },
+  lights_framebuffer = Core::make_scope<Framebuffer>(FramebufferSpecification{
+    .width = get_renderer().get_size().width,
+    .height = get_renderer().get_size().height,
+    .clear_colour_on_load = false,
+    .clear_depth_on_load = false,
+    .attachments = { { VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_D32_SFLOAT } },
     .samples = VK_SAMPLE_COUNT_1_BIT,
-    .no_resize = true,
-    .debug_name = "Shadow",
+    .existing_images = { {0, get_renderer().get_render_pass("Deferred").get_colour_attachment(0),}, { 1, get_renderer()
+                             .get_render_pass("Predepth")
+                             .get_depth_attachment(), }, },
+    .debug_name = "Lights",
   });
-  shadow_shader = Shader::compile_graphics_scoped("Assets/shaders/shadow.vert",
-                                                  "Assets/shaders/empty.frag");
-  shadow_pipeline =
+  lights_shader = Shader::compile_graphics_scoped(
+    "Assets/shaders/main_geometry.vert", "Assets/shaders/lights.frag");
+  lights_pipeline =
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
-      .framebuffer = shadow_framebuffer.get(),
-      .shader = shadow_shader.get(),
+      .framebuffer = lights_framebuffer.get(),
+      .shader = lights_shader.get(),
       .sample_count = VK_SAMPLE_COUNT_1_BIT,
       .cull_mode = VK_CULL_MODE_BACK_BIT,
       .face_mode = VK_FRONT_FACE_COUNTER_CLOCKWISE,
       .depth_comparator = VK_COMPARE_OP_GREATER_OR_EQUAL,
-      .override_vertex_attributes = { {
-        { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
-      } },
     });
 
-  shadow_material = Core::make_scope<Material>(Material::Configuration{
-    .shader = shadow_shader.get(),
+  lights_material = Core::make_scope<Material>(Material::Configuration{
+    .shader = lights_shader.get(),
   });
 }
 
 auto
-ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
+LightsRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 {
-  const auto& [shadow_framebuffer,
-               shadow_shader,
-               shadow_pipeline,
-               shadow_material] = get_data();
+  const auto& [lights_framebuffer,
+               lights_shader,
+               lights_pipeline,
+               lights_material] = get_data();
 
   auto descriptor_set =
-    generate_and_update_descriptor_write_sets(*shadow_material);
+    generate_and_update_descriptor_write_sets(*lights_material);
 
   vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
-                          shadow_pipeline->get_bind_point(),
-                          shadow_pipeline->get_layout(),
+                          lights_pipeline->get_bind_point(),
+                          lights_pipeline->get_layout(),
                           0,
                           1,
                           &descriptor_set,
                           0,
                           nullptr);
 
-  static constexpr float depthBiasConstant = 1.25f;
-  static constexpr float depthBiasSlope = 1.75f;
-
-  vkCmdSetDepthBias(command_buffer.get_command_buffer(),
-                    depthBiasConstant,
-                    0.0f,
-                    depthBiasSlope);
-
-  for (const auto& [key, command] : get_renderer().shadow_draw_commands) {
+  for (const auto& [key, command] : get_renderer().lights_draw_commands) {
     const auto& [mesh, submesh_index, instance_count] = command;
 
     const auto& mesh_asset = mesh->get_mesh_asset();
@@ -121,7 +113,7 @@ ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 }
 
 auto
-ShadowRenderPass::on_resize(const Core::Extent& ext) -> void
+LightsRenderPass::on_resize(const Core::Extent& ext) -> void
 {
   auto&& [framebuffer, shader, pipeline, material] = get_data();
   framebuffer->on_resize(ext);

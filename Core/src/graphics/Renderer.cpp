@@ -6,6 +6,8 @@
 #include "core/Logger.hpp"
 #include "core/Scene.hpp"
 
+#include "core/Clock.hpp"
+
 #include "graphics/DescriptorResource.hpp"
 #include "graphics/GPUBuffer.hpp"
 #include "graphics/Swapchain.hpp"
@@ -17,10 +19,12 @@
 
 #include "graphics/render_passes/Deferred.hpp"
 #include "graphics/render_passes/LightCulling.hpp"
+#include "graphics/render_passes/Lights.hpp"
 #include "graphics/render_passes/MainGeometry.hpp"
 #include "graphics/render_passes/Predepth.hpp"
 #include "graphics/render_passes/Shadow.hpp"
 
+#include <glm/gtc/quaternion.hpp>
 #include <ranges>
 #include <span>
 
@@ -120,10 +124,7 @@ Renderer::Renderer(Configuration config, const Window* window)
   std::unordered_map<RendererTechnique, std::vector<std::string>>
     technique_construction_order;
   technique_construction_order[RendererTechnique::Deferred] = {
-    "Shadow",
-    "Predepth",
-    "MainGeometry",
-    "Deferred",
+    "Shadow", "Predepth", "MainGeometry", "Deferred", "Lights",
   };
 
   render_passes["MainGeometry"] =
@@ -132,6 +133,7 @@ Renderer::Renderer(Configuration config, const Window* window)
     Core::make_scope<ShadowRenderPass>(*this, config.shadow_pass_size);
   render_passes["Deferred"] = Core::make_scope<DeferredRenderPass>(*this);
   render_passes["Predepth"] = Core::make_scope<PredepthRenderPass>(*this);
+  render_passes["Lights"] = Core::make_scope<LightsRenderPass>(*this);
 
   for (const auto& k :
        technique_construction_order.at(RendererTechnique::Deferred)) {
@@ -256,16 +258,17 @@ Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
   specular_colour_intensity = light_environment.specular_colour_and_intensity;
   renderer_ubo.update();
 
-  auto& [light_view, light_proj, light_view_proj, light_pos] =
+  auto& [light_view, light_proj, light_view_proj, light_pos, light_dir] =
     shadow_ubo.get_data();
   auto projection = light_environment.shadow_projection;
-  auto view_matrix = glm::lookAt(light_environment.sun_position,
+  auto view_matrix = glm::lookAt(glm::vec3{ light_environment.sun_position },
                                  glm::vec3(0.0f),
                                  glm::vec3(0.0f, 1.0f, 0.0f));
   light_view = view_matrix;
   light_proj = projection;
   light_view_proj = projection * view_matrix;
   light_pos = light_environment.sun_position;
+  light_dir = glm::vec4(light_environment.sun_direction, 1.0F);
   shadow_ubo.update();
 
   static constexpr auto update_lights = []<class Light>(Light& light_ubo,
@@ -299,7 +302,8 @@ Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
   screen_data.near_plane = camera.camera.get_near_clip();
   screen_data.far_plane = camera.camera.get_far_clip();
   screen_data.tile_count_x = light_culling_work_groups.x;
-  // screen_data.time =
+  static auto begin = Core::Clock::now();
+  screen_data.time = Core::Clock::now() - begin;
   screen_data_ubo.update();
 }
 
@@ -393,7 +397,7 @@ Renderer::submit_static_light(Core::Ref<StaticMesh>& static_mesh,
       submesh_transform[3][2],
     };
 
-    auto& command = draw_commands[key];
+    auto& command = lights_draw_commands[key];
     command.static_mesh = static_mesh;
     command.submesh_index = submesh_index;
     command.instance_count++;
@@ -441,15 +445,15 @@ Renderer::flush_draw_lists() -> void
   render_passes.at("Shadow")->execute(*command_buffer);
   // Prepdepth pass
   render_passes.at("Predepth")->execute(*command_buffer);
-
+  render_passes.at("LightCulling")->execute(*compute_command_buffer, true);
   if (technique == RendererTechnique::Deferred) {
-    render_passes.at("LightCulling")->execute(*compute_command_buffer, true);
     // Geometry pass
     render_passes.at("MainGeometry")->execute(*command_buffer);
     // Deferred
     render_passes.at("Deferred")->execute(*command_buffer);
+
+    render_passes.at("Lights")->execute(*command_buffer);
   } else if (technique == RendererTechnique::ForwardPlus) {
-    render_passes.at("LightCulling")->execute(*compute_command_buffer, true);
     render_passes.at("ForwardPlusGeometry")->execute(*command_buffer);
     render_passes.at("Composite")->execute(*command_buffer);
   }
@@ -461,7 +465,7 @@ Renderer::flush_draw_lists() -> void
 
   draw_commands.clear();
   shadow_draw_commands.clear();
-  point_light_draw_commands.clear();
+  lights_draw_commands.clear();
   mesh_transform_map.clear();
 }
 

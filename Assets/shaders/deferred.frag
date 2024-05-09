@@ -32,7 +32,7 @@ main()
 
   vec3 position = texture(position_map, input_uvs).xyz;
   vec3 normal = texture(normal_map, input_uvs).xyz;
-  vec3 L = normalize(shadow.sun_position); // Direcitonal
+  vec3 L = normalize(shadow.sun_position.xyz); // Direcitonal
   float diff = max(dot(normal, L), 0.0);
   vec3 diffuse = diff * renderer.light_colour_intensity.xyz *
                  renderer.light_colour_intensity.a;
@@ -46,7 +46,8 @@ main()
 
   vec3 mapped = tonemap_aces(specular + diffuse + alb.xyz);
   vec3 gamma_corrected = pow(mapped, vec3(1.0 / 2.2));
-  final_fragment_colour = vec4(gamma_corrected, 1.0);
+  final_fragment_colour =
+    vec4(texture(shadow_position_map, input_uvs).xyz, 1.0);
 }
 
 const mat3 aces_m1 = mat3(0.59719,

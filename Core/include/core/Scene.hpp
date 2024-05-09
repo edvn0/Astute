@@ -67,11 +67,13 @@ struct SpotLightComponent
 
 struct LightEnvironment
 {
-  glm::vec3 sun_position{ 0 };
+  glm::vec4 sun_position{ 0 };
+  glm::vec3 sun_direction{};
   glm::vec4 colour_and_intensity{ 0 };
   glm::vec4 specular_colour_and_intensity{ 0 };
 
   glm::mat4 shadow_projection{ 1 };
+  bool is_perspective{ false };
 
   std::vector<Graphics::PointLight> point_lights;
   std::vector<Graphics::SpotLight> spot_lights;

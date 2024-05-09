@@ -27,7 +27,8 @@ struct ShadowUBO
   glm::mat4 view{};
   glm::mat4 proj{};
   glm::mat4 view_proj{};
-  glm::vec3 light_pos{};
+  glm::vec4 light_pos{};
+  glm::vec4 light_dir{};
 
   static constexpr std::string_view name = "ShadowUBO";
 };

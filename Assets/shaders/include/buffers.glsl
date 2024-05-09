@@ -19,7 +19,8 @@ layout(std140, set = 0, binding = 1) uniform ShadowUBO
   mat4 view;
   mat4 projection;
   mat4 view_projection;
-  vec3 sun_position;
+  vec4 sun_position;
+  vec4 sun_direction;
 }
 shadow;
 
