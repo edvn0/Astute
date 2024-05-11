@@ -4,13 +4,14 @@
 
 #include "graphics/IFramebuffer.hpp"
 
-using BufferBinding = Engine::Core::usize;
-using BufferOffset = Engine::Core::usize;
+using BufferBinding = Engine::Core::u32;
+using BufferOffset = Engine::Core::u32;
 
 namespace Engine::Graphics::RendererExtensions {
 
 auto
-begin_renderpass(const CommandBuffer&, const IFramebuffer&) -> void;
+begin_renderpass(const CommandBuffer&, const IFramebuffer&, bool flip = false)
+  -> void;
 auto
 end_renderpass(const CommandBuffer&) -> void;
 auto

@@ -38,17 +38,17 @@ Framebuffer::Framebuffer(const FramebufferSpecification& specification)
   if (config.existing_framebuffer)
     return;
 
-  Core::u32 attachmentIndex = 0;
-  for (auto& attachmentSpec : config.attachments) {
+  Core::u32 attachment_index = 0;
+  for (auto& attachment_specification : config.attachments) {
     if (config.existing_image && config.existing_image->get_layer_count() > 1) {
-      if (Utils::is_depth_format(attachmentSpec.format))
+      if (Utils::is_depth_format(attachment_specification.format))
         depth_attachment_image = config.existing_image;
       else
         attachment_images.emplace_back(config.existing_image);
-    } else if (config.existing_images.contains(attachmentIndex)) {
-      if (!Utils::is_depth_format(attachmentSpec.format))
+    } else if (config.existing_images.contains(attachment_index)) {
+      if (!Utils::is_depth_format(attachment_specification.format))
         attachment_images.emplace_back(); // This will be set later
-    } else if (Utils::is_depth_format(attachmentSpec.format)) {
+    } else if (Utils::is_depth_format(attachment_specification.format)) {
       const VkImageUsageFlags usage =
         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
         VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
@@ -56,12 +56,12 @@ Framebuffer::Framebuffer(const FramebufferSpecification& specification)
       const auto name = std::format(
         "{0}-DepthAttachment{1}",
         config.debug_name.empty() ? "Unnamed FB" : config.debug_name,
-        attachmentIndex);
+        attachment_index);
       depth_attachment_image = Core::make_ref<Image>(ImageConfiguration{
         .width = scaled_width(),
         .height = scaled_height(),
         .sample_count = config.samples,
-        .format = attachmentSpec.format,
+        .format = attachment_specification.format,
         .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
         .usage = usage,
         .additional_name_data = name,
@@ -73,19 +73,19 @@ Framebuffer::Framebuffer(const FramebufferSpecification& specification)
       const auto name = std::format(
         "{0}-DepthAttachment{1}",
         config.debug_name.empty() ? "Unnamed FB" : config.debug_name,
-        attachmentIndex);
+        attachment_index);
       auto image = Core::make_ref<Image>(ImageConfiguration{
         .width = scaled_width(),
         .height = scaled_height(),
         .sample_count = config.samples,
-        .format = attachmentSpec.format,
+        .format = attachment_specification.format,
         .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         .usage = usage,
         .additional_name_data = name,
       });
       attachment_images.emplace_back(image);
     }
-    attachmentIndex++;
+    attachment_index++;
   }
 
   Core::ensure(specification.attachments.attachments.size(),
@@ -126,7 +126,7 @@ Framebuffer::release()
   if (!depth_attachment_image)
     return;
 
-  const auto index = config.attachments.size() - 1;
+  const auto index = static_cast<Core::u32>(config.attachments.size() - 1U);
   if (!config.existing_images.contains(index)) {
     depth_attachment_image->destroy();
   }
@@ -177,31 +177,30 @@ Framebuffer::invalidate() -> void
 
   clear_values.resize(config.attachments.size());
 
-  bool createImages = attachment_images.empty();
-
   if (config.existing_framebuffer)
     attachment_images.clear();
 
-  Core::u32 attachmentIndex = 0;
-  for (auto attachmentSpec : config.attachments) {
-    if (Utils::is_depth_format(attachmentSpec.format)) {
+  Core::u32 attachment_index = 0;
+  for (auto attachment_specification : config.attachments) {
+    if (Utils::is_depth_format(attachment_specification.format)) {
       if (config.existing_image) {
         depth_attachment_image = config.existing_image;
       } else if (config.existing_framebuffer) {
         depth_attachment_image =
           config.existing_framebuffer->get_depth_attachment();
-      } else if (config.existing_images.contains(attachmentIndex)) {
-        const auto& existingImage = config.existing_images.at(attachmentIndex);
-        depth_attachment_image = existingImage;
+      } else if (config.existing_images.contains(attachment_index)) {
+        const auto& existing_image =
+          config.existing_images.at(attachment_index);
+        depth_attachment_image = existing_image;
       } else {
         depth_attachment_image =
-          create_depth_attachment_image(attachmentSpec.format);
+          create_depth_attachment_image(attachment_specification.format);
       }
 
       VkAttachmentDescription& attachmentDescription =
         attachmentDescriptions.emplace_back();
       attachmentDescription.flags = 0;
-      attachmentDescription.format = attachmentSpec.format;
+      attachmentDescription.format = attachment_specification.format;
       attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
       attachmentDescription.loadOp = config.clear_depth_on_load
                                        ? VK_ATTACHMENT_LOAD_OP_CLEAR
@@ -219,36 +218,37 @@ Framebuffer::invalidate() -> void
       attachmentDescription.finalLayout =
         VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
       depthAttachmentReference = {
-        attachmentIndex, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        attachment_index, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
       };
 
-      clear_values[attachmentIndex].depthStencil = {
+      clear_values[attachment_index].depthStencil = {
         .depth = config.depth_clear_value,
         .stencil = 0,
       };
     } else {
       Core::Ref<Image> colour_attachment;
       if (config.existing_framebuffer) {
-        const auto& existingImage =
-          config.existing_framebuffer->get_colour_attachment(attachmentIndex);
-        colour_attachment = attachment_images.emplace_back(existingImage);
-      } else if (config.existing_images.contains(attachmentIndex)) {
-        const auto& existingImage = config.existing_images[attachmentIndex];
-        colour_attachment = existingImage;
-        attachment_images[attachmentIndex] = existingImage;
+        const auto& existing_image =
+          config.existing_framebuffer->get_colour_attachment(attachment_index);
+        colour_attachment = attachment_images.emplace_back(existing_image);
+      } else if (config.existing_images.contains(attachment_index)) {
+        const auto& existing_image = config.existing_images[attachment_index];
+        colour_attachment = existing_image;
+        attachment_images[attachment_index] = existing_image;
       } else {
-        auto& image = attachment_images[attachmentIndex];
+        auto& image = attachment_images[attachment_index];
         // ImageSpecification& spec = image->GetSpecification();
         // spec.width = (Core::u32)(m_Width * config.Scale);
         // spec.Height = (Core::u32)(m_Height * config.Scale);
         colour_attachment = image;
         if (colour_attachment->get_layer_count() == 1)
           colour_attachment->invalidate();
-        else if (attachmentIndex == 0 && config.existing_image_layers[0] == 0) {
+        else if (attachment_index == 0 &&
+                 config.existing_image_layers[0] == 0) {
           colour_attachment->invalidate();
           colour_attachment->create_specific_layer_image_views(
             std::span{ config.existing_image_layers });
-        } else if (attachmentIndex == 0) {
+        } else if (attachment_index == 0) {
           colour_attachment->create_specific_layer_image_views(
             std::span{ config.existing_image_layers });
         }
@@ -257,7 +257,7 @@ Framebuffer::invalidate() -> void
       VkAttachmentDescription& attachmentDescription =
         attachmentDescriptions.emplace_back();
       attachmentDescription.flags = 0;
-      attachmentDescription.format = attachmentSpec.format;
+      attachmentDescription.format = attachment_specification.format;
       attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
       attachmentDescription.loadOp = config.clear_colour_on_load
                                        ? VK_ATTACHMENT_LOAD_OP_CLEAR
@@ -272,14 +272,14 @@ Framebuffer::invalidate() -> void
         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
       const auto& clearColor = config.clear_colour;
-      clear_values[attachmentIndex].color = {
+      clear_values[attachment_index].color = {
         .float32 = { clearColor.r, clearColor.g, clearColor.b, clearColor.a }
       };
       colorAttachmentReferences.emplace_back(VkAttachmentReference{
-        attachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+        attachment_index, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
     }
 
-    attachmentIndex++;
+    attachment_index++;
   }
 
   VkSubpassDescription subpassDescription = {};
@@ -432,14 +432,14 @@ Framebuffer::construct_blend_states() const
     if (!config.blend)
       break;
 
-    const auto& attachmentSpec = config.attachments[i];
+    const auto& attachment_specification = config.attachments[i];
     FramebufferBlendMode blendMode =
       config.blend_mode == FramebufferBlendMode::None
-        ? attachmentSpec.blend_mode
+        ? attachment_specification.blend_mode
         : config.blend_mode;
 
     blendAttachmentStates[i].blendEnable =
-      attachmentSpec.blend ? VK_TRUE : VK_FALSE;
+      attachment_specification.blend ? VK_TRUE : VK_FALSE;
 
     blendAttachmentStates[i].colorBlendOp = VK_BLEND_OP_ADD;
     blendAttachmentStates[i].alphaBlendOp = VK_BLEND_OP_ADD;

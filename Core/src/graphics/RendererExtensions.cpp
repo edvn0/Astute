@@ -15,7 +15,8 @@ namespace Engine::Graphics::RendererExtensions {
 
 auto
 begin_renderpass(const CommandBuffer& command_buffer,
-                 const IFramebuffer& framebuffer) -> void
+                 const IFramebuffer& framebuffer,
+                 const bool flip) -> void
 {
   VkRenderPassBeginInfo render_pass_begin_info = {};
   render_pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -40,6 +41,11 @@ begin_renderpass(const CommandBuffer& command_buffer,
   viewport.height = -static_cast<float>(height);
   viewport.minDepth = 1.0F;
   viewport.maxDepth = 0.0F;
+
+  if (flip) {
+    viewport.y = 0.0F;
+    viewport.height = static_cast<float>(height);
+  }
 
   vkCmdSetViewport(command_buffer.get_command_buffer(), 0, 1, &viewport);
 
@@ -108,22 +114,28 @@ bind_vertex_buffer(const CommandBuffer& command,
                    BufferBinding binding,
                    BufferOffset offset) -> void
 {
-  std::array<VkDeviceSize, 1> offsets{ offset };
+  std::array<VkDeviceSize, 1> offsets{
+    offset,
+  };
   auto cmd_buffer = command.get_command_buffer();
 
-  std::array vk_buffers{ buffer.get_buffer() };
+  std::array vk_buffers{
+    buffer.get_buffer(),
+  };
 
-  vkCmdBindVertexBuffers(
-    cmd_buffer, binding, 1, vk_buffers.data(), offsets.data());
+  vkCmdBindVertexBuffers(cmd_buffer,
+                         binding,
+                         static_cast<Core::u32>(vk_buffers.size()),
+                         vk_buffers.data(),
+                         offsets.data());
 }
 
 auto
 bind_index_buffer(const CommandBuffer& command,
                   const IndexBuffer& buffer,
-                  BufferBinding binding,
+                  BufferBinding,
                   BufferOffset offset) -> void
 {
-  auto cmd_buffer = command.get_command_buffer();
   vkCmdBindIndexBuffer(command.get_command_buffer(),
                        buffer.get_buffer(),
                        offset,

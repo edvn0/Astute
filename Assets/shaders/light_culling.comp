@@ -40,16 +40,16 @@ ScreenSpaceToViewSpaceDepth(const float screenDepth)
   return depthLinearizeMul / (depthLinearizeAdd - screenDepth);
 }
 // Shared values between all the threads in the group
-shared uint minDepthInt;
-shared uint maxDepthInt;
-shared uint visiblePointLightCount;
-shared uint visibleSpotLightCount;
-shared vec4 frustumPlanes[6];
+shared uint shared_min_depth_int;
+shared uint shared_max_depth_int;
+shared uint shared_visible_point_light_count;
+shared uint shared_visible_spot_light_count;
+shared vec4 frustum_planes[6];
 
 // Shared local storage for visible indices, will be written out to the global
 // buffer at the end
-shared int visiblePointLightIndices[MAX_LIGHT_COUNT];
-shared int visibleSpotLightIndices[MAX_LIGHT_COUNT];
+shared int share_visible_point_lights[MAX_LIGHT_COUNT];
+shared int share_visible_spot_lights[MAX_LIGHT_COUNT];
 
 layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
 void
@@ -71,10 +71,10 @@ main()
 
   // Initialize shared global values for depth and light count
   if (gl_LocalInvocationIndex == 0) {
-    minDepthInt = 0xFFFFFFFF;
-    maxDepthInt = 0;
-    visiblePointLightCount = 0;
-    visibleSpotLightCount = 0;
+    shared_min_depth_int = 0xFFFFFFFF;
+    shared_max_depth_int = 0;
+    shared_visible_point_light_count = 0;
+    shared_visible_spot_light_count = 0;
   }
 
   barrier();
@@ -88,8 +88,8 @@ main()
   // Convert depth to uint so we can do atomic min and max comparisons between
   // the threads
   uint depthInt = floatBitsToUint(linearDepth);
-  atomicMin(minDepthInt, depthInt);
-  atomicMax(maxDepthInt, depthInt);
+  atomicMin(shared_min_depth_int, depthInt);
+  atomicMax(shared_max_depth_int, depthInt);
 
   barrier();
 
@@ -97,32 +97,32 @@ main()
   // tile
   if (gl_LocalInvocationIndex == 0) {
     // Convert the min and max across the entire tile back to float
-    float minDepth = uintBitsToFloat(minDepthInt);
-    float maxDepth = uintBitsToFloat(maxDepthInt);
+    float minDepth = uintBitsToFloat(shared_min_depth_int);
+    float maxDepth = uintBitsToFloat(shared_max_depth_int);
 
     // Steps based on tile sale
     vec2 negativeStep = (2.0 * vec2(tileID)) / vec2(tileNumber);
     vec2 positiveStep = (2.0 * vec2(tileID + ivec2(1, 1))) / vec2(tileNumber);
 
     // Set up starting values for planes using steps and min and max z values
-    frustumPlanes[0] = vec4(1.0, 0.0, 0.0, 1.0 - negativeStep.x);   // Left
-    frustumPlanes[1] = vec4(-1.0, 0.0, 0.0, -1.0 + positiveStep.x); // Right
-    frustumPlanes[2] = vec4(0.0, 1.0, 0.0, 1.0 - negativeStep.y);   // Bottom
-    frustumPlanes[3] = vec4(0.0, -1.0, 0.0, -1.0 + positiveStep.y); // Top
-    frustumPlanes[4] = vec4(0.0, 0.0, -1.0, -minDepth);             // Near
-    frustumPlanes[5] = vec4(0.0, 0.0, 1.0, maxDepth);               // Far
+    frustum_planes[0] = vec4(1.0, 0.0, 0.0, 1.0 - negativeStep.x);   // Left
+    frustum_planes[1] = vec4(-1.0, 0.0, 0.0, -1.0 + positiveStep.x); // Right
+    frustum_planes[2] = vec4(0.0, 1.0, 0.0, 1.0 - negativeStep.y);   // Bottom
+    frustum_planes[3] = vec4(0.0, -1.0, 0.0, -1.0 + positiveStep.y); // Top
+    frustum_planes[4] = vec4(0.0, 0.0, -1.0, -minDepth);             // Near
+    frustum_planes[5] = vec4(0.0, 0.0, 1.0, maxDepth);               // Far
 
     // Transform the first four planes
     for (uint i = 0; i < 4; i++) {
-      frustumPlanes[i] *= renderer.view_projection;
-      frustumPlanes[i] /= length(frustumPlanes[i].xyz);
+      frustum_planes[i] *= renderer.view_projection;
+      frustum_planes[i] /= length(frustum_planes[i].xyz);
     }
 
     // Transform the depth planes
-    frustumPlanes[4] *= renderer.view;
-    frustumPlanes[4] /= length(frustumPlanes[4].xyz);
-    frustumPlanes[5] *= renderer.view;
-    frustumPlanes[5] /= length(frustumPlanes[5].xyz);
+    frustum_planes[4] *= renderer.view;
+    frustum_planes[4] /= length(frustum_planes[4].xyz);
+    frustum_planes[5] *= renderer.view;
+    frustum_planes[5] /= length(frustum_planes[5].xyz);
   }
 
   barrier();
@@ -147,7 +147,7 @@ main()
     // Check if light radius is in frustum
     float dist = 0.0;
     for (uint j = 0; j < 6; j++) {
-      dist = dot(position, frustumPlanes[j]) + radius;
+      dist = dot(position, frustum_planes[j]) + radius;
       if (dist <= 0.0) // No intersection
         break;
     }
@@ -155,8 +155,8 @@ main()
     // If greater than zero, then it is a visible light
     if (dist > 0.0) {
       // Add index to the shared array of visible indices
-      uint offset = atomicAdd(visiblePointLightCount, 1);
-      visiblePointLightIndices[offset] = int(lightIndex);
+      uint offset = atomicAdd(shared_visible_point_light_count, 1);
+      share_visible_point_lights[offset] = int(lightIndex);
     }
   }
 
@@ -174,7 +174,7 @@ main()
     float dist = 0.0;
     for (uint j = 0; j < 6; j++) {
       dist = dot(vec4(light.pos - light.direction * (light.range * 0.7), 1.0),
-                 frustumPlanes[j]) +
+                 frustum_planes[j]) +
              radius * 1.3;
       if (dist < 0.0) // No intersection
         break;
@@ -183,8 +183,8 @@ main()
     // If greater than zero, then it is a visible light
     if (dist > 0.0) {
       // Add index to the shared array of visible indices
-      uint offset = atomicAdd(visibleSpotLightCount, 1);
-      visibleSpotLightIndices[offset] = int(lightIndex);
+      uint offset = atomicAdd(shared_visible_spot_light_count, 1);
+      share_visible_spot_lights[offset] = int(lightIndex);
     }
   }
 
@@ -192,20 +192,22 @@ main()
 
   if (gl_LocalInvocationIndex == 0) {
     const uint offset = index * MAX_LIGHT_COUNT;
-    for (uint i = 0; i < visiblePointLightCount; i++) {
-      visible_point_lights.indices[offset + i] = visiblePointLightIndices[i];
+    for (uint i = 0; i < shared_visible_point_light_count; i++) {
+      visible_point_lights.indices[offset + i] = share_visible_point_lights[i];
     }
 
-    for (uint i = 0; i < visibleSpotLightCount; i++) {
-      visible_spot_lights.indices[offset + i] = visibleSpotLightIndices[i];
+    for (uint i = 0; i < shared_visible_spot_light_count; i++) {
+      visible_spot_lights.indices[offset + i] = share_visible_spot_lights[i];
     }
 
-    if (visiblePointLightCount != MAX_LIGHT_COUNT) {
-      visible_point_lights.indices[offset + visiblePointLightCount] = -1;
+    if (shared_visible_point_light_count != MAX_LIGHT_COUNT) {
+      visible_point_lights.indices[offset + shared_visible_point_light_count] =
+        -1;
     }
 
-    if (visibleSpotLightCount != MAX_LIGHT_COUNT) {
-      visible_spot_lights.indices[offset + visibleSpotLightCount] = -1;
+    if (shared_visible_spot_light_count != MAX_LIGHT_COUNT) {
+      visible_spot_lights.indices[offset + shared_visible_spot_light_count] =
+        -1;
     }
   }
 }

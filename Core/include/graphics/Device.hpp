@@ -90,6 +90,7 @@ private:
   VkDevice vk_device;
   VkPhysicalDevice vk_physical_device;
   VkCommandPool graphics_command_pool;
+  VkCommandPool transfer_command_pool;
   VkCommandPool compute_command_pool;
 
   std::unordered_set<std::string> extension_support;

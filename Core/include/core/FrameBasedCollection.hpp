@@ -33,7 +33,7 @@ public:
   template<class... Args>
   auto emplace(Args&&... args) -> decltype(auto)
   {
-    return collection.emplace<Type>(std::forward<Args>(args)...);
+    return collection.template emplace<Type>(std::forward<Args>(args)...);
   }
 
   auto clear()

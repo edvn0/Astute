@@ -9,6 +9,7 @@ layout(set = 1, binding = 10) uniform sampler2D position_map;
 layout(set = 1, binding = 11) uniform sampler2D normal_map;
 layout(set = 1, binding = 12) uniform sampler2D albedo_specular_map;
 layout(set = 1, binding = 13) uniform sampler2D shadow_position_map;
+layout(set = 1, binding = 14) uniform sampler2D noise_map;
 
 layout(constant_id = 0) const int NUM_SAMPLES = 4;
 
@@ -27,7 +28,8 @@ main()
   uint count_spot_lights = spot_lights.count;
 
   // Resolve G-buffer
-  vec4 alb = texture(albedo_specular_map, input_uvs);
+  vec4 alb =
+    texture(albedo_specular_map, input_uvs) * texture(noise_map, input_uvs).r;
   vec3 frag_colour = vec3(0.0);
 
   vec3 position = texture(position_map, input_uvs).xyz;
@@ -44,10 +46,9 @@ main()
   vec3 specular = spec * renderer.specular_colour_intensity.xyz *
                   renderer.specular_colour_intensity.a * alb.a;
 
-  vec3 mapped = tonemap_aces(specular + diffuse + alb.xyz);
+  vec3 mapped = tonemap_aces(alb.xyz);
   vec3 gamma_corrected = pow(mapped, vec3(1.0 / 2.2));
-  final_fragment_colour =
-    vec4(texture(shadow_position_map, input_uvs).xyz, 1.0);
+  final_fragment_colour = vec4(gamma_corrected, 1.0);
 }
 
 const mat3 aces_m1 = mat3(0.59719,

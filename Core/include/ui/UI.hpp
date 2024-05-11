@@ -104,7 +104,7 @@ image(const Graphics::Image& image, InterfaceImageProperties<T> properties = {})
       image, properties.extent, properties.colour, properties.flipped);
   } else {
 
-    auto ext = properties.extent.as<Core::f32>();
+    auto ext = properties.extent.template as<Core::f32>();
     return Impl::image(image, ext, properties.colour, properties.flipped);
   }
 }

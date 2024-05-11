@@ -31,18 +31,18 @@ LightsRenderPass::construct() -> void
     .attachments = { { VK_FORMAT_R32G32B32A32_SFLOAT, VK_FORMAT_D32_SFLOAT } },
     .samples = VK_SAMPLE_COUNT_1_BIT,
     .existing_images = { {0, get_renderer().get_render_pass("Deferred").get_colour_attachment(0),}, { 1, get_renderer()
-                             .get_render_pass("Predepth")
+                             .get_render_pass("MainGeometry")
                              .get_depth_attachment(), }, },
     .debug_name = "Lights",
   });
-  lights_shader = Shader::compile_graphics_scoped(
-    "Assets/shaders/main_geometry.vert", "Assets/shaders/lights.frag");
+  lights_shader = Shader::compile_graphics_scoped("Assets/shaders/lights.vert",
+                                                  "Assets/shaders/lights.frag");
   lights_pipeline =
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
       .framebuffer = lights_framebuffer.get(),
       .shader = lights_shader.get(),
       .sample_count = VK_SAMPLE_COUNT_1_BIT,
-      .cull_mode = VK_CULL_MODE_BACK_BIT,
+      .cull_mode = VK_CULL_MODE_FRONT_BIT,
       .face_mode = VK_FRONT_FACE_COUNTER_CLOCKWISE,
       .depth_comparator = VK_COMPARE_OP_GREATER_OR_EQUAL,
     });
@@ -122,6 +122,23 @@ LightsRenderPass::on_resize(const Core::Extent& ext) -> void
   auto&& [framebuffer, shader, pipeline, material] = get_data();
   framebuffer->on_resize(ext);
   pipeline->on_resize(ext);
+}
+
+auto
+LightsRenderPass::bind(CommandBuffer& command_buffer) -> void
+{
+  auto&& [_, __, pipeline, ___] = get_data();
+  RendererExtensions::begin_renderpass(
+    command_buffer, *get_framebuffer(), true);
+  vkCmdBindPipeline(command_buffer.get_command_buffer(),
+                    pipeline->get_bind_point(),
+                    pipeline->get_pipeline());
+}
+
+auto
+LightsRenderPass::unbind(CommandBuffer& command_buffer) -> void
+{
+  RendererExtensions::end_renderpass(command_buffer);
 }
 
 } // namespace Engine::Graphics

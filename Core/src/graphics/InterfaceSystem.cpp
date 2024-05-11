@@ -52,7 +52,7 @@ InterfaceSystem::InterfaceSystem(const Window& win)
   vkCreateDescriptorPool(device.device(), &pool_info, nullptr, &pool);
 
   image_pool = Core::make_scope<Core::FrameBasedCollection<VkDescriptorPool>>();
-  image_pool->for_each([&](const auto& k, auto& v) {
+  image_pool->for_each([&](const auto&, auto& v) {
     vkCreateDescriptorPool(device.device(), &pool_info, nullptr, &v);
   });
 

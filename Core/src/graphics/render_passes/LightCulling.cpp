@@ -68,7 +68,7 @@ LightCullingRenderPass::destruct_impl() -> void
 }
 
 auto
-LightCullingRenderPass::on_resize(const Core::Extent& ext) -> void
+LightCullingRenderPass::on_resize(const Core::Extent&) -> void
 {
   auto&& [_,
           light_culling_shader,

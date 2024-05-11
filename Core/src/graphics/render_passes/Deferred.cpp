@@ -15,6 +15,7 @@
 #include "graphics/Renderer.hpp"
 #include "graphics/Shader.hpp"
 #include "graphics/Swapchain.hpp"
+#include "graphics/TextureGenerator.hpp"
 #include "graphics/Window.hpp"
 
 #include "graphics/RendererExtensions.hpp"
@@ -51,50 +52,29 @@ private:
 
 namespace Engine::Graphics {
 
+struct Impl
+{
+  Core::Scope<filewatch::FileWatch<std::string>> watch;
+};
+
 auto
 DeferredRenderPass::construct() -> void
 {
+  noise_map = Renderer::get_white_texture();
   on_resize(get_renderer().get_size());
 
-  watch = Core::make_scope<filewatch::FileWatch<std::string>>(
-    "Assets/shaders/deferred.frag",
-    [this](const auto& path, const filewatch::Event change_type) {
-      Core::Application::submit_post_frame_function([this,
-                                                     path,
-                                                     change_type]() {
-        info("Path {} had an event of type: '{}'", path, change_type);
-        auto&& [deferred_framebuffer,
-                deferred_shader,
-                deferred_pipeline,
-                deferred_material] = get_data();
+  setup_file_watcher("Assets/shaders/deferred.frag");
+}
 
-        auto maybe_deferred_shader = Shader::compile_graphics_scoped(
-          "Assets/shaders/deferred.vert", "Assets/shaders/deferred.frag", true);
-        if (!maybe_deferred_shader)
-          return;
+DeferredRenderPass::DeferredRenderPass(Renderer& ren)
+  : RenderPass(ren)
+{
+  watch = Core::make_scope<Impl>();
+}
 
-        std::unique_lock lock{ RenderPass::get_mutex() };
-
-        deferred_pipeline =
-    Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
-      .framebuffer = deferred_framebuffer.get(),
-      .shader = deferred_shader.get(),
-      .sample_count = VK_SAMPLE_COUNT_1_BIT,
-      .cull_mode = VK_CULL_MODE_BACK_BIT,
-      .depth_comparator = VK_COMPARE_OP_LESS,
-      .override_vertex_attributes = {
-          {  },
-        },
-      .override_instance_attributes = {
-          {  },
-        },
-    });
-
-        deferred_material = Core::make_scope<Material>(Material::Configuration{
-          .shader = deferred_shader.get(),
-        });
-      });
-    });
+DeferredRenderPass::~DeferredRenderPass()
+{
+  watch.reset();
 }
 
 auto
@@ -117,6 +97,7 @@ DeferredRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
   deferred_material->set(
     "shadow_map",
     get_renderer().get_render_pass("Shadow").get_depth_attachment());
+  deferred_material->set("noise_map", noise_map);
 
   auto renderer_desc_set =
     get_renderer().generate_and_update_descriptor_write_sets(
@@ -184,7 +165,7 @@ DeferredRenderPass::on_resize(const Core::Extent& ext) -> void
 void
 DeferredRenderPass::setup_file_watcher(const std::string& shader_path)
 {
-  watch = Core::make_scope<filewatch::FileWatch<std::string>>(
+  watch->watch = Core::make_scope<filewatch::FileWatch<std::string>>(
     shader_path, [this](const auto& path, filewatch::Event change_type) {
       handle_file_change(path, change_type);
     });

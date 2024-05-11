@@ -101,7 +101,10 @@ public:
   }
   auto add_resize_callback(const std::function<void(Framebuffer*)>&) -> void;
 
-  auto get_name() const -> const std::string& { return config.debug_name; }
+  auto get_name() const -> const std::string& override
+  {
+    return config.debug_name;
+  }
   auto get_renderpass() -> VkRenderPass override { return renderpass; }
   auto get_renderpass() const -> VkRenderPass override { return renderpass; }
   auto get_framebuffer() -> VkFramebuffer override { return framebuffer; }
@@ -136,7 +139,7 @@ public:
   }
   auto get_colour_attachment_count() const -> Core::u32 override
   {
-    return attachment_images.size();
+    return static_cast<Core::u32>(attachment_images.size());
   }
   auto get_depth_attachment() const -> const Core::Ref<Image>& override;
   auto invalidate() -> void override;
@@ -151,7 +154,7 @@ public:
     return depth_attachment_image != nullptr;
   }
   auto construct_blend_states() const
-    -> std::vector<VkPipelineColorBlendAttachmentState>;
+    -> std::vector<VkPipelineColorBlendAttachmentState> override;
 
   auto get_specification() const -> const FramebufferSpecification&;
 

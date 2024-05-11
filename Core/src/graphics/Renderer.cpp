@@ -16,6 +16,7 @@
 #include "graphics/Framebuffer.hpp"
 
 #include "graphics/RendererExtensions.hpp"
+#include "graphics/TextureGenerator.hpp"
 
 #include "graphics/render_passes/Deferred.hpp"
 #include "graphics/render_passes/LightCulling.hpp"
@@ -176,9 +177,9 @@ Renderer::Renderer(Configuration config, const Window* window)
   const glm::uvec2 viewport_size{ size.width, size.height };
 
   constexpr uint32_t TILE_SIZE = 16u;
-  glm::uvec2 size = viewport_size;
-  size += TILE_SIZE - viewport_size % TILE_SIZE;
-  light_culling_work_groups = { size / TILE_SIZE, 1 };
+  glm::uvec2 vp_size = viewport_size;
+  vp_size += TILE_SIZE - viewport_size % TILE_SIZE;
+  light_culling_work_groups = { vp_size / TILE_SIZE, 1 };
 
   visible_point_lights_ssbo.resize(light_culling_work_groups.x *
                                    light_culling_work_groups.y * 4 * 1024);
@@ -202,8 +203,8 @@ Renderer::destruct() -> void
 }
 
 auto
-Renderer::begin_scene(Core::Scene& scene,
-                      const SceneRendererCamera& camera) -> void
+Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
+  -> void
 {
   if (old_size != size) {
     Device::the().wait();
@@ -222,9 +223,9 @@ Renderer::begin_scene(Core::Scene& scene,
     const glm::uvec2 viewport_size{ size.width, size.height };
 
     constexpr uint32_t TILE_SIZE = 16u;
-    glm::uvec2 size = viewport_size;
-    size += TILE_SIZE - viewport_size % TILE_SIZE;
-    light_culling_work_groups = { size / TILE_SIZE, 1 };
+    glm::uvec2 vp_size = viewport_size;
+    vp_size += TILE_SIZE - viewport_size % TILE_SIZE;
+    light_culling_work_groups = { vp_size / TILE_SIZE, 1 };
 
     visible_point_lights_ssbo.resize(light_culling_work_groups.x *
                                      light_culling_work_groups.y * 4 * 1024);
@@ -292,7 +293,7 @@ Renderer::begin_scene(Core::Scene& scene,
   screen_data.far_plane = camera.camera.get_far_clip();
   screen_data.tile_count_x = light_culling_work_groups.x;
   static auto begin = Core::Clock::now();
-  screen_data.time = Core::Clock::now() - begin;
+  screen_data.time = static_cast<Core::f32>(Core::Clock::now() - begin);
   screen_data_ubo.update();
 }
 
@@ -443,6 +444,7 @@ Renderer::flush_draw_lists() -> void
 
     render_passes.at("Lights")->execute(*command_buffer);
   } else if (technique == RendererTechnique::ForwardPlus) {
+    // TODO: Not yet implemented.
     render_passes.at("ForwardPlusGeometry")->execute(*command_buffer);
     render_passes.at("Composite")->execute(*command_buffer);
   }

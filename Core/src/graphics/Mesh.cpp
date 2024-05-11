@@ -126,8 +126,17 @@ MeshAsset::MeshAsset(const std::string& file_name)
 
     // Vertices
     auto& aabb = submesh.bounding_box;
-    aabb.min = { FLT_MAX, FLT_MAX, FLT_MAX };
-    aabb.max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+    static constexpr auto flt_max = std::numeric_limits<float>::max();
+    aabb.min = {
+      flt_max,
+      flt_max,
+      flt_max,
+    };
+    aabb.max = {
+      -flt_max,
+      -flt_max,
+      -flt_max,
+    };
 
     const auto count = mesh->mNumVertices;
 
@@ -142,7 +151,7 @@ MeshAsset::MeshAsset(const std::string& file_name)
     const auto has_tangents = mesh->HasTangentsAndBitangents();
     const auto has_uvs = mesh->HasTextureCoords(0);
 
-    for (auto i = 0; i < mesh->mNumVertices; i++) {
+    for (auto i = 0U; i < count; i++) {
       Vertex vertex{};
       vertex.position = {
         vertices_span[i].x,
@@ -181,7 +190,7 @@ MeshAsset::MeshAsset(const std::string& file_name)
     }
 
     // Indices
-    for (auto i = 0; i < mesh->mNumFaces; i++) {
+    for (auto i = 0U; i < mesh->mNumFaces; i++) {
       Index index = {
         .V1 = index_span[i].mIndices[0],
         .V2 = index_span[i].mIndices[1],
@@ -246,7 +255,7 @@ MeshAsset::MeshAsset(const std::string& file_name)
         buffer.write(aiTexEmbedded->pcData,
                      aiTexEmbedded->mWidth * aiTexEmbedded->mHeight * 4);
         texture = Image::load_from_memory(
-          aiTexEmbedded->mWidth, aiTexEmbedded->mHeight, std::move(buffer));
+          aiTexEmbedded->mWidth, aiTexEmbedded->mHeight, std::move(buffer), {});
       } else {
         std::filesystem::path path = file_name;
         auto parentPath = path.parent_path();
@@ -283,7 +292,7 @@ MeshAsset::MeshAsset(const std::string& file_name)
           aiTexEmbedded->mWidth * aiTexEmbedded->mHeight * 4,
         });
         texture = Image::load_from_memory(
-          aiTexEmbedded->mWidth, aiTexEmbedded->mHeight, std::move(buffer));
+          aiTexEmbedded->mWidth, aiTexEmbedded->mHeight, std::move(buffer), {});
       } else {
         std::filesystem::path path = file_name;
         auto parentPath = path.parent_path();
@@ -319,7 +328,7 @@ MeshAsset::MeshAsset(const std::string& file_name)
           aiTexEmbedded->mWidth * aiTexEmbedded->mHeight * 4,
         });
         texture = Image::load_from_memory(
-          aiTexEmbedded->mWidth, aiTexEmbedded->mHeight, std::move(buffer));
+          aiTexEmbedded->mWidth, aiTexEmbedded->mHeight, std::move(buffer), {});
       } else {
         std::filesystem::path path = file_name;
         auto parentPath = path.parent_path();
@@ -365,7 +374,7 @@ MeshAsset::MeshAsset(const std::string& file_name)
         buffer.write(aiTexEmbedded->pcData,
                      aiTexEmbedded->mWidth * aiTexEmbedded->mHeight * 4);
         texture = Image::load_from_memory(
-          aiTexEmbedded->mWidth, aiTexEmbedded->mHeight, std::move(buffer));
+          aiTexEmbedded->mWidth, aiTexEmbedded->mHeight, std::move(buffer), {});
       } else {
         std::filesystem::path path = file_name;
         auto parentPath = path.parent_path();
@@ -394,6 +403,8 @@ MeshAsset::MeshAsset(const std::string& file_name)
   index_buffer = Core::make_scope<IndexBuffer>(indices.data(),
                                                indices.size() * sizeof(Index));
 }
+
+MeshAsset::~MeshAsset() = default;
 
 auto
 MeshAsset::traverse_nodes(aiNode* node,

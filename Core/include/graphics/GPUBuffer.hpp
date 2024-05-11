@@ -6,7 +6,6 @@
 #include <span>
 #include <type_traits>
 #include <vector>
-#include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
 namespace Engine::Graphics {
@@ -18,11 +17,13 @@ enum class GPUBufferType : Core::u8
   Index,
   Uniform,
   Storage,
+  Staging,
 };
 
 template<class T, GPUBufferType BufferType>
 class UniformBufferObject;
 
+struct GPUBufferImpl;
 class GPUBuffer
 {
 public:
@@ -50,14 +51,14 @@ public:
   }
 
   auto get_buffer() const -> VkBuffer { return buffer; }
+  auto copy_to(GPUBuffer&) -> void;
 
 private:
   Core::usize size;
 
   GPUBufferType buffer_type{ GPUBufferType::Invalid };
   VkBuffer buffer;
-  VmaAllocation allocation;
-  VmaAllocationInfo allocation_info;
+  Core::Scope<GPUBufferImpl> alloc_impl;
 
   auto write(const void*, Core::usize) -> void;
   auto construct_buffer() -> void;
@@ -67,6 +68,26 @@ private:
   friend class UniformBufferObject;
   friend class VertexBuffer;
   friend class IndexBuffer;
+  friend class StagingBuffer;
+};
+
+class StagingBuffer
+{
+public:
+  template<class T>
+  StagingBuffer(const std::span<T> data)
+    : buffer(GPUBufferType::Staging, data.size_bytes())
+  {
+    buffer.write(data);
+  }
+
+  auto size() const -> Core::usize { return buffer.get_size(); }
+  auto get_buffer() const -> VkBuffer { return buffer.get_buffer(); }
+
+private:
+  GPUBuffer buffer;
+
+  friend class VertexBuffer;
 };
 
 class VertexBuffer
@@ -76,28 +97,32 @@ public:
   explicit VertexBuffer(std::span<VertexType, Extent> vertices)
     : buffer(GPUBufferType::Vertex, vertices.size_bytes())
   {
-    buffer.write(vertices);
+    auto temp = StagingBuffer{ vertices };
+    temp.buffer.copy_to(buffer);
   }
 
   template<class VertexType, Core::usize Extent = std::dynamic_extent>
   explicit VertexBuffer(std::span<const VertexType, Extent> vertices)
     : buffer(GPUBufferType::Vertex, vertices.size_bytes())
   {
-    buffer.write(vertices);
+    auto temp = StagingBuffer{ vertices };
+    temp.buffer.copy_to(buffer);
   }
 
   template<class VertexType>
   explicit VertexBuffer(std::span<VertexType> vertices)
     : buffer(GPUBufferType::Vertex, vertices.size_bytes())
   {
-    buffer.write(vertices);
+    auto temp = StagingBuffer{ vertices };
+    temp.buffer.copy_to(buffer);
   }
 
   template<class VertexType>
   explicit VertexBuffer(std::span<const VertexType> vertices)
     : buffer(GPUBufferType::Vertex, vertices.size_bytes())
   {
-    buffer.write(vertices);
+    auto temp = StagingBuffer{ vertices };
+    temp.buffer.copy_to(buffer);
   }
 
   explicit VertexBuffer(Core::usize new_size)

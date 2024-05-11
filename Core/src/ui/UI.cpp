@@ -65,7 +65,7 @@ convert_to_imvec(const Core::FloatExtent& extent)
   return ImVec2{ extent.width, extent.height };
 }
 
-auto
+inline auto
 to_vector(const ImVec4& vec)
 {
   return Core::Vec4{ vec.x, vec.y, vec.z, vec.w };
@@ -169,8 +169,11 @@ image(const Graphics::Image& image,
   ImGui::PushID(made.c_str());
   static constexpr auto uv0 = ImVec2(0, 0);
   static constexpr auto uv1 = ImVec2(1, 1);
-  ImGui::Image(
-    set, convert_to_imvec(extent), flipped ? uv1 : uv0, flipped ? uv0 : uv1);
+  ImGui::Image(set,
+               convert_to_imvec(extent),
+               flipped ? uv1 : uv0,
+               flipped ? uv0 : uv1,
+               convert_to_imvec(colour));
   ImGui::PopID();
 }
 

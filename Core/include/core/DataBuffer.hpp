@@ -46,6 +46,10 @@ public:
   }
 
   [[nodiscard]] auto raw() const -> const void* { return data.get(); }
+  [[nodiscard]] auto span() const
+  {
+    return std::span{ data.get(), buffer_size };
+  }
 
   [[nodiscard]] auto operator=(DataBuffer&& other) noexcept -> DataBuffer&
   {

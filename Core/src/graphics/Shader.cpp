@@ -202,9 +202,8 @@ Shader::get_descriptor_set(std::string_view descriptor_name,
 
   const auto& shader_descriptor_set =
     reflection_data.shader_descriptor_sets[set];
-  auto as_string = std::string{ descriptor_name };
+  const auto as_string = std::string{ descriptor_name };
   if (shader_descriptor_set.write_descriptor_sets.contains(as_string)) {
-    const auto as_string = std::string{ descriptor_name };
     return &shader_descriptor_set.write_descriptor_sets.at(as_string);
   }
 

@@ -1,4 +1,4 @@
-#include "pch/CorePCH.hpp"
+#include "pch/ApplicationPCH.hpp"
 
 #include "SceneWidget.hpp"
 

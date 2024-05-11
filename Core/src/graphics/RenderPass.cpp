@@ -69,9 +69,8 @@ RenderPass::generate_and_update_descriptor_write_sets(Material& material)
 }
 
 auto
-RenderPass::blit_to(const CommandBuffer& command_buffer,
-                    const Framebuffer& destination,
-                    BlitProperties properties) -> void
+RenderPass::blit_to(const CommandBuffer&, const Framebuffer&, BlitProperties)
+  -> void
 {
 }
 

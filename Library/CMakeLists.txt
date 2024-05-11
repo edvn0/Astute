@@ -63,3 +63,4 @@ function(add_assimp)
 endfunction()
 
 add_assimp()
+add_subdirectory(FastNoise2)

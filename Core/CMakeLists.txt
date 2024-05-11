@@ -44,6 +44,7 @@ add_library(Core STATIC
     include/graphics/ShaderBuffers.hpp
     include/graphics/Swapchain.hpp
     include/graphics/Vertex.hpp
+    include/graphics/TextureGenerator.hpp
     include/graphics/Window.hpp
     include/graphics/render_passes/Deferred.hpp
     include/graphics/render_passes/MainGeometry.hpp
@@ -82,6 +83,7 @@ add_library(Core STATIC
     src/graphics/Shader.cpp
     src/graphics/Swapchain.cpp
     src/graphics/Vertex.cpp
+    src/graphics/TextureGenerator.cpp
     src/graphics/Window.cpp
     src/graphics/render_passes/Deferred.cpp
     src/graphics/render_passes/MainGeometry.cpp
@@ -98,12 +100,13 @@ target_include_directories(Core PUBLIC include
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/Library/assimp/include
-    ${CMAKE_SOURCE_DIR}/Library/filewatch
 )
-target_link_libraries(Core PUBLIC ShaderCompilation glfw Vulkan::Vulkan GPUOpen::VulkanMemoryAllocator PRIVATE imgui glm EnTT::EnTT stbimage::stbimage assimp)
+target_include_directories(Core SYSTEM PRIVATE
+    ${CMAKE_SOURCE_DIR}/Library/VulkanMemoryAllocator/include
+    ${CMAKE_SOURCE_DIR}/Library/filewatch)
 
+target_link_libraries(Core PUBLIC ShaderCompilation glfw Vulkan::Vulkan PRIVATE imgui glm EnTT::EnTT stbimage::stbimage assimp FastNoise2)
 target_precompile_headers(Core PRIVATE include/pch/CorePCH.hpp)
-
 target_compile_definitions(Core PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")

@@ -11,7 +11,9 @@
 
 #include "core/Verify.hpp"
 
+#include <span>
 #include <stb_image.h>
+#include <vk_mem_alloc.h>
 
 template<>
 struct std::hash<VkImage>
@@ -306,8 +308,21 @@ copy_buffer_to_image(VkBuffer buffer,
 }
 
 auto
-create_view(VkImage& image, VkFormat format, VkImageAspectFlags aspect_mask)
-  -> VkImageView
+copy_buffer_to_image(const Core::DataBuffer& data, Image& image) -> void
+{
+  StagingBuffer buffer{ data.span() };
+  copy_buffer_to_image(buffer.get_buffer(),
+                       image.image,
+                       image.configuration.width,
+                       image.configuration.height);
+}
+
+auto
+create_view(VkImage& image,
+            VkFormat format,
+            VkImageAspectFlags aspect_mask,
+            Core::u32 mip_levels,
+            Core::u32 layer) -> VkImageView
 {
   VkImageViewCreateInfo view_create_info{};
   view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -316,9 +331,9 @@ create_view(VkImage& image, VkFormat format, VkImageAspectFlags aspect_mask)
   view_create_info.format = format;
   view_create_info.subresourceRange.aspectMask = aspect_mask;
   view_create_info.subresourceRange.baseMipLevel = 0;
-  view_create_info.subresourceRange.levelCount = 1;
+  view_create_info.subresourceRange.levelCount = mip_levels;
   view_create_info.subresourceRange.baseArrayLayer = 0;
-  view_create_info.subresourceRange.layerCount = 1;
+  view_create_info.subresourceRange.layerCount = layer;
   view_create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
   view_create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
   view_create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -369,6 +384,12 @@ create_sampler(VkFilter filter, VkSamplerAddressMode mode, VkBorderColor col)
   return create_sampler(filter, filter, mode, mode, mode, col);
 }
 
+struct ImageImpl
+{
+  VmaAllocation allocation{};
+  VmaAllocationInfo allocation_info{};
+};
+
 auto
 Image::destroy() -> void
 {
@@ -383,9 +404,18 @@ Image::destroy() -> void
   vkDestroyImageView(Device::the().device(), view, nullptr);
   vkDestroySampler(Device::the().device(), sampler, nullptr);
   Allocator allocator{ "destroy_image" };
-  allocator.deallocate_image(allocation, image);
+  allocator.deallocate_image(alloc_impl->allocation, image);
+  alloc_impl.reset(new ImageImpl);
 
   destroyed = true;
+}
+
+Image::~Image()
+{
+  if (!destroyed) {
+    destroy();
+    destroyed = true;
+  }
 }
 
 auto
@@ -520,15 +550,13 @@ Image::load_from_memory(Core::u32 width,
 }
 
 auto
-Image::resolve_msaa(const Image& source, const CommandBuffer* command_buffer)
-  -> Core::Scope<Image>
+Image::resolve_msaa(const Image&, const CommandBuffer*) -> Core::Scope<Image>
 {
   return nullptr;
 }
 
 auto
-Image::reference_resolve_msaa(const Image& source,
-                              const CommandBuffer* command_buffer)
+Image::reference_resolve_msaa(const Image&, const CommandBuffer*)
   -> Core::Ref<Image>
 {
   return nullptr;
@@ -567,7 +595,7 @@ Image::Image(const ImageConfiguration& conf)
   : aspect_mask(to_aspect_mask(conf.format))
   , configuration(conf)
 {
-  configuration.additional_name_data = "Colour Attachment MSAA";
+  alloc_impl = Core::make_scope<ImageImpl>();
   invalidate();
 }
 
@@ -575,14 +603,26 @@ auto
 Image::create_specific_layer_image_views(
   const std::span<const Core::u32> indices) -> void
 {
+  for (auto layer = 0U; layer < indices.size(); layer++) {
+    layer_image_views[indices[layer]] = create_view(image,
+                                                    configuration.format,
+                                                    aspect_mask,
+                                                    configuration.mip_levels,
+                                                    indices[layer]);
+  }
 }
-
+void
+create_image(const ImageConfiguration&,
+             VkImage&,
+             VmaAllocation&,
+             VmaAllocationInfo&);
 auto
 Image::invalidate() -> void
 {
   destroy();
 
-  create_image(configuration, image, allocation, allocation_info);
+  create_image(
+    configuration, image, alloc_impl->allocation, alloc_impl->allocation_info);
   view = create_view(image, configuration.format, aspect_mask);
   sampler = create_sampler(configuration.min_filter,
                            configuration.mag_filter,
@@ -596,6 +636,23 @@ Image::invalidate() -> void
   descriptor_info.sampler = sampler;
 
   destroyed = false;
+
+  if (!configuration.transition_directly) {
+    return;
+  }
+
+  transition_image_layout(image, VK_IMAGE_LAYOUT_UNDEFINED, get_layout());
+}
+
+auto
+Image::generate_mips() -> void
+{
+}
+
+auto
+Image::construct(const ImageConfiguration& config) -> Core::Ref<Image>
+{
+  return Core::make_ref<Image>(config);
 }
 
 } // namespace Engine::Graphic

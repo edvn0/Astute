@@ -7,8 +7,8 @@
 namespace Engine::Graphics {
 
 auto
-Device::is_device_suitable(VkPhysicalDevice device,
-                           VkSurfaceKHR surface) -> bool
+Device::is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface)
+  -> bool
 {
   Core::i32 graphics_family_index = -1;
   Core::i32 present_family_index = -1;
@@ -21,7 +21,7 @@ Device::is_device_suitable(VkPhysicalDevice device,
   vkGetPhysicalDeviceQueueFamilyProperties(
     device, &family_count, families.data());
 
-  for (int i = 0; i < families.size(); i++) {
+  for (int i = 0U; i < families.size(); i++) {
 
     if (families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
       graphics_family_index = i;
@@ -72,22 +72,6 @@ Device::is_device_suitable(VkPhysicalDevice device,
         VK_NULL_HANDLE,
         static_cast<Core::u32>(present_family_index),
       };
-    }
-  }
-
-  auto extension_count = 0u;
-  vkEnumerateDeviceExtensionProperties(
-    device, nullptr, &extension_count, nullptr);
-  std::vector<VkExtensionProperties> available_extensions(extension_count);
-  vkEnumerateDeviceExtensionProperties(
-    device, nullptr, &extension_count, available_extensions.data());
-
-  bool extensionFound = false;
-  for (const auto& ext : available_extensions) {
-    if (std::string(ext.extensionName) ==
-        VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME) {
-      extensionFound = true;
-      break;
     }
   }
 
@@ -299,6 +283,11 @@ Device::create_device(VkSurfaceKHR surface) -> void
     queue_support.at(QueueType::Compute).family_index;
   vkCreateCommandPool(
     device(), &command_pool_create_info, nullptr, &compute_command_pool);
+
+  command_pool_create_info.queueFamilyIndex =
+    queue_support.at(QueueType::Transfer).family_index;
+  vkCreateCommandPool(
+    device(), &command_pool_create_info, nullptr, &transfer_command_pool);
 }
 
 auto
@@ -310,8 +299,17 @@ Device::execute_immediate(QueueType type,
 
   VkCommandBufferAllocateInfo allocation_info = {};
   allocation_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  allocation_info.commandPool =
-    type == QueueType::Compute ? compute_command_pool : graphics_command_pool;
+  switch (type) {
+    case QueueType::Compute:
+      allocation_info.commandPool = compute_command_pool;
+      break;
+    case QueueType::Transfer:
+      allocation_info.commandPool = transfer_command_pool;
+      break;
+    default:
+      allocation_info.commandPool = graphics_command_pool;
+      break;
+  }
   allocation_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   allocation_info.commandBufferCount = 1;
 
@@ -380,6 +378,7 @@ Device::deinitialise() -> void
 {
   vkDestroyCommandPool(vk_device, graphics_command_pool, nullptr);
   vkDestroyCommandPool(vk_device, compute_command_pool, nullptr);
+  vkDestroyCommandPool(vk_device, transfer_command_pool, nullptr);
 
   vkDestroyDevice(vk_device, nullptr);
 }

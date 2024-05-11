@@ -160,7 +160,6 @@ struct Padded
   }
 
   auto operator=(T new_value) -> void { value = new_value; }
-  auto operator=(const Padded& new_value) -> void { value = new_value.value; }
 
   explicit(false) operator T() const { return value; }
 };

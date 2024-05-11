@@ -7,7 +7,7 @@
 #ifdef ASTUTE_BASE_PATH
 static constexpr std::string_view base_path = ASTUTE_BASE_PATH;
 #else  // ASTUTE_BASE_PATH
-static constexpr std::string_view base_path = "C:\\Dev\\Personal\\Astute";
+static constexpr std::string_view base_path = "C:\\D\\Dev\\AstuteEngine";
 #endif // ASTUTE_BASE_PATH
 
 auto

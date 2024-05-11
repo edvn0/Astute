@@ -32,13 +32,15 @@ Allocator::allocate_buffer(VkBuffer& buffer,
     static_cast<VmaAllocationCreateFlags>(props.creation);
   allocation_create_info.priority = props.priority;
 
+  buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+
   VmaAllocation allocation{};
-  vmaCreateBuffer(allocator,
-                  &buffer_info,
-                  &allocation_create_info,
-                  &buffer,
-                  &allocation,
-                  nullptr);
+  VK_CHECK(vmaCreateBuffer(allocator,
+                           &buffer_info,
+                           &allocation_create_info,
+                           &buffer,
+                           &allocation,
+                           nullptr));
   vmaSetAllocationName(allocator, allocation, resource_name.data());
 
   return allocation;
@@ -59,13 +61,15 @@ Allocator::allocate_buffer(VkBuffer& buffer,
   }
   allocation_create_info.priority = props.priority;
 
+  buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+
   VmaAllocation allocation{};
-  vmaCreateBuffer(allocator,
-                  &buffer_info,
-                  &allocation_create_info,
-                  &buffer,
-                  &allocation,
-                  &allocation_info);
+  VK_CHECK(vmaCreateBuffer(allocator,
+                           &buffer_info,
+                           &allocation_create_info,
+                           &buffer,
+                           &allocation,
+                           &allocation_info));
   vmaSetAllocationName(allocator, allocation, resource_name.data());
 
   return allocation;
@@ -145,8 +149,8 @@ Allocator::unmap_memory(VmaAllocation allocation)
 }
 
 auto
-Allocator::construct_allocator(const Device& device,
-                               const Instance& instance) -> VmaAllocator
+Allocator::construct_allocator(const Device& device, const Instance& instance)
+  -> VmaAllocator
 {
   VmaAllocatorCreateInfo allocator_create_info{};
   allocator_create_info.physicalDevice = device.physical();

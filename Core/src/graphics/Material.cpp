@@ -28,8 +28,8 @@ Material::Material(Configuration config)
 }
 
 auto
-Material::set(const std::string_view name,
-              const Core::Ref<Image>& image) -> bool
+Material::set(const std::string_view name, const Core::Ref<Image>& image)
+  -> bool
 {
   if (!image) {
     return false;
@@ -44,7 +44,6 @@ Material::set(const std::string_view name,
 #ifdef ASTUTE_DEBUG
   if (images.contains(as_string)) {
     error("Could not map new image into type '{}'", as_string);
-    return false;
   }
 #endif
 
@@ -133,9 +132,8 @@ Material::find_resource_by_name(const std::string_view name) const
 }
 
 auto
-Material::set(const std::string_view name,
-              const void* data,
-              Core::usize size) -> void
+Material::set(const std::string_view name, const void* data, Core::usize size)
+  -> void
 {
   const auto& shader_buffers = shader->get_reflection_data().constant_buffers;
   const Engine::Reflection::ShaderUniform* found = nullptr;

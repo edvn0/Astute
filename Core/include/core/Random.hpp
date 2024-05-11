@@ -40,11 +40,11 @@ random() -> Core::f64
   return random(0.0, 1.0);
 }
 
+template<std::floating_point Out = Core::f32>
 auto
-random(std::floating_point auto min, std::floating_point auto max)
-  -> std::remove_cvref_t<decltype(min)>
+random(std::floating_point auto min, std::floating_point auto max) -> Out
 {
-  return random(min, max);
+  return static_cast<Out>(random(min, max));
 }
 
 } // namespace Engine::Core

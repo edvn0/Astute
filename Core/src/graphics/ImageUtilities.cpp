@@ -509,7 +509,6 @@ to_string(VkFormat format) -> std::string_view
     default:
       return "Missing";
   }
-  return "Missing";
 }
 
 auto
@@ -577,7 +576,6 @@ to_string(VkImageLayout layout) -> std::string_view
     default:
       return "Missing";
   }
-  return "Missing";
 }
 
 auto

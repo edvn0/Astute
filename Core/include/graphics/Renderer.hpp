@@ -126,7 +126,7 @@ public:
   }
   auto get_final_output() const -> const Image*
   {
-    return render_passes.at("Deferred")
+    return render_passes.at("Lights")
       ->get_framebuffer()
       ->get_colour_attachment(0)
       .get();
@@ -153,10 +153,7 @@ public:
     return *render_passes.at(name);
   }
 
-  auto set_technique(RendererTechnique technique) -> void
-  {
-    this->technique = technique;
-  }
+  auto set_technique(RendererTechnique tech) -> void { technique = tech; }
 
 private:
   Core::Extent size{ 0, 0 };

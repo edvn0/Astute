@@ -16,6 +16,8 @@ public:
   auto on_resize(const Core::Extent&) -> void override;
 
 protected:
+  auto bind(CommandBuffer&) -> void override;
+  auto unbind(CommandBuffer&) -> void override;
   auto destruct_impl() -> void override {}
   auto execute_impl(CommandBuffer&) -> void override;
 };

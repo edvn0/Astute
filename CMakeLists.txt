@@ -31,3 +31,13 @@ target_compile_definitions(Core PRIVATE
     $<$<AND:$<CONFIG:Debug>,$<BOOL:${ENABLE_VALIDATION_LAYERS}>>:ENABLE_VALIDATION_LAYERS>)
 target_compile_definitions(App PRIVATE
     $<$<AND:$<CONFIG:Debug>,$<BOOL:${ENABLE_VALIDATION_LAYERS}>>:ENABLE_VALIDATION_LAYERS>)
+
+target_compile_options(Core PRIVATE
+    $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror>
+)
+
+target_compile_options(App PRIVATE
+    $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror>
+)

@@ -15,12 +15,12 @@ namespace Engine::Graphics {
 
 GraphicsPipeline::GraphicsPipeline(const Configuration& config)
   : sample_count(config.sample_count)
-  , face_mode(config.face_mode)
   , cull_mode(config.cull_mode)
+  , face_mode(config.face_mode)
   , depth_comparator(config.depth_comparator)
+  , clear_depth_value(config.clear_depth_value)
   , override_vertex_attributes(config.override_vertex_attributes)
   , override_instance_attributes(config.override_instance_attributes)
-  , clear_depth_value(config.clear_depth_value)
   , framebuffer(config.framebuffer)
   , shader(config.shader)
 {
@@ -92,12 +92,14 @@ GraphicsPipeline::create_pipeline() -> void
   std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages = {
     VkPipelineShaderStageCreateInfo{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .pNext = nullptr,
       .stage = VK_SHADER_STAGE_VERTEX_BIT,
       .module = maybe_vertex_stage.value(),
       .pName = "main",
     },
     VkPipelineShaderStageCreateInfo{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .pNext = nullptr,
       .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
       .module = maybe_fragment_stage.value(),
       .pName = "main",

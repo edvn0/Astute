@@ -150,7 +150,7 @@ Window::Window(Configuration config)
     });
 
   glfwSetMouseButtonCallback(
-    window, +[](GLFWwindow* win, int button, int action, int mods) {
+    window, +[](GLFWwindow* win, int button, int action, int) {
       const auto& self = *static_cast<Window*>(glfwGetWindowUserPointer(win));
 
       // Assuming you have a way to get the current mouse position

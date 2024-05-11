@@ -28,12 +28,6 @@ Scene::Scene(const std::string_view name_view)
   // Floor is big!
   transform2.scale = { 0.01, 0.01, 0.01 };
 
-  // small cube on top with some offset
-  auto entity3 = registry.create();
-  registry.emplace<MeshComponent>(entity3, cube_mesh);
-  auto& transform3 = registry.emplace<TransformComponent>(entity3);
-  transform3.translation = { 0, 0, 0 };
-
   const auto& bounds = sponza_mesh->get_mesh_asset()->get_bounding_box();
   const auto scaled = bounds.scaled(0.01);
   for (auto i = 0; i < 300; i++) {
@@ -45,11 +39,11 @@ Scene::Scene(const std::string_view name_view)
     t.translation = Random::random_in(scaled);
     t.translation.y -= 5;
     light_data.radiance = Random::random_colour();
-    light_data.intensity = Random::random(0.5, 1.0);
-    light_data.light_size = Random::random(0.1, 1.0);
-    light_data.min_radius = Random::random(1.0, 20.0);
-    light_data.radius = Random::random(0.1, 30.0);
-    light_data.falloff = Random::random(0.1, 0.5);
+    light_data.intensity = Random::random<Core::f32>(0.5, 1.0);
+    light_data.light_size = Random::random<Core::f32>(0.1, 1.0);
+    light_data.min_radius = Random::random<Core::f32>(1.0, 20.0);
+    light_data.radius = Random::random<Core::f32>(0.1, 30.0);
+    light_data.falloff = Random::random<Core::f32>(0.1, 0.5);
   }
 
   for (auto i = 0; i < 300; i++) {
@@ -62,15 +56,15 @@ Scene::Scene(const std::string_view name_view)
     t.translation.y -= 5;
     auto& light_data = registry.emplace<SpotLightComponent>(light);
     light_data.radiance = Random::random_colour();
-    light_data.angle = Random::random(30.0, 90.0);
-    light_data.range = Random::random(0.1, 1.0);
-    light_data.angle_attenuation = Random::random(1.0, 5.0);
-    light_data.intensity = Random::random(0.5, 1.0);
+    light_data.angle = Random::random<Core::f32>(30.0, 90.0);
+    light_data.range = Random::random<Core::f32>(0.1, 1.0);
+    light_data.angle_attenuation = Random::random<Core::f32>(1.0, 5.0);
+    light_data.intensity = Random::random<Core::f32>(0.5, 1.0);
   }
 }
 
 auto
-Scene::on_update_editor(f64 ts) -> void
+Scene::on_update_editor(f64) -> void
 {
   // Improved gradient for color based on rotation
   // Using different frequencies and phases for color channels
@@ -111,7 +105,7 @@ Scene::on_update_editor(f64 ts) -> void
 
   [&]() {
     static auto prev_count = 15U;
-    auto count = 0;
+    auto count = 0U;
     light_environment.spot_lights.reserve(prev_count + 1);
 
     for (auto&& [entity, transform, spot_light] :
@@ -149,24 +143,34 @@ Scene::on_render_editor(Graphics::Renderer& renderer, const Camera& camera)
                          camera.get_far_clip(),
                          camera.get_fov(),
                        });
+  std::unordered_set<entt::entity> already_submitted;
   for (auto&& [entity, mesh, transform] :
        registry
          .view<MeshComponent, TransformComponent>(
            entt::exclude<PointLightComponent, SpotLightComponent>)
          .each()) {
+    if (already_submitted.contains(entity))
+      continue;
     renderer.submit_static_mesh(mesh.mesh, transform.compute());
+    already_submitted.insert(entity);
   }
 
   for (auto&& [entity, light, mesh, transform] :
        registry.view<PointLightComponent, MeshComponent, TransformComponent>()
          .each()) {
+    if (already_submitted.contains(entity))
+      continue;
     renderer.submit_static_light(mesh.mesh, transform.compute());
+    already_submitted.insert(entity);
   }
 
   for (auto&& [entity, light, mesh, transform] :
        registry.view<SpotLightComponent, MeshComponent, TransformComponent>()
          .each()) {
+    if (already_submitted.contains(entity))
+      continue;
     renderer.submit_static_light(mesh.mesh, transform.compute());
+    already_submitted.insert(entity);
   }
 
   renderer.end_scene();

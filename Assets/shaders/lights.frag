@@ -1,6 +1,7 @@
 #version 460
 
 #include "buffers.glsl"
+#include "util.glsl"
 
 layout(location = 0) in vec3 fragment_normal;
 layout(location = 1) in vec3 fragment_tangents;
@@ -8,6 +9,7 @@ layout(location = 2) in vec3 fragment_bitangents;
 layout(location = 3) in vec2 fragment_uvs;
 layout(location = 4) in vec3 world_space_fragment_position;
 layout(location = 5) in vec4 shadow_space_fragment_position;
+layout(location = 6) in vec4 colour;
 
 layout(location = 0) out vec4 fragment_colour;
 
@@ -33,10 +35,7 @@ compute_normal_from_map(mat3 tbn);
 void
 main()
 {
-  vec2 flipped_uvs = vec2(fragment_uvs.x, 1.0f - fragment_uvs.y);
-  fragment_colour = vec4(mat_pc.emission * mat_pc.albedo_colour *
-                           texture(albedo_map, flipped_uvs).xyz,
-                         1.0f);
+  fragment_colour = colour * vec4(mat_pc.albedo_colour, 1.0);
 }
 
 vec4

@@ -13,7 +13,7 @@ determine_present_mode(const VkPhysicalDevice& physical_device,
     physical_device, surface, &present_mode_count, present_modes.data());
 
   if (!vsync) {
-    for (auto i = 0; i < present_mode_count; i++) {
+    for (auto i = 0U; i < present_mode_count; i++) {
       if (present_modes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
         present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
         break;

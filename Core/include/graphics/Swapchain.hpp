@@ -34,10 +34,6 @@ public:
   {
     return images[index].view;
   }
-  auto get_depth_image() const -> VkImageView
-  {
-    return depth_stencil_image.view;
-  }
   auto get_renderpass() const -> VkRenderPass { return render_pass; }
   auto get_command_buffer(Core::u32 index) const -> VkCommandBuffer
   {
@@ -88,14 +84,6 @@ private:
     VkImageView view{ nullptr };
   };
   std::vector<SwapchainImage> images;
-
-  struct DepthImage
-  {
-    VkImage image{ nullptr };
-    VmaAllocation allocation{ nullptr };
-    VkImageView view{ nullptr };
-  };
-  DepthImage depth_stencil_image;
 
   std::vector<VkFramebuffer> framebuffers;
 

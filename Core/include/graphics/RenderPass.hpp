@@ -46,7 +46,7 @@ public:
     std::optional<Core::u32> colour_attachment_index{};
     bool depth_attachment{ false };
   };
-  auto blit_to(const CommandBuffer&, const Framebuffer&, BlitProperties = {})
+  auto blit_to(const CommandBuffer&, const Framebuffer&, BlitProperties)
     -> void;
 
 protected:

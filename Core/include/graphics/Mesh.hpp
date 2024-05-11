@@ -61,7 +61,7 @@ class MeshAsset
 {
 public:
   explicit MeshAsset(const std::string&);
-  ~MeshAsset() = default;
+  ~MeshAsset();
 
   auto get_submeshes() -> auto& { return submeshes; }
   auto get_submeshes() const -> const auto& { return submeshes; }

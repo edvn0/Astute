@@ -136,7 +136,7 @@ Application::run() -> i32
 }
 
 auto
-Application::on_resize(const Extent& new_size) -> void
+Application::on_resize(const Extent&) -> void
 {
 }
 

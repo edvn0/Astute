@@ -23,3 +23,6 @@
 [submodule "Library/filewatch"]
 	path = Library/filewatch
 	url = git@github.com:ThomasMonkman/filewatch.git
+[submodule "Library/FastNoise2"]
+	path = Library/FastNoise2
+	url = git@github.com:Auburn/FastNoise2.git

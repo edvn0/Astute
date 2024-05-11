@@ -236,15 +236,12 @@ static constexpr Core::u64 DEFAULT_FENCE_TIMEOUT = 100000000000;
 auto
 Swapchain::begin_frame() -> bool
 {
-  const auto& device = Device::the().device();
 
   auto acquired = acquire_next_image();
   if (!acquired)
     return false;
 
   current_image_index = acquired.value();
-
-  // vkResetCommandPool(device, command_buffers[current_buffer_index].pool, 0);
 
   return true;
 }
