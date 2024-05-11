@@ -60,7 +60,7 @@ struct Impl
 auto
 DeferredRenderPass::construct() -> void
 {
-  noise_map = Renderer::get_white_texture();
+  noise_map = TextureGenerator::simplex_noise(100, 100);
   on_resize(get_renderer().get_size());
 
   setup_file_watcher("Assets/shaders/deferred.frag");

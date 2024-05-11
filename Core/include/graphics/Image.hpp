@@ -133,6 +133,8 @@ public:
   VkDescriptorImageInfo descriptor_info{};
   ImageConfiguration configuration;
 
+  std::optional<Core::usize> hash_value{ std::nullopt };
+
   bool destroyed{ false };
 
   ~Image();
@@ -166,6 +168,8 @@ public:
   auto get_usage() const { return configuration.usage; }
   auto get_layer_count() const { return configuration.layers; }
 
+  auto hash() -> Core::usize;
+
   struct Configuration
   {
     const std::string path;
@@ -183,6 +187,9 @@ public:
     -> Core::Ref<Image>;
 
   static auto construct(const ImageConfiguration&) -> Core::Ref<Image>;
+
+private:
+  auto invalidate_hash() -> void;
 };
 
 } // namespace Engine::Graphics

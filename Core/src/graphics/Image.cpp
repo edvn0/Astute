@@ -378,8 +378,9 @@ create_sampler(VkFilter min_filter,
 }
 
 auto
-create_sampler(VkFilter filter, VkSamplerAddressMode mode, VkBorderColor col)
-  -> VkSampler
+create_sampler(VkFilter filter,
+               VkSamplerAddressMode mode,
+               VkBorderColor col) -> VkSampler
 {
   return create_sampler(filter, filter, mode, mode, mode, col);
 }
@@ -556,8 +557,8 @@ Image::resolve_msaa(const Image&, const CommandBuffer*) -> Core::Scope<Image>
 }
 
 auto
-Image::reference_resolve_msaa(const Image&, const CommandBuffer*)
-  -> Core::Ref<Image>
+Image::reference_resolve_msaa(const Image&,
+                              const CommandBuffer*) -> Core::Ref<Image>
 {
   return nullptr;
 }
@@ -636,6 +637,7 @@ Image::invalidate() -> void
   descriptor_info.sampler = sampler;
 
   destroyed = false;
+  invalidate_hash();
 
   if (!configuration.transition_directly) {
     return;
@@ -653,6 +655,49 @@ auto
 Image::construct(const ImageConfiguration& config) -> Core::Ref<Image>
 {
   return Core::make_ref<Image>(config);
+}
+
+auto
+Image::hash() -> Core::usize
+{
+  if (!hash_value.has_value()) {
+    invalidate_hash();
+  }
+  return hash_value.value();
+}
+
+auto
+Image::invalidate_hash() -> void
+{
+  static constexpr auto hash_combine = []<typename... Ts>(Core::usize& seed,
+                                                          Ts... ts) {
+    ((seed ^= std::hash<Ts>{}(ts) + 0x9e3779b9 + (seed << 6) + (seed >> 2)),
+     ...);
+  };
+
+  hash_value = 0;
+  hash_combine(hash_value.value(),
+               configuration.width,
+               configuration.height,
+               configuration.format,
+               configuration.sample_count,
+               configuration.mip_levels,
+               configuration.layers,
+               configuration.usage,
+               configuration.tiling,
+               configuration.layout,
+               configuration.min_filter,
+               configuration.mag_filter,
+               configuration.address_mode_u,
+               configuration.address_mode_v,
+               configuration.address_mode_w,
+               configuration.border_colour,
+               (const void*)view,
+               (const void*)sampler,
+               (const void*)image);
+
+  // We hash the vulkan handles because we need the material to be recreated if
+  // the image is recreated
 }
 
 } // namespace Engine::Graphic

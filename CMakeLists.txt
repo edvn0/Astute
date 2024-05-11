@@ -41,3 +41,6 @@ target_compile_options(App PRIVATE
     $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
     $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror>
 )
+
+add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+add_link_options(-fsanitize=address -fno-omit-frame-pointer)

@@ -203,8 +203,8 @@ Renderer::destruct() -> void
 }
 
 auto
-Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
-  -> void
+Renderer::begin_scene(Core::Scene& scene,
+                      const SceneRendererCamera& camera) -> void
 {
   if (old_size != size) {
     Device::the().wait();
@@ -435,7 +435,7 @@ Renderer::flush_draw_lists() -> void
   render_passes.at("Shadow")->execute(*command_buffer);
   // Prepdepth pass
   render_passes.at("Predepth")->execute(*command_buffer);
-  render_passes.at("LightCulling")->execute(*compute_command_buffer, true);
+  // render_passes.at("LightCulling")->execute(*compute_command_buffer, true);
   if (technique == RendererTechnique::Deferred) {
     // Geometry pass
     render_passes.at("MainGeometry")->execute(*command_buffer);
