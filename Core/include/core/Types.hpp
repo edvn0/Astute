@@ -81,7 +81,7 @@ struct BasicExtent
   template<Number U>
   auto operator==(const BasicExtent<U>& other) const -> bool
   {
-    const auto casted = other.as<T>();
+    const auto casted = other.template as<T>();
     return width == casted.width && height == casted.height;
   }
 

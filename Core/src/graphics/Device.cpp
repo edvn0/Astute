@@ -7,8 +7,8 @@
 namespace Engine::Graphics {
 
 auto
-Device::is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface)
-  -> bool
+Device::is_device_suitable(VkPhysicalDevice device,
+                           VkSurfaceKHR surface) -> bool
 {
   Core::i32 graphics_family_index = -1;
   Core::i32 present_family_index = -1;
@@ -21,7 +21,7 @@ Device::is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface)
   vkGetPhysicalDeviceQueueFamilyProperties(
     device, &family_count, families.data());
 
-  for (int i = 0U; i < families.size(); i++) {
+  for (auto i = 0ULL; i < families.size(); i++) {
 
     if (families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
       graphics_family_index = i;

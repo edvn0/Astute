@@ -232,7 +232,6 @@ Swapchain::acquire_next_image() -> Core::Maybe<Core::u32>
   return image_index;
 }
 
-static constexpr Core::u64 DEFAULT_FENCE_TIMEOUT = 100000000000;
 auto
 Swapchain::begin_frame() -> bool
 {

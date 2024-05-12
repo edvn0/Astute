@@ -121,12 +121,12 @@ MainGeometryRenderPass::on_resize(const Core::Extent& ext) -> void
     "Assets/shaders/main_geometry.vert", "Assets/shaders/main_geometry.frag");
   main_geometry_pipeline =
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
-      .framebuffer{ main_geometry_framebuffer.get() },
-      .shader{ main_geometry_shader.get() },
-      .sample_count{ VK_SAMPLE_COUNT_1_BIT },
-      .cull_mode{ VK_CULL_MODE_BACK_BIT },
-      .face_mode{ VK_FRONT_FACE_COUNTER_CLOCKWISE },
-      .depth_comparator{ VK_COMPARE_OP_EQUAL },
+      .framebuffer = main_geometry_framebuffer.get(),
+      .shader = main_geometry_shader.get(),
+      .sample_count = VK_SAMPLE_COUNT_1_BIT,
+      .cull_mode = VK_CULL_MODE_BACK_BIT,
+      .face_mode = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+      .depth_comparator = VK_COMPARE_OP_EQUAL,
     });
   main_geometry_material = Core::make_scope<Material>(Material::Configuration{
     .shader = main_geometry_shader.get(),

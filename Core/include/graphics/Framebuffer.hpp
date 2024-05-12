@@ -80,13 +80,13 @@ struct FramebufferSpecification
 
   bool transfer = false;
 
-  Core::Ref<Image> existing_image;
-  std::vector<Core::u32> existing_image_layers;
+  Core::Ref<Image> existing_image{ nullptr };
+  std::vector<Core::u32> existing_image_layers{};
 
-  std::unordered_map<Core::u32, Core::Ref<Image>> existing_images;
+  std::unordered_map<Core::u32, Core::Ref<Image>> existing_images{};
 
-  Core::Ref<Framebuffer> existing_framebuffer;
-  std::string debug_name;
+  Core::Ref<Framebuffer> existing_framebuffer{ nullptr };
+  std::string debug_name{ "Framebuffer" };
 };
 
 class Framebuffer : public IFramebuffer

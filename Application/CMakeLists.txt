@@ -12,4 +12,8 @@ if(ASTUTE_BASE_PATH)
     target_compile_definitions(App PRIVATE ASTUTE_BASE_PATH="${ASTUTE_BASE_PATH}")
 endif()
 
+if("Clang" IN_LIST CMAKE_CXX_COMPILER_ID)
+    target_compile_options(Core PRIVATE -Wno-unused-local-typedef)
+endif()
+
 target_compile_definitions(App PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)

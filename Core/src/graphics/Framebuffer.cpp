@@ -117,7 +117,7 @@ Framebuffer::release()
     }
 
     if (image->get_layer_count() == 1 ||
-        attachment_index == 0 && !image->get_layer_image_view(0)) {
+        (attachment_index == 0 && !image->get_layer_image_view(0))) {
       image->destroy();
     }
     attachment_index++;

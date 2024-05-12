@@ -93,13 +93,16 @@ GraphicsPipeline::create_pipeline() -> void
     VkPipelineShaderStageCreateInfo{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .pNext = nullptr,
+      .flags = 0,
       .stage = VK_SHADER_STAGE_VERTEX_BIT,
       .module = maybe_vertex_stage.value(),
       .pName = "main",
+      .pSpecializationInfo = &specialisation_info,
     },
     VkPipelineShaderStageCreateInfo{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       .pNext = nullptr,
+      .flags = 0,
       .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
       .module = maybe_fragment_stage.value(),
       .pName = "main",

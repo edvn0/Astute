@@ -228,7 +228,8 @@ class UniformBufferObject : public IShaderBindable
 public:
   explicit UniformBufferObject(const T& data,
                                const std::string_view input_identifier)
-    : identifier(input_identifier)
+    : pod_data(data)
+    , identifier(input_identifier)
   {
     buffer = Core::make_scope<GPUBuffer>(BufferType, sizeof(T));
     buffer->write(&pod_data, sizeof(T));

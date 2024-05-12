@@ -113,6 +113,10 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(Core PRIVATE ASTUTE_DEBUG)
 endif()
 
+if("Clang" IN_LIST CMAKE_CXX_COMPILER_ID)
+    target_compile_options(Core PRIVATE -Wno-unused-local-typedef)
+endif()
+
 # Add ASTUTE_PERFORMANCE as a preprocessor definition to enable performance tracking IF ASTUTE_PERFORMANCE is defined
 if(ASTUTE_PERFORMANCE)
     target_compile_definitions(Core PRIVATE ASTUTE_PERFORMANCE)
