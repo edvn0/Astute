@@ -249,24 +249,33 @@ MeshAsset::MeshAsset(const std::string& file_name)
     bool fallback = !hasAlbedoMap;
     if (hasAlbedoMap) {
       Core::Ref<Image> texture;
-      if (auto aiTexEmbedded = scene->GetEmbeddedTexture(aiTexPath.C_Str())) {
-        Core::DataBuffer buffer{ aiTexEmbedded->mWidth *
-                                 aiTexEmbedded->mHeight * 4 };
-        buffer.write(aiTexEmbedded->pcData,
-                     aiTexEmbedded->mWidth * aiTexEmbedded->mHeight * 4);
-        texture = Image::load_from_memory(
-          aiTexEmbedded->mWidth, aiTexEmbedded->mHeight, std::move(buffer), {});
+      if (auto embedded_texture =
+            scene->GetEmbeddedTexture(aiTexPath.C_Str())) {
+        Core::DataBuffer buffer{ embedded_texture->mWidth *
+                                 embedded_texture->mHeight * 4 };
+        buffer.write(embedded_texture->pcData,
+                     embedded_texture->mWidth * embedded_texture->mHeight * 4);
+        texture = Image::load_from_memory(embedded_texture->mWidth,
+                                          embedded_texture->mHeight,
+                                          std::move(buffer),
+                                          {
+                                            .use_mips = true,
+                                          });
       } else {
         std::filesystem::path path = file_name;
-        auto parentPath = path.parent_path();
-        parentPath /= std::string(aiTexPath.data);
-        std::string texturePath = parentPath.string();
-        texture = Image::load_from_file({ .path = texturePath });
+        auto parent_path = path.parent_path();
+        parent_path /= std::string(aiTexPath.data);
+        std::string texture_path = parent_path.string();
+        texture = Image::load_from_file({
+          .path = texture_path,
+          .use_mips = true,
+        });
       }
 
       if (texture) {
         materials.at(i)->set("albedo_map", texture);
         materials.at(i)->set("mat_pc.albedo_colour", glm::vec3(1.0F));
+        materials.at(i)->set("mat_pc.emission", 1.0F);
       } else {
         fallback = true;
       }
@@ -275,30 +284,39 @@ MeshAsset::MeshAsset(const std::string& file_name)
     if (fallback) {
       materials.at(i)->set("albedo_map", white_texture);
       materials.at(i)->set("mat_pc.albedo_colour", glm::vec3(1.0F));
+      materials.at(i)->set("mat_pc.emission", 1.0F);
     }
 
     // Normal maps
-    bool hasNormalMap = ai_material->GetTexture(
-                          aiTextureType_NORMALS, 0, &aiTexPath) == AI_SUCCESS;
-    fallback = !hasNormalMap;
-    if (hasNormalMap) {
+    bool has_normal_map = ai_material->GetTexture(
+                            aiTextureType_NORMALS, 0, &aiTexPath) == AI_SUCCESS;
+    fallback = !has_normal_map;
+    if (has_normal_map) {
       Core::Ref<Image> texture;
-      if (auto aiTexEmbedded = scene->GetEmbeddedTexture(aiTexPath.C_Str())) {
+      if (auto embedded_texture =
+            scene->GetEmbeddedTexture(aiTexPath.C_Str())) {
         Core::DataBuffer buffer{
-          aiTexEmbedded->mWidth * aiTexEmbedded->mHeight * 4,
+          embedded_texture->mWidth * embedded_texture->mHeight * 4,
         };
         buffer.write(std::span{
-          aiTexEmbedded->pcData,
-          aiTexEmbedded->mWidth * aiTexEmbedded->mHeight * 4,
+          embedded_texture->pcData,
+          embedded_texture->mWidth * embedded_texture->mHeight * 4,
         });
-        texture = Image::load_from_memory(
-          aiTexEmbedded->mWidth, aiTexEmbedded->mHeight, std::move(buffer), {});
+        texture = Image::load_from_memory(embedded_texture->mWidth,
+                                          embedded_texture->mHeight,
+                                          std::move(buffer),
+                                          {
+                                            .use_mips = true,
+                                          });
       } else {
         std::filesystem::path path = file_name;
-        auto parentPath = path.parent_path();
-        parentPath /= std::string(aiTexPath.data);
-        std::string texturePath = parentPath.string();
-        texture = Image::load_from_file({ .path = texturePath });
+        auto parent_path = path.parent_path();
+        parent_path /= std::string(aiTexPath.data);
+        std::string texture_path = parent_path.string();
+        texture = Image::load_from_file({
+          .path = texture_path,
+          .use_mips = true,
+        });
       }
 
       if (texture) {
@@ -314,27 +332,35 @@ MeshAsset::MeshAsset(const std::string& file_name)
     }
 
     // Normal maps
-    bool hasSpecularMap =
+    bool has_specular_map =
       ai_material->GetTexture(aiTextureType_SPECULAR, 0, &aiTexPath) ==
       AI_SUCCESS;
-    fallback = !hasSpecularMap;
-    if (hasSpecularMap) {
+    fallback = !has_specular_map;
+    if (has_specular_map) {
       Core::Ref<Image> texture;
-      if (auto aiTexEmbedded = scene->GetEmbeddedTexture(aiTexPath.C_Str())) {
-        Core::DataBuffer buffer{ aiTexEmbedded->mWidth *
-                                 aiTexEmbedded->mHeight * 4 };
+      if (auto embedded_texture =
+            scene->GetEmbeddedTexture(aiTexPath.C_Str())) {
+        Core::DataBuffer buffer{ embedded_texture->mWidth *
+                                 embedded_texture->mHeight * 4 };
         buffer.write(std::span{
-          aiTexEmbedded->pcData,
-          aiTexEmbedded->mWidth * aiTexEmbedded->mHeight * 4,
+          embedded_texture->pcData,
+          embedded_texture->mWidth * embedded_texture->mHeight * 4,
         });
-        texture = Image::load_from_memory(
-          aiTexEmbedded->mWidth, aiTexEmbedded->mHeight, std::move(buffer), {});
+        texture = Image::load_from_memory(embedded_texture->mWidth,
+                                          embedded_texture->mHeight,
+                                          std::move(buffer),
+                                          {
+                                            .use_mips = true,
+                                          });
       } else {
         std::filesystem::path path = file_name;
-        auto parentPath = path.parent_path();
-        parentPath /= std::string(aiTexPath.data);
-        std::string texturePath = parentPath.string();
-        texture = Image::load_from_file({ .path = texturePath });
+        auto parent_path = path.parent_path();
+        parent_path /= std::string(aiTexPath.data);
+        std::string texture_path = parent_path.string();
+        texture = Image::load_from_file({
+          .path = texture_path,
+          .use_mips = true,
+        });
       }
 
       if (texture) {
@@ -348,7 +374,7 @@ MeshAsset::MeshAsset(const std::string& file_name)
     }
 
     // Roughness map
-    bool hasRoughnessMap =
+    bool has_roughness_map =
       ai_material->GetTexture(aiTextureType_SHININESS, 0, &aiTexPath) ==
       AI_SUCCESS;
 
@@ -359,28 +385,35 @@ MeshAsset::MeshAsset(const std::string& file_name)
     bool prefer_combined = false;
     if (combined_roughness_metallic_file.length > 0) {
       prefer_combined = true;
-      hasRoughnessMap = true;
+      has_roughness_map = true;
     }
 
-    fallback = !hasRoughnessMap;
-    if (hasRoughnessMap) {
+    fallback = !has_roughness_map;
+    if (has_roughness_map) {
       Core::Ref<Image> texture;
 
-      if (auto aiTexEmbedded = scene->GetEmbeddedTexture(
+      if (auto embedded_texture = scene->GetEmbeddedTexture(
             prefer_combined ? combined_roughness_metallic_file.C_Str()
                             : aiTexPath.C_Str())) {
-        Core::DataBuffer buffer{ aiTexEmbedded->mWidth *
-                                 aiTexEmbedded->mHeight * 4 };
-        buffer.write(aiTexEmbedded->pcData,
-                     aiTexEmbedded->mWidth * aiTexEmbedded->mHeight * 4);
-        texture = Image::load_from_memory(
-          aiTexEmbedded->mWidth, aiTexEmbedded->mHeight, std::move(buffer), {});
+        Core::DataBuffer buffer{ embedded_texture->mWidth *
+                                 embedded_texture->mHeight * 4 };
+        buffer.write(embedded_texture->pcData,
+                     embedded_texture->mWidth * embedded_texture->mHeight * 4);
+        texture = Image::load_from_memory(embedded_texture->mWidth,
+                                          embedded_texture->mHeight,
+                                          std::move(buffer),
+                                          {
+                                            .use_mips = true,
+                                          });
       } else {
         std::filesystem::path path = file_name;
-        auto parentPath = path.parent_path();
-        parentPath /= std::string(aiTexPath.data);
-        std::string texturePath = parentPath.string();
-        texture = Image::load_from_file({ .path = texturePath });
+        auto parent_path = path.parent_path();
+        parent_path /= std::string(aiTexPath.data);
+        std::string texture_path = parent_path.string();
+        texture = Image::load_from_file({
+          .path = texture_path,
+          .use_mips = true,
+        });
       }
 
       if (texture) {

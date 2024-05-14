@@ -28,8 +28,7 @@ main()
   uint count_spot_lights = spot_lights.count;
 
   // Resolve G-buffer
-  vec4 alb =
-    texture(albedo_specular_map, input_uvs) * texture(noise_map, input_uvs).r;
+  vec4 alb = texture(albedo_specular_map, input_uvs);
   vec3 frag_colour = vec3(0.0);
 
   vec3 position = texture(position_map, input_uvs).xyz;

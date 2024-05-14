@@ -143,34 +143,24 @@ Scene::on_render_editor(Graphics::Renderer& renderer, const Camera& camera)
                          camera.get_far_clip(),
                          camera.get_fov(),
                        });
-  std::unordered_set<entt::entity> already_submitted;
   for (auto&& [entity, mesh, transform] :
        registry
          .view<MeshComponent, TransformComponent>(
            entt::exclude<PointLightComponent, SpotLightComponent>)
          .each()) {
-    if (already_submitted.contains(entity))
-      continue;
     renderer.submit_static_mesh(mesh.mesh, transform.compute());
-    already_submitted.insert(entity);
   }
 
   for (auto&& [entity, light, mesh, transform] :
        registry.view<PointLightComponent, MeshComponent, TransformComponent>()
          .each()) {
-    if (already_submitted.contains(entity))
-      continue;
     renderer.submit_static_light(mesh.mesh, transform.compute());
-    already_submitted.insert(entity);
   }
 
   for (auto&& [entity, light, mesh, transform] :
        registry.view<SpotLightComponent, MeshComponent, TransformComponent>()
          .each()) {
-    if (already_submitted.contains(entity))
-      continue;
     renderer.submit_static_light(mesh.mesh, transform.compute());
-    already_submitted.insert(entity);
   }
 
   renderer.end_scene();

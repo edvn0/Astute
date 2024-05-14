@@ -70,10 +70,10 @@ struct SubmeshTransformBuffer
 struct SceneRendererCamera
 {
   const Core::Camera& camera;
-  glm::mat4 view_matrix;
-  Core::f32 near;
-  Core::f32 far;
-  Core::f32 fov;
+  glm::mat4 view_matrix{};
+  Core::f32 near{};
+  Core::f32 far{};
+  Core::f32 fov{};
 };
 
 struct CommandKey

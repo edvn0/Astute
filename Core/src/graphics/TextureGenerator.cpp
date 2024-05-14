@@ -1,5 +1,6 @@
 #include "pch/CorePCH.hpp"
 
+#include "graphics/GPUBuffer.hpp"
 #include "graphics/TextureGenerator.hpp"
 
 #include <FastNoise/FastNoise.h>
@@ -28,12 +29,28 @@ TextureGenerator::simplex_noise(Core::u32 w, Core::u32 h) -> Core::Ref<Image>
     .height = h,
     .additional_name_data = "SimpleNoise",
   });
-  transition_image_layout(image->image,
-                          VK_IMAGE_LAYOUT_UNDEFINED,
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-  copy_buffer_to_image(buffer, *image);
-  transition_image_layout(
-    image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, image->get_layout());
+  Graphics::StagingBuffer staging_buffer{ std::move(buffer) };
+  Device::the().execute_immediate([&](auto* buf) {
+    transition_image_layout(buf,
+                            image->image,
+                            VK_IMAGE_LAYOUT_UNDEFINED,
+                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                            image->get_aspect_flags(),
+                            image->get_mip_levels(),
+                            0);
+    copy_buffer_to_image(buf,
+                         staging_buffer.get_buffer(),
+                         image->image,
+                         image->configuration.width,
+                         image->configuration.height);
+    transition_image_layout(buf,
+                            image->image,
+                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                            image->get_layout(),
+                            image->get_aspect_flags(),
+                            image->get_mip_levels(),
+                            0);
+  });
 
   return image;
 }

@@ -2,20 +2,13 @@
 
 #include "graphics/render_passes/Predepth.hpp"
 
-#include "core/Logger.hpp"
-#include "core/Scene.hpp"
-
 #include "core/Application.hpp"
-#include "graphics/DescriptorResource.hpp"
 #include "graphics/Framebuffer.hpp"
 #include "graphics/GPUBuffer.hpp"
 #include "graphics/GraphicsPipeline.hpp"
-#include "graphics/Image.hpp"
 #include "graphics/Material.hpp"
 #include "graphics/Renderer.hpp"
 #include "graphics/Shader.hpp"
-#include "graphics/Swapchain.hpp"
-#include "graphics/Window.hpp"
 
 #include "graphics/RendererExtensions.hpp"
 
@@ -38,7 +31,7 @@ PredepthRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
   RendererExtensions::explicitly_clear_framebuffer(command_buffer,
                                                    *predepth_framebuffer);
 
-  auto descriptor_set =
+  auto* descriptor_set =
     generate_and_update_descriptor_write_sets(*predepth_material);
 
   vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
@@ -50,13 +43,13 @@ PredepthRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                           0,
                           nullptr);
 
-  static constexpr float depthBiasConstant = 1.25f;
-  static constexpr float depthBiasSlope = 1.75f;
+  static constexpr float depth_bias_constant = 1.25F;
+  static constexpr float depth_bias_slope = 1.75F;
 
   vkCmdSetDepthBias(command_buffer.get_command_buffer(),
-                    depthBiasConstant,
-                    0.0f,
-                    depthBiasSlope);
+                    depth_bias_constant,
+                    0.0F,
+                    depth_bias_slope);
 
   for (const auto& [key, command] : get_renderer().draw_commands) {
     const auto& [mesh, submesh_index, instance_count] = command;
@@ -75,7 +68,7 @@ PredepthRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
       get_renderer()
         .transform_buffers.at(Core::Application::the().current_frame_index())
         .transform_buffer;
-    auto vb = transform_vertex_buffer->get_buffer();
+    auto* vb = transform_vertex_buffer->get_buffer();
     auto offset = get_renderer().mesh_transform_map.at(key).offset;
     const auto& submesh = mesh_asset->get_submeshes().at(submesh_index);
 
@@ -92,7 +85,7 @@ PredepthRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                      submesh.index_count,
                      instance_count,
                      submesh.base_index,
-                     submesh.base_vertex,
+                     static_cast<Core::i32>(submesh.base_vertex),
                      0);
   }
 }

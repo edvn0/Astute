@@ -40,8 +40,9 @@ void
 Logger::stop_all()
 {
   // If the worker thread is already stopped, return
-  if (exit_flag)
+  if (exit_flag) {
     return;
+  }
 
   exit_flag = true;
   cv.notify_one();
@@ -63,8 +64,9 @@ Logger::process_queue(const std::stop_token& stop_token)
     std::unique_lock lock(queue_mutex);
     cv.wait(lock, [this] { return !log_queue.empty() || exit_flag; });
 
-    if (exit_flag && log_queue.empty())
+    if (exit_flag && log_queue.empty()) {
       break;
+    }
 
     while (!log_queue.empty()) {
       auto&& log_message = log_queue.front();
@@ -120,8 +122,8 @@ Logger::set_level(LogLevel level)
   current_level = level;
 }
 
-LogLevel
-Logger::get_level() const
+auto
+Logger::get_level() const -> LogLevel
 {
   return current_level;
 }
@@ -137,27 +139,32 @@ to_lower(const std::string& str)
   return lower_str;
 }
 
-LogLevel
-Logger::get_log_level_from_environment()
+auto
+Logger::get_log_level_from_environment() -> LogLevel
 {
   if (const auto env_value = Platform::get_environment_variable("LOG_LEVEL");
       !env_value.empty()) {
     const std::string log_level = to_lower(env_value);
     if (log_level == "trace" || log_level == "t" || log_level == "tr" ||
-        log_level == "tra")
+        log_level == "tra") {
       return LogLevel::Trace;
+    }
     if (log_level == "debug" || log_level == "d" || log_level == "de" ||
-        log_level == "deb")
+        log_level == "deb") {
       return LogLevel::Debug;
+    }
     if (log_level == "info" || log_level == "i" || log_level == "in" ||
-        log_level == "inf")
+        log_level == "inf") {
       return LogLevel::Info;
+    }
     if (log_level == "error" || log_level == "e" || log_level == "er" ||
-        log_level == "err")
+        log_level == "err") {
       return LogLevel::Error;
+    }
     if (log_level == "none" || log_level == "n" || log_level == "no" ||
-        log_level == "non")
+        log_level == "non") {
       return LogLevel::None;
+    }
   }
   return LogLevel::Info; // Default log level
 }

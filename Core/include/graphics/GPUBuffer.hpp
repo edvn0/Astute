@@ -75,14 +75,23 @@ class StagingBuffer
 {
 public:
   template<class T>
-  StagingBuffer(const std::span<T> data)
+  explicit StagingBuffer(const std::span<T> data)
     : buffer(GPUBufferType::Staging, data.size_bytes())
   {
     buffer.write(data);
   }
 
-  auto size() const -> Core::usize { return buffer.get_size(); }
-  auto get_buffer() const -> VkBuffer { return buffer.get_buffer(); }
+  explicit StagingBuffer(Core::DataBuffer&& data)
+    : buffer(GPUBufferType::Staging, data.size())
+  {
+    buffer.write(data.span());
+  }
+
+  [[nodiscard]] auto size() const -> Core::usize { return buffer.get_size(); }
+  [[nodiscard]] auto get_buffer() const -> VkBuffer
+  {
+    return buffer.get_buffer();
+  }
 
 private:
   GPUBuffer buffer;

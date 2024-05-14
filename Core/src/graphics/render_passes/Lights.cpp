@@ -28,11 +28,9 @@ LightsRenderPass::construct() -> void
     .height = get_renderer().get_size().height,
     .clear_colour_on_load = false,
     .clear_depth_on_load = false,
-    .attachments = { { VK_FORMAT_R32G32B32A32_SFLOAT, VK_FORMAT_D32_SFLOAT } },
+    .attachments = { { VK_FORMAT_R32G32B32A32_SFLOAT } },
     .samples = VK_SAMPLE_COUNT_1_BIT,
-    .existing_images = { {0, get_renderer().get_render_pass("Deferred").get_colour_attachment(0),}, { 1, get_renderer()
-                             .get_render_pass("MainGeometry")
-                             .get_depth_attachment(), }, },
+    .existing_images = { {0, get_renderer().get_render_pass("Deferred").get_colour_attachment(0),}, },
     .debug_name = "Lights",
   });
   lights_shader = Shader::compile_graphics_scoped("Assets/shaders/lights.vert",
@@ -44,12 +42,16 @@ LightsRenderPass::construct() -> void
       .sample_count = VK_SAMPLE_COUNT_1_BIT,
       .cull_mode = VK_CULL_MODE_FRONT_BIT,
       .face_mode = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-      .depth_comparator = VK_COMPARE_OP_GREATER_OR_EQUAL,
+      .depth_comparator = VK_COMPARE_OP_GREATER,
     });
 
   lights_material = Core::make_scope<Material>(Material::Configuration{
     .shader = lights_shader.get(),
   });
+
+  lights_material->set(
+    "predepth_map",
+    get_renderer().get_render_pass("Predepth").get_depth_attachment());
 }
 
 auto

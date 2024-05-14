@@ -8,8 +8,8 @@
 
 namespace Engine::Core {
 
-inline std::string_view
-result_to_string(const VkResult result)
+inline auto
+result_to_string(const VkResult result) -> std::string_view
 {
   switch (result) {
     case VK_SUCCESS:
@@ -112,8 +112,8 @@ result_to_string(const VkResult result)
   return {};
 }
 
-inline std::string_view
-object_type_to_string(const VkObjectType type)
+inline auto
+object_type_to_string(const VkObjectType type) -> std::string_view
 {
   switch (type) {
     case VK_OBJECT_TYPE_COMMAND_BUFFER:
@@ -256,3 +256,6 @@ ensure(bool condition, std::string_view message)
     VkResult res = (f);                                                        \
     Core::check_result(res);                                                   \
   }
+
+#define CHECK(opt)                                                             \
+  Core::ensure((opt).has_value(), "Optional is missing value.");

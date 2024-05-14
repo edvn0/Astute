@@ -8,6 +8,7 @@
 
 #include "core/Clock.hpp"
 
+#include "core/Random.hpp"
 #include "graphics/DescriptorResource.hpp"
 #include "graphics/GPUBuffer.hpp"
 #include "graphics/Swapchain.hpp"
@@ -25,6 +26,7 @@
 #include "graphics/render_passes/Predepth.hpp"
 #include "graphics/render_passes/Shadow.hpp"
 
+#include <cstddef>
 #include <glm/gtc/quaternion.hpp>
 #include <ranges>
 #include <span>
@@ -166,8 +168,12 @@ Renderer::Renderer(Configuration config, const Window* window)
   static constexpr auto white_data = 0xFFFFFFFF;
   data_buffer.write(&white_data, sizeof(Core::u32), 0U);
 
-  white_texture = Image::load_from_memory(
-    1, 1, data_buffer, { .path = "white-default-texture" });
+  white_texture = Image::load_from_memory(1,
+                                          1,
+                                          data_buffer,
+                                          {
+                                            .path = "white-default-texture",
+                                          });
 
   Core::u32 black_data{ 0 };
   data_buffer.write(&black_data, sizeof(Core::u32), 0U);
@@ -176,15 +182,19 @@ Renderer::Renderer(Configuration config, const Window* window)
 
   const glm::uvec2 viewport_size{ size.width, size.height };
 
-  constexpr uint32_t TILE_SIZE = 16u;
+  constexpr uint32_t tile_size = 16U;
   glm::uvec2 vp_size = viewport_size;
-  vp_size += TILE_SIZE - viewport_size % TILE_SIZE;
-  light_culling_work_groups = { vp_size / TILE_SIZE, 1 };
+  vp_size += tile_size - viewport_size % tile_size;
+  light_culling_work_groups = { vp_size / tile_size, 1 };
 
-  visible_point_lights_ssbo.resize(light_culling_work_groups.x *
-                                   light_culling_work_groups.y * 4 * 1024);
-  visible_spot_lights_ssbo.resize(light_culling_work_groups.x *
-                                  light_culling_work_groups.y * 4 * 1024);
+  visible_point_lights_ssbo.resize(
+    static_cast<Core::usize>(light_culling_work_groups.x *
+                             light_culling_work_groups.y) *
+    4 * 1024);
+  visible_spot_lights_ssbo.resize(
+    static_cast<Core::usize>(light_culling_work_groups.x *
+                             light_culling_work_groups.y) *
+    4 * 1024);
 }
 
 Renderer::~Renderer() = default;
@@ -203,8 +213,8 @@ Renderer::destruct() -> void
 }
 
 auto
-Renderer::begin_scene(Core::Scene& scene,
-                      const SceneRendererCamera& camera) -> void
+Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
+  -> void
 {
   if (old_size != size) {
     Device::the().wait();
@@ -363,7 +373,7 @@ Renderer::submit_static_light(Core::Ref<StaticMesh>& static_mesh,
 
     const auto& vertex_buffer = source->get_vertex_buffer();
     const auto& index_buffer = source->get_index_buffer();
-    const auto& material =
+    auto& material =
       source->get_materials().at(submesh_data[submesh_index].material_index);
 
     CommandKey key{ &vertex_buffer, &index_buffer, material.get(), 0 };

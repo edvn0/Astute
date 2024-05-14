@@ -51,7 +51,7 @@ struct ImageConfiguration
     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
       VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
   };
-  const std::string_view additional_name_data{ "" };
+  const std::string_view additional_name_data;
 
   const VkFilter mag_filter{
     VK_FILTER_LINEAR,
@@ -86,15 +86,26 @@ transition_image_layout(
   VkImageLayout old_layout,
   VkImageLayout new_layout,
   VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT,
-  Core::u32 mip_levels = 1) -> void;
-
+  Core::u32 mip_levels = 1,
+  Core::u32 current_mip_base = 0) -> void;
 auto
 transition_image_layout(
   VkImage image,
   VkImageLayout old_layout,
   VkImageLayout new_layout,
   VkImageAspectFlags aspect_mask = VK_IMAGE_ASPECT_COLOR_BIT,
-  Core::u32 mip_levels = 1) -> void;
+  Core::u32 mip_levels = 1,
+  Core::u32 current_mip_base = 0) -> void;
+
+auto
+copy_buffer_to_image(VkCommandBuffer,
+                     VkBuffer buffer,
+                     VkImage image,
+                     Core::u32 width,
+                     Core::u32 height) -> void;
+
+auto
+copy_buffer_to_image(VkCommandBuffer, const Core::DataBuffer&, Image&) -> void;
 
 auto
 copy_buffer_to_image(VkBuffer buffer,
@@ -139,26 +150,36 @@ public:
 
   ~Image();
   Image() = default;
-  Image(const ImageConfiguration&);
+  explicit Image(const ImageConfiguration&);
 
   Image(const Image&) = delete;
   auto operator=(const Image&) -> Image& = delete;
   Image(Image&&) = delete;
   auto operator=(Image&&) -> Image& = delete;
 
-  auto get_aspect_flags() const -> VkImageAspectFlags { return aspect_mask; }
-  auto hash() const -> Core::usize;
+  [[nodiscard]] auto get_aspect_flags() const -> VkImageAspectFlags
+  {
+    return aspect_mask;
+  }
+  [[nodiscard]] auto hash() const -> Core::usize;
   auto destroy() -> void;
-  auto get_descriptor_info() const -> const VkDescriptorImageInfo&;
+  [[nodiscard]] auto get_descriptor_info() const
+    -> const VkDescriptorImageInfo&;
 
   auto get_layer_image_view(Core::u32 index) -> VkImageView
   {
+    if (layer_image_views.empty() || index > layer_image_views.size()) {
+      return nullptr;
+    }
+
     return layer_image_views.at(index);
   }
   auto create_specific_layer_image_views(
     const std::span<const Core::u32> indices) -> void;
   auto invalidate() -> void;
+  auto generate_mips(CommandBuffer&) -> void;
   auto generate_mips() -> void;
+  auto generate_mips(VkCommandBuffer) -> void;
 
   auto get_mip_levels() const { return configuration.mip_levels; }
   auto get_sample_count() const { return configuration.sample_count; }
@@ -174,6 +195,7 @@ public:
   {
     const std::string path;
     const VkSampleCountFlagBits sample_count{ VK_SAMPLE_COUNT_1_BIT };
+    const bool use_mips{ false };
   };
   static auto load_from_file(const Configuration&) -> Core::Ref<Image>;
   static auto load_from_memory(Core::u32,

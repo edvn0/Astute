@@ -19,8 +19,9 @@ Material::Material(Configuration config)
 
   if (!shader_buffers.empty()) {
     Core::u32 size = 0;
-    for (auto&& [name, buffer] : shader_buffers)
+    for (auto&& [name, buffer] : shader_buffers) {
       size += buffer.size;
+    }
 
     uniform_storage.set_size_and_reallocate(size);
     uniform_storage.fill_zero();
@@ -28,14 +29,14 @@ Material::Material(Configuration config)
 }
 
 auto
-Material::set(const std::string_view name,
-              const Core::Ref<Image>& image) -> bool
+Material::set(const std::string_view name, const Core::Ref<Image>& image)
+  -> bool
 {
   if (!image) {
     return false;
   }
   const auto* resource = find_resource_by_name(name);
-  if (!resource) {
+  if (resource == nullptr) {
     error("Could not find {} as a uniform.", name);
     return false;
   }
@@ -139,9 +140,8 @@ Material::find_resource_by_name(const std::string_view name) const
 }
 
 auto
-Material::set(const std::string_view name,
-              const void* data,
-              Core::usize size) -> void
+Material::set(const std::string_view name, const void* data, Core::usize size)
+  -> void
 {
   const auto& shader_buffers = shader->get_reflection_data().constant_buffers;
   const Engine::Reflection::ShaderUniform* found = nullptr;
@@ -151,7 +151,7 @@ Material::set(const std::string_view name,
     }
   }
 
-  if (!found) {
+  if (found == nullptr) {
     return;
   }
 

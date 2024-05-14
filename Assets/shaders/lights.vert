@@ -17,7 +17,7 @@ layout(location = 0) out vec3 fragment_normal;
 layout(location = 1) out vec3 fragment_tangents;
 layout(location = 2) out vec3 fragment_bitangents;
 layout(location = 3) out vec2 fragment_uvs;
-layout(location = 4) out vec3 world_space_fragment_position;
+layout(location = 4) out vec4 world_space_fragment_position;
 layout(location = 5) out vec4 shadow_space_fragment_position;
 layout(location = 6) out vec4 fragment_colour;
 
@@ -39,7 +39,6 @@ const mat4 bias = mat4(0.5,
                        1.0);
 
 invariant precise gl_Position;
-
 void
 main()
 {
@@ -54,8 +53,12 @@ main()
   fragment_bitangents = normalize(local_normals * normalize(bitangents));
   fragment_uvs = uvs;
 
-  world_space_fragment_position = computed.xyz;
+  world_space_fragment_position = computed;
   shadow_space_fragment_position = bias * shadow.view_projection * computed;
 
-  fragment_colour = vec4(random_color(uvs, 0), 1.0F);
+  if (gl_InstanceIndex < 300) {
+    fragment_colour = vec4(point_lights.lights[gl_InstanceIndex].radiance, 1.0);
+  } else {
+    fragment_colour = vec4(spot_lights.lights[gl_InstanceIndex].radiance, 1.0);
+  }
 }

@@ -133,7 +133,6 @@ public:
     if (!data) {
       throw WriteRangeException{ "DataBuffer::read: data is null" };
     }
-    // Do i need to cast the input_data to u8*?
     std::memcpy(output.data(), data.get(), input_size);
   }
 
@@ -147,7 +146,6 @@ public:
     if (!data) {
       throw WriteRangeException{ "DataBuffer::read: data is null" };
     }
-    // Do i need to cast the input_data to u8*?
     std::memcpy(output.data(), data.get(), size);
   }
 

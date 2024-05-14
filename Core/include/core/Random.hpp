@@ -24,6 +24,8 @@ random_in(const AABB&) -> glm::vec3;
 
 auto
 random_colour() -> glm::vec4;
+auto
+random_colour3() -> glm::vec3;
 
 auto
 random(Core::f32 min, Core::f32 max) -> Core::f32;

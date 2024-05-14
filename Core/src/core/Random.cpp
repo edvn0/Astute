@@ -41,6 +41,17 @@ random_colour() -> glm::vec4
 }
 
 auto
+random_colour3() -> glm::vec3
+{
+  static std::uniform_real_distribution distribution{ 0.0, 1.0 };
+  return {
+    distribution(engine),
+    distribution(engine),
+    distribution(engine),
+  };
+}
+
+auto
 random(Core::f32 min, Core::f32 max) -> Core::f32
 {
   std::uniform_real_distribution distribution{ min, max };
