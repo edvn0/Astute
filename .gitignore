@@ -1,6 +1,8 @@
 # Prerequisites
 *.d
 
+test_output
+
 vscode-build
 build
 out

@@ -2,8 +2,10 @@
 
 #include "core/Random.hpp"
 #include "core/Scene.hpp"
+#include "graphics/Device.hpp"
 #include "graphics/Material.hpp"
 #include "graphics/Vertex.hpp"
+#include "logging/Logger.hpp"
 
 #include "graphics/Renderer.hpp"
 
@@ -16,6 +18,8 @@ Scene::Scene(const std::string_view name_view)
 {
   auto cube_mesh = Core::make_ref<Graphics::StaticMesh>(
     Core::make_ref<Graphics::MeshAsset>("Assets/meshes/cube/cube.gltf"));
+
+  info("Creating scene: {}", name);
   auto sponza_mesh =
     Graphics::StaticMesh::construct("Assets/meshes/sponza/sponza.obj");
 
@@ -66,6 +70,14 @@ Scene::Scene(const std::string_view name_view)
 auto
 Scene::on_update_editor(f64) -> void
 {
+  if (!scene_tasks.empty()) {
+    auto& task = scene_tasks.front();
+    if (task.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+      task.get();
+      scene_tasks.pop();
+    }
+  }
+
   // Improved gradient for color based on rotation
   // Using different frequencies and phases for color channels
   light_environment.colour_and_intensity = {
@@ -130,8 +142,8 @@ Scene::on_update_editor(f64) -> void
 }
 
 auto
-Scene::on_render_editor(Graphics::Renderer& renderer, const Camera& camera)
-  -> void
+Scene::on_render_editor(Graphics::Renderer& renderer,
+                        const Camera& camera) -> void
 {
   light_environment.sun_position = { camera.get_position(), 1.0F };
 

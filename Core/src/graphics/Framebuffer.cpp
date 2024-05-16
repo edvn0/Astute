@@ -252,9 +252,9 @@ Framebuffer::invalidate() -> void
         attachment_images[attachment_index] = existing_image;
       } else {
         auto& image = attachment_images[attachment_index];
-        // ImageSpecification& spec = image->GetSpecification();
-        // spec.width = (Core::u32)(m_Width * config.Scale);
-        // spec.Height = (Core::u32)(m_Height * config.Scale);
+        auto& spec = image->configuration;
+        spec.width = scaled_width();
+        spec.height = scaled_height();
         colour_attachment = image;
         if (colour_attachment->get_layer_count() == 1) {
           colour_attachment->invalidate();

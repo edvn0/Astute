@@ -13,6 +13,7 @@
 
 #include <span>
 #include <stb_image.h>
+#include <stb_image_write.h>
 #include <vk_mem_alloc.h>
 
 template<>
@@ -396,6 +397,43 @@ Image::hash() const -> Core::usize
 }
 
 auto
+Image::load_from_file_into_staging(const std::string_view path,
+                                   Core::u32* out_w,
+                                   Core::u32* out_h)
+  -> Core::Scope<StagingBuffer>
+{
+  std::filesystem::path whole_path{ path };
+
+  if (!std::filesystem::exists(whole_path)) {
+    error("Could not find image at '{}'", whole_path.string());
+    throw std::runtime_error("Could not find image");
+  }
+
+  Core::i32 width{};
+  Core::i32 height{};
+  Core::i32 channels{};
+  auto* pixel_data = stbi_load(
+    whole_path.string().c_str(), &width, &height, &channels, STBI_rgb_alpha);
+
+  Core::DataBuffer data_buffer{ width * height * STBI_rgb_alpha };
+  data_buffer.write(std::span{
+    pixel_data, static_cast<Core::usize>(width * height * STBI_rgb_alpha) });
+  info("Loaded image from file '{}', size: {}",
+       whole_path.string(),
+       data_buffer.size());
+  stbi_image_free(pixel_data);
+
+  if (out_w) {
+    *out_w = static_cast<Core::u32>(width);
+  }
+  if (out_h) {
+    *out_h = static_cast<Core::u32>(height);
+  }
+
+  return Core::make_scope<StagingBuffer>(std::move(data_buffer));
+}
+
+auto
 Image::load_from_file(const Configuration& config) -> Core::Ref<Image>
 {
   Core::Ref<Image> image = Core::make_ref<Image>();
@@ -527,6 +565,75 @@ Image::load_from_memory(Core::u32 width,
   return image;
 }
 
+auto
+Image::load_from_memory(const CommandBuffer* buffer,
+                        Core::u32 width,
+                        Core::u32 height,
+                        const Graphics::StagingBuffer& staging_buffer,
+                        const Configuration& config) -> Core::Ref<Image>
+{
+  static constexpr auto compute_mips_from_width_height = [](auto w, auto h) {
+    const auto max_of = std::max(w, h);
+    return static_cast<Core::u32>(std::floor(std::log2(max_of)) + 1);
+  };
+  Core::Ref<Image> image = Core::make_ref<Image>(ImageConfiguration{
+    .width = width,
+    .height = height,
+    .mip_levels =
+      config.use_mips ? compute_mips_from_width_height(width, height) : 1,
+    .sample_count = config.sample_count,
+    .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+             VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+    .additional_name_data = std::format("LoadedFromMemory@{}", config.path) });
+
+  transition_image_layout(buffer->get_command_buffer(),
+                          image->image,
+                          VK_IMAGE_LAYOUT_UNDEFINED,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                          image->get_aspect_flags(),
+                          image->get_mip_levels());
+  VkBufferImageCopy region{};
+  region.bufferOffset = 0;
+  region.bufferRowLength = 0;
+  region.bufferImageHeight = 0;
+  region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  region.imageSubresource.mipLevel = 0;
+  region.imageSubresource.baseArrayLayer = 0;
+  region.imageSubresource.layerCount = 1;
+  region.imageOffset = {
+    0,
+    0,
+    0,
+  };
+  region.imageExtent = {
+    width,
+    height,
+    1,
+  };
+
+  info("Region extent: {}x{}",
+       region.imageExtent.width,
+       region.imageExtent.height);
+
+  vkCmdCopyBufferToImage(buffer->get_command_buffer(),
+                         staging_buffer.get_buffer(),
+                         image->image,
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                         1,
+                         &region);
+
+  if (image->get_mip_levels() > 1) {
+    image->generate_mips(buffer->get_command_buffer());
+  } else {
+    transition_image_layout(buffer->get_command_buffer(),
+                            image->image,
+                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                            image->get_layout(),
+                            image->get_aspect_flags(),
+                            image->get_mip_levels());
+  }
+  return image;
+}
 auto
 Image::resolve_msaa(const Image&, const CommandBuffer*) -> Core::Scope<Image>
 {
@@ -827,9 +934,92 @@ Image::invalidate_hash() -> void
                std::bit_cast<const void*>(view),
                std::bit_cast<const void*>(sampler),
                std::bit_cast<const void*>(image));
+}
 
-  // We hash the vulkan handles because we need the material to be recreated if
-  // the image is recreated
+auto
+Image::write_to_file(const std::string_view path) -> bool
+{
+  std::filesystem::path file_path{ path };
+  // Check parent directory exists
+  if (!std::filesystem::exists(file_path.parent_path())) {
+    error("Parent directory does not exist for file '{}'", path);
+    return false;
+  }
+
+  auto layout = configuration.layout;
+  auto aspect = aspect_mask;
+  auto mip_levels = configuration.mip_levels;
+  auto width = configuration.width;
+  auto height = configuration.height;
+
+  // Need to transition to general, copy into vkbuffer, copy vkbuffer data to a
+  // DataBuffer, then write to file, then transition back
+
+  VkBufferCreateInfo buffer_create_info{};
+  buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+  buffer_create_info.size = width * height * 4;
+  buffer_create_info.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+  VkBuffer staging_buffer{};
+  VmaAllocationInfo staging_allocation_info{};
+  Allocator allocator{ "Image" };
+  auto allocation = allocator.allocate_buffer(
+    staging_buffer,
+    staging_allocation_info,
+    buffer_create_info,
+    {
+      .usage = Usage::AUTO_PREFER_DEVICE,
+      .creation = Creation::HOST_ACCESS_RANDOM_BIT | Creation::MAPPED_BIT,
+    });
+
+  Core::DataBuffer data_buffer{ width * height * 4 };
+  Device::the().execute_immediate([&](auto* cmd_buffer) {
+    transition_image_layout(cmd_buffer,
+                            image,
+                            layout,
+                            VK_IMAGE_LAYOUT_GENERAL,
+                            aspect,
+                            mip_levels,
+                            0);
+    VkBufferImageCopy region{};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = {
+      0,
+      0,
+      0,
+    };
+    region.imageExtent = {
+      width,
+      height,
+      1,
+    };
+
+    vkCmdCopyImageToBuffer(
+      cmd_buffer, image, VK_IMAGE_LAYOUT_GENERAL, staging_buffer, 1, &region);
+
+    auto* mapped = static_cast<Core::u8*>(staging_allocation_info.pMappedData);
+    data_buffer.write(mapped, width * height * 4);
+
+    transition_image_layout(cmd_buffer,
+                            image,
+                            VK_IMAGE_LAYOUT_GENERAL,
+                            layout,
+                            aspect,
+                            mip_levels,
+                            0);
+  });
+
+  auto output = stbi_write_png(
+    file_path.string().c_str(), width, height, 4, data_buffer.raw(), width * 4);
+
+  allocator.deallocate_buffer(allocation, staging_buffer);
+  return output != 0;
 }
 
 } // namespace Engine::Graphic

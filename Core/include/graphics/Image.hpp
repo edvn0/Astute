@@ -3,6 +3,7 @@
 #include "core/DataBuffer.hpp"
 
 #include "graphics/CommandBuffer.hpp"
+#include "graphics/GPUBuffer.hpp"
 
 #include <vulkan/vulkan.h>
 
@@ -189,6 +190,8 @@ public:
   auto get_usage() const { return configuration.usage; }
   auto get_layer_count() const { return configuration.layers; }
 
+  auto write_to_file(std::string_view path) -> bool;
+
   auto hash() -> Core::usize;
 
   struct Configuration
@@ -198,11 +201,22 @@ public:
     const bool use_mips{ false };
   };
   static auto load_from_file(const Configuration&) -> Core::Ref<Image>;
+  static auto load_from_file_into_staging(std::string_view,
+                                          Core::u32* = nullptr,
+                                          Core::u32* = nullptr)
+    -> Core::Scope<StagingBuffer>;
 
   static auto load_from_memory(Core::u32,
                                Core::u32,
                                const Core::DataBuffer&,
                                const Configuration&) -> Core::Ref<Image>;
+
+  static auto load_from_memory(const CommandBuffer*,
+                               Core::u32,
+                               Core::u32,
+                               const Graphics::StagingBuffer&,
+                               const Configuration&) -> Core::Ref<Image>;
+
   static auto resolve_msaa(const Image&, const CommandBuffer* = nullptr)
     -> Core::Scope<Image>;
   static auto reference_resolve_msaa(const Image&,

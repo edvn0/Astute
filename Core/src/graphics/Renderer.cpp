@@ -195,6 +195,13 @@ Renderer::Renderer(Configuration config, const Window* window)
     static_cast<Core::usize>(light_culling_work_groups.x *
                              light_culling_work_groups.y) *
     4 * 1024);
+
+  struct
+  {
+    auto get_device() const -> VkDevice { return Device::the().device(); }
+    auto get_queue_type() const -> QueueType { return QueueType::Graphics; }
+  } a{};
+  thread_pool = Core::make_scope<ED::ThreadPool>(a, 4U);
 }
 
 Renderer::~Renderer() = default;
@@ -210,6 +217,8 @@ Renderer::destruct() -> void
   }
 
   command_buffer.reset();
+
+  thread_pool.reset();
 }
 
 auto
@@ -225,10 +234,12 @@ Renderer::begin_scene(Core::Scene& scene,
     auto& main_geom = get_render_pass("MainGeometry");
     auto& deferred = get_render_pass("Deferred");
     auto& predepth = get_render_pass("Predepth");
+    auto& lights = get_render_pass("Lights");
     predepth.on_resize(size);
     shadow_render_pass.on_resize(size);
     main_geom.on_resize(size);
     deferred.on_resize(size);
+    lights.on_resize(size);
 
     const glm::uvec2 viewport_size{ size.width, size.height };
 

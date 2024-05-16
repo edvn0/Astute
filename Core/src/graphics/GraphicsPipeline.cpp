@@ -152,6 +152,16 @@ GraphicsPipeline::create_pipeline() -> void
     static_cast<Core::u32>(binding_descriptions.size());
   vertex_input_info.pVertexBindingDescriptions = binding_descriptions.data();
 
+  if ((override_instance_attributes.has_value() &&
+       override_instance_attributes->empty()) &&
+      (override_vertex_attributes.has_value() &&
+       override_vertex_attributes->empty())) {
+    vertex_input_info.vertexAttributeDescriptionCount = 0;
+    vertex_input_info.pVertexAttributeDescriptions = nullptr;
+    vertex_input_info.vertexBindingDescriptionCount = 0;
+    vertex_input_info.pVertexBindingDescriptions = nullptr;
+  }
+
   VkPipelineInputAssemblyStateCreateInfo input_assembly_info{};
   input_assembly_info.sType =
     VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;

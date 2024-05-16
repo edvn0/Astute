@@ -51,6 +51,8 @@ private:
   auto create_fences() -> void;
 
   auto destroy() -> void;
+
+  auto is_secondary() const -> bool { return !primary; } 
 };
 
 } // namespace Engine::Graphics

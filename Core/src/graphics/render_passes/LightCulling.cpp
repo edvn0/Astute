@@ -24,7 +24,20 @@ namespace Engine::Graphics {
 auto
 LightCullingRenderPass::construct() -> void
 {
-  on_resize(get_renderer().get_size());
+  auto&& [_,
+          light_culling_shader,
+          light_culling_pipeline,
+          light_culling_material] = get_data();
+  light_culling_shader =
+    Shader::compile_compute_scoped("Assets/shaders/light_culling.comp");
+
+  light_culling_pipeline =
+    Core::make_scope<ComputePipeline>(ComputePipeline::Configuration{
+      .shader = light_culling_shader.get(),
+    });
+  light_culling_material = Core::make_scope<Material>(Material::Configuration{
+    .shader = light_culling_shader.get(),
+  });
 }
 
 auto
@@ -68,22 +81,10 @@ LightCullingRenderPass::destruct_impl() -> void
 }
 
 auto
-LightCullingRenderPass::on_resize(const Core::Extent&) -> void
+LightCullingRenderPass::on_resize(const Core::Extent& ext) -> void
 {
-  auto&& [_,
-          light_culling_shader,
-          light_culling_pipeline,
-          light_culling_material] = get_data();
-  light_culling_shader =
-    Shader::compile_compute_scoped("Assets/shaders/light_culling.comp");
-
-  light_culling_pipeline =
-    Core::make_scope<ComputePipeline>(ComputePipeline::Configuration{
-      .shader = light_culling_shader.get(),
-    });
-  light_culling_material = Core::make_scope<Material>(Material::Configuration{
-    .shader = light_culling_shader.get(),
-  });
+  auto& [___, __, pipe, _] = get_data();
+  pipe->on_resize(ext);
 }
 
 } // namespace Engine::Graphics

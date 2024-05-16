@@ -3,8 +3,15 @@
 #include "core/Types.hpp"
 #include "graphics/Types.hpp"
 
+#include <functional>
 #include <unordered_set>
 #include <vulkan/vulkan.h>
+
+#include "thread_pool/ThreadPool.hpp"
+
+#ifdef ASTUTE_USE_MUTEX_ACCESS
+#include <mutex>
+#endif
 
 namespace Engine::Graphics {
 
@@ -22,14 +29,18 @@ public:
   static auto initialise(VkSurfaceKHR = nullptr) -> void;
   auto device() const -> const VkDevice&
   {
+#ifdef ASTUTE_USE_MUTEX_ACCESS
     static std::mutex mutex;
     std::scoped_lock lock{ mutex };
+#endif
     return vk_device;
   }
   auto device() -> VkDevice
   {
+#ifdef ASTUTE_USE_MUTEX_ACCESS
     static std::mutex mutex;
     std::scoped_lock lock{ mutex };
+#endif
     return vk_device;
   }
   auto physical() -> VkPhysicalDevice { return vk_physical_device; }

@@ -5,6 +5,8 @@
 #include "graphics/Material.hpp"
 #include "graphics/Vertex.hpp"
 
+#include "thread_pool/CommandBufferDispatcher.hpp"
+
 #include <vector>
 
 struct aiNode;
@@ -15,6 +17,37 @@ struct aiScene;
 namespace Assimp {
 class Importer;
 }
+
+namespace Engine::Graphics {
+
+enum class TextureType : Core::u8
+{
+  Albedo,
+  Normal,
+  Specular,
+  Roughness,
+};
+
+struct Key
+{
+  TextureType type;
+  Core::u32 index;
+
+  constexpr auto operator<=>(const Key&) const = default;
+};
+
+}
+
+template<>
+struct std::hash<Engine::Graphics::Key>
+{
+  auto operator()(const Engine::Graphics::Key& key) const noexcept
+    -> Engine::Core::usize
+  {
+    return std::hash<Engine::Graphics::TextureType>{}(key.type) ^
+           std::hash<Engine::Core::u32>{}(key.index);
+  }
+};
 
 namespace Engine::Graphics {
 
@@ -108,6 +141,11 @@ private:
   Core::AABB bounding_box;
 
   std::string file_path;
+
+  ED::CommandBufferDispatcher dispatcher;
+  std::mutex mutex;
+  std::unordered_map<Key, Core::Scope<StagingBuffer>> image_staging_buffers;
+  std::unordered_map<Key, Core::Ref<Image>> output_images;
 
   friend class Core::Scene;
   friend class Renderer;

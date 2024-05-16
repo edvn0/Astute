@@ -22,7 +22,41 @@ namespace Engine::Graphics {
 auto
 MainGeometryRenderPass::construct() -> void
 {
-  on_resize(get_renderer().get_size());
+  const auto& ext = get_renderer().get_size();
+  auto&& [main_geometry_framebuffer,
+          main_geometry_shader,
+          main_geometry_pipeline,
+          main_geometry_material] = get_data();
+  main_geometry_framebuffer =
+    Core::make_scope<Framebuffer>(FramebufferSpecification{
+      .width = ext.width,
+      .height= ext.height,
+      .clear_depth_on_load = false,
+      .attachments = {
+          VK_FORMAT_R32G32B32A32_SFLOAT, // world pos
+          VK_FORMAT_R32G32B32A32_SFLOAT, // normals
+          VK_FORMAT_R32G32B32A32_SFLOAT, // albedo + specular strength
+          VK_FORMAT_R32G32B32A32_SFLOAT, // shadow position
+          VK_FORMAT_D32_SFLOAT, // depth
+      },
+      .samples = VK_SAMPLE_COUNT_1_BIT,
+      .existing_images = { {4, get_renderer().get_render_pass("Predepth").get_depth_attachment(), }, },
+      .debug_name = "MainGeometry",
+    });
+  main_geometry_shader = Shader::compile_graphics_scoped(
+    "Assets/shaders/main_geometry.vert", "Assets/shaders/main_geometry.frag");
+  main_geometry_pipeline =
+    Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
+      .framebuffer = main_geometry_framebuffer.get(),
+      .shader = main_geometry_shader.get(),
+      .sample_count = VK_SAMPLE_COUNT_1_BIT,
+      .cull_mode = VK_CULL_MODE_BACK_BIT,
+      .face_mode = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+      .depth_comparator = VK_COMPARE_OP_EQUAL,
+    });
+  main_geometry_material = Core::make_scope<Material>(Material::Configuration{
+    .shader = main_geometry_shader.get(),
+  });
 }
 
 auto
@@ -97,40 +131,10 @@ MainGeometryRenderPass::destruct_impl() -> void
 auto
 MainGeometryRenderPass::on_resize(const Core::Extent& ext) -> void
 {
-  auto&& [main_geometry_framebuffer,
-          main_geometry_shader,
-          main_geometry_pipeline,
-          main_geometry_material] = get_data();
-  main_geometry_framebuffer =
-    Core::make_scope<Framebuffer>(FramebufferSpecification{
-      .width = ext.width,
-      .height= ext.height,
-      .clear_depth_on_load = false,
-      .attachments = {
-          VK_FORMAT_R32G32B32A32_SFLOAT, // world pos
-          VK_FORMAT_R32G32B32A32_SFLOAT, // normals
-          VK_FORMAT_R32G32B32A32_SFLOAT, // albedo + specular strength
-          VK_FORMAT_R32G32B32A32_SFLOAT, // shadow position
-          VK_FORMAT_D32_SFLOAT, // depth
-      },
-      .samples = VK_SAMPLE_COUNT_1_BIT,
-      .existing_images = { {4, get_renderer().get_render_pass("Predepth").get_depth_attachment(), }, },
-      .debug_name = "MainGeometry",
-    });
-  main_geometry_shader = Shader::compile_graphics_scoped(
-    "Assets/shaders/main_geometry.vert", "Assets/shaders/main_geometry.frag");
-  main_geometry_pipeline =
-    Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
-      .framebuffer = main_geometry_framebuffer.get(),
-      .shader = main_geometry_shader.get(),
-      .sample_count = VK_SAMPLE_COUNT_1_BIT,
-      .cull_mode = VK_CULL_MODE_BACK_BIT,
-      .face_mode = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-      .depth_comparator = VK_COMPARE_OP_EQUAL,
-    });
-  main_geometry_material = Core::make_scope<Material>(Material::Configuration{
-    .shader = main_geometry_shader.get(),
-  });
+  auto&& [fb, _, pipe, __] = get_data();
+
+  fb->on_resize(ext);
+  pipe->on_resize(ext);
 }
 
 } // namespace Engine::Graphics

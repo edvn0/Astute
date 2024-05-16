@@ -121,9 +121,10 @@ LightsRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 auto
 LightsRenderPass::on_resize(const Core::Extent& ext) -> void
 {
-  auto&& [framebuffer, shader, pipeline, material] = get_data();
-  framebuffer->on_resize(ext);
-  pipeline->on_resize(ext);
+  auto&& [fb, _, pipe, __] = get_data();
+
+  fb->on_resize(ext);
+  pipe->on_resize(ext);
 }
 
 auto

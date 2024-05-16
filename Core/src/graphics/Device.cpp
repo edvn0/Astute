@@ -4,6 +4,8 @@
 #include "graphics/Instance.hpp"
 #include "logging/Logger.hpp"
 
+#include "graphics/CommandBuffer.hpp"
+
 namespace Engine::Graphics {
 
 auto

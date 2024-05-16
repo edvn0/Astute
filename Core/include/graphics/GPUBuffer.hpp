@@ -82,9 +82,8 @@ public:
   }
 
   explicit StagingBuffer(Core::DataBuffer&& data)
-    : buffer(GPUBufferType::Staging, data.size())
+    : StagingBuffer(data.span())
   {
-    buffer.write(data.span());
   }
 
   [[nodiscard]] auto size() const -> Core::usize { return buffer.get_size(); }

@@ -117,11 +117,17 @@ CommandBuffer::end() -> void
 {
   vkEndCommandBuffer(active_command_buffer);
 }
+
 auto
 CommandBuffer::submit() -> void
 {
-  if (owned_by_swapchain)
+  if (owned_by_swapchain) {
     return;
+  }
+
+  if (is_secondary()) {
+    return;
+  }
 
   const auto& device = Device::the();
   VkSubmitInfo submit_info{};

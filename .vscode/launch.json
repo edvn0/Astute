@@ -27,7 +27,7 @@
       "type": "cppvsdbg",
       "request": "launch",
       "name": "Test",
-      "program": "${workspaceRoot}/build/ThreadPool/Tests/Debug/ThreadPoolTests",
+      "program": "${workspaceRoot}/build/Modules/ThreadPool/Tests/Debug/ThreadPoolTests",
       "cwd": "${workspaceRoot}"
     }
   ]

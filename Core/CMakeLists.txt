@@ -101,7 +101,7 @@ target_include_directories(Core SYSTEM PRIVATE
     ${CMAKE_SOURCE_DIR}/Library/VulkanMemoryAllocator/include
     ${CMAKE_SOURCE_DIR}/Library/filewatch)
 
-target_link_libraries(Core PUBLIC glfw Vulkan::Vulkan PRIVATE imgui glm EnTT::EnTT stbimage::stbimage assimp FastNoise2 ShaderCompilation Logging Platform)
+target_link_libraries(Core PUBLIC ThreadPool glfw Vulkan::Vulkan PRIVATE VulkanMemoryAllocator imgui glm EnTT::EnTT stbimage::stbimage assimp FastNoise2 ShaderCompilation Logging Platform)
 target_precompile_headers(Core PRIVATE include/pch/CorePCH.hpp)
 target_compile_definitions(Core PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)
 

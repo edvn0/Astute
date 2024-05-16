@@ -17,7 +17,37 @@ namespace Engine::Graphics {
 auto
 PredepthRenderPass::construct() -> void
 {
-  on_resize(get_renderer().get_size());
+  const auto& ext = get_renderer().get_size();
+  auto&& [predepth_framebuffer,
+          predepth_shader,
+          predepth_pipeline,
+          predepth_material] = get_data();
+  predepth_framebuffer = Core::make_scope<Framebuffer>(FramebufferSpecification{
+    .width = ext.width,
+    .height = ext.height,
+    .clear_depth_on_load = false,
+    .attachments = { VK_FORMAT_D32_SFLOAT },
+    .debug_name = "Predepth",
+  });
+
+  predepth_shader = Shader::compile_graphics_scoped(
+    "Assets/shaders/predepth.vert", "Assets/shaders/empty.frag");
+  predepth_pipeline =
+    Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
+      .framebuffer = predepth_framebuffer.get(),
+      .shader = predepth_shader.get(),
+      .sample_count = VK_SAMPLE_COUNT_1_BIT,
+      .cull_mode = VK_CULL_MODE_BACK_BIT,
+      .face_mode = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+      .depth_comparator = VK_COMPARE_OP_GREATER,
+      .override_vertex_attributes = { {
+        { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
+      } },
+    });
+
+  predepth_material = Core::make_scope<Material>(Material::Configuration{
+    .shader = predepth_shader.get(),
+  });
 }
 
 auto
@@ -98,36 +128,10 @@ PredepthRenderPass::destruct_impl() -> void
 auto
 PredepthRenderPass::on_resize(const Core::Extent& ext) -> void
 {
-  auto&& [predepth_framebuffer,
-          predepth_shader,
-          predepth_pipeline,
-          predepth_material] = get_data();
-  predepth_framebuffer = Core::make_scope<Framebuffer>(FramebufferSpecification{
-    .width = ext.width,
-    .height = ext.height,
-    .clear_depth_on_load = false,
-    .attachments = { VK_FORMAT_D32_SFLOAT },
-    .debug_name = "Predepth",
-  });
+  auto&& [fb, _, pipe, __] = get_data();
 
-  predepth_shader = Shader::compile_graphics_scoped(
-    "Assets/shaders/predepth.vert", "Assets/shaders/empty.frag");
-  predepth_pipeline =
-    Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
-      .framebuffer = predepth_framebuffer.get(),
-      .shader = predepth_shader.get(),
-      .sample_count = VK_SAMPLE_COUNT_1_BIT,
-      .cull_mode = VK_CULL_MODE_BACK_BIT,
-      .face_mode = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-      .depth_comparator = VK_COMPARE_OP_GREATER,
-      .override_vertex_attributes = { {
-        { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
-      } },
-    });
-
-  predepth_material = Core::make_scope<Material>(Material::Configuration{
-    .shader = predepth_shader.get(),
-  });
+  fb->on_resize(ext);
+  pipe->on_resize(ext);
 }
 
 } // namespace Engine::Graphics

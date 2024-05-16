@@ -61,7 +61,39 @@ auto
 DeferredRenderPass::construct() -> void
 {
   noise_map = TextureGenerator::simplex_noise(100, 100);
-  on_resize(get_renderer().get_size());
+  const auto& ext = get_renderer().get_size();
+  auto&& [deferred_framebuffer,
+          deferred_shader,
+          deferred_pipeline,
+          deferred_material] = get_data();
+  deferred_framebuffer =
+    Core::make_scope<Framebuffer>(FramebufferSpecification{
+      .width = ext.width,
+      .height = ext.height,
+      .attachments = { VK_FORMAT_R32G32B32A32_SFLOAT, },
+      .debug_name = "Deferred",
+    });
+
+  deferred_shader = Shader::compile_graphics_scoped(
+    "Assets/shaders/deferred.vert", "Assets/shaders/deferred.frag");
+  deferred_pipeline =
+    Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
+      .framebuffer = deferred_framebuffer.get(),
+      .shader = deferred_shader.get(),
+      .sample_count = VK_SAMPLE_COUNT_1_BIT,
+      .cull_mode = VK_CULL_MODE_BACK_BIT,
+      .depth_comparator = VK_COMPARE_OP_LESS,
+      .override_vertex_attributes = {
+          {  },
+        },
+      .override_instance_attributes = {
+          {  },
+        },
+    });
+
+  deferred_material = Core::make_scope<Material>(Material::Configuration{
+    .shader = deferred_shader.get(),
+  });
 
   setup_file_watcher("Assets/shaders/deferred.frag");
 }
@@ -128,38 +160,10 @@ DeferredRenderPass::destruct_impl() -> void
 auto
 DeferredRenderPass::on_resize(const Core::Extent& ext) -> void
 {
-  auto&& [deferred_framebuffer,
-          deferred_shader,
-          deferred_pipeline,
-          deferred_material] = get_data();
-  deferred_framebuffer =
-    Core::make_scope<Framebuffer>(FramebufferSpecification{
-      .width = ext.width,
-      .height = ext.height,
-      .attachments = { VK_FORMAT_R32G32B32A32_SFLOAT, },
-      .debug_name = "Deferred",
-    });
+  auto&& [fb, _, pipe, __] = get_data();
 
-  deferred_shader = Shader::compile_graphics_scoped(
-    "Assets/shaders/deferred.vert", "Assets/shaders/deferred.frag");
-  deferred_pipeline =
-    Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
-      .framebuffer = deferred_framebuffer.get(),
-      .shader = deferred_shader.get(),
-      .sample_count = VK_SAMPLE_COUNT_1_BIT,
-      .cull_mode = VK_CULL_MODE_BACK_BIT,
-      .depth_comparator = VK_COMPARE_OP_LESS,
-      .override_vertex_attributes = {
-          {  },
-        },
-      .override_instance_attributes = {
-          {  },
-        },
-    });
-
-  deferred_material = Core::make_scope<Material>(Material::Configuration{
-    .shader = deferred_shader.get(),
-  });
+  fb->on_resize(ext);
+  pipe->on_resize(ext);
 }
 
 void

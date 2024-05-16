@@ -9,16 +9,13 @@
 
 namespace ED {
 
+ThreadPool::~ThreadPool() = default;
+
 auto
 ThreadPool::initialise(std::uint32_t thread_count,
                        VkDevice device,
                        Engine::Graphics::QueueType type) -> void
 {
-  mutexes.resize(thread_count);
-  for (auto& m : mutexes) {
-    m = Engine::Core::make_scope<std::mutex>();
-  }
-
   command_buffers.resize(thread_count);
   // Create a command buffer for each thread
   for (auto& cb : command_buffers) {

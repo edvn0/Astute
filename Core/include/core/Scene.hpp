@@ -8,10 +8,14 @@
 #include "graphics/Mesh.hpp"
 #include "graphics/ShaderBuffers.hpp"
 
+#include "thread_pool/ResultContainer.hpp"
+
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
 #include <entt/entt.hpp>
+#include <mutex>
+#include <queue>
 
 namespace Engine::Core {
 
@@ -106,9 +110,13 @@ public:
   }
 
 private:
+  std::mutex registry_mutex;
   entt::registry registry;
+
   std::string name;
 
   LightEnvironment light_environment;
+  std::queue<std::future<void>> scene_tasks;
 };
+
 }

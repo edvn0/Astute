@@ -5,7 +5,9 @@ set(CMAKE_CXX_STANDARD 20)
 
 set(SOURCES
     include/thread_pool/ThreadPool.hpp
+    include/thread_pool/CommandBufferDispatcher.hpp
     src/thread_pool/ThreadPool.cpp
+    src/thread_pool/CommandBufferDispatcher.cpp
 )
 add_library(ThreadPool STATIC ${SOURCES})
 target_link_libraries(ThreadPool Vulkan::Vulkan)

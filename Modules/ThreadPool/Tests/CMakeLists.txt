@@ -14,9 +14,11 @@ FetchContent_MakeAvailable(googletest)
 add_executable(
     ThreadPoolTests
     simple_test.cpp
+    command_buffer_dispatcher_test.cpp
 )
 target_link_libraries(
     ThreadPoolTests
+    PRIVATE
     GTest::gtest_main
     ThreadPool
     Core

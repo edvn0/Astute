@@ -24,7 +24,7 @@ class ThreadPool
 {
 public:
   explicit ThreadPool(
-    const DeviceProvider auto& device_provider,
+    const DeviceProvider auto device_provider,
     std::uint32_t thread_count = std::thread::hardware_concurrency())
     : device(device_provider.get_device())
   {
@@ -32,6 +32,7 @@ public:
                device_provider.get_device(),
                device_provider.get_queue_type());
   }
+  ~ThreadPool();
 
   template<typename F>
   auto enqueue_task(F&& f) -> std::future<decltype(f())>
@@ -47,26 +48,29 @@ public:
     auto* this_ptr = this;
     auto task = [f = std::forward<F>(f),
                  &buffers = command_buffers,
-                 &mutexes = mutexes,
+                 &m = big_lock,
                  this_ptr]() {
       const auto current_thread_index = BS::this_thread::get_index();
       if (!current_thread_index)
         throw std::runtime_error("No thread index");
 
       auto cmd_buffer = buffers[*current_thread_index].get();
-      auto& mutex = *mutexes[*current_thread_index];
       this_ptr->begin(*cmd_buffer);
 
       if constexpr (std::is_same_v<decltype(f(*cmd_buffer)), void>) {
         f(*cmd_buffer);
         this_ptr->end(*cmd_buffer);
-        std::lock_guard lock(mutex);
-        this_ptr->submit(*cmd_buffer);
+        {
+          std::lock_guard lock(m);
+          this_ptr->submit(*cmd_buffer);
+        }
       } else {
         auto computed = f(*cmd_buffer);
         this_ptr->end(*cmd_buffer);
-        std::lock_guard lock(mutex);
-        this_ptr->submit(*cmd_buffer);
+        {
+          std::lock_guard lock(m);
+          this_ptr->submit(*cmd_buffer);
+        }
         return computed;
       }
     };
@@ -77,16 +81,9 @@ public:
 private:
   BS::thread_pool thread_pool;
   std::vector<std::unique_ptr<Engine::Graphics::CommandBuffer>> command_buffers;
-  std::vector<Engine::Core::Scope<std::mutex>> mutexes;
-  std::atomic<unsigned int> next_index{
-    0
-  }; // Simple counter for buffer assignment
+  std::mutex big_lock;
   VkDevice device;
-  std::uint32_t queue_family_index;
-
-  auto initialise(std::uint32_t thread_count,
-                  VkDevice device,
-                  Engine::Graphics::QueueType) -> void;
+  auto initialise(std::uint32_t, VkDevice, Engine::Graphics::QueueType) -> void;
   auto begin(Engine::Graphics::CommandBuffer&) -> void;
   auto end(Engine::Graphics::CommandBuffer&) -> void;
   auto submit(Engine::Graphics::CommandBuffer&) -> void;

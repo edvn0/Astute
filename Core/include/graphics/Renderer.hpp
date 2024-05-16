@@ -155,6 +155,8 @@ public:
 
   auto set_technique(RendererTechnique tech) -> void { technique = tech; }
 
+  static auto get_thread_pool() -> ED::ThreadPool& { return *thread_pool; }
+
 private:
   Core::Extent size{ 0, 0 };
   Core::Extent old_size{ 0, 0 };
@@ -202,6 +204,8 @@ private:
   static inline Core::Ref<Image> black_texture;
 
   RendererTechnique technique{ RendererTechnique::Deferred };
+
+  static inline Core::Scope<ED::ThreadPool> thread_pool{ nullptr };
 
   friend class RenderPass;
   friend class DeferredRenderPass;

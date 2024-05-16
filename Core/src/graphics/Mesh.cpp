@@ -4,6 +4,7 @@
 
 #include "graphics/Renderer.hpp"
 #include "logging/Logger.hpp"
+#include "thread_pool/CommandBufferDispatcher.hpp"
 
 #include <assimp/DefaultLogger.hpp>
 #include <assimp/Importer.hpp>
@@ -241,136 +242,163 @@ MeshAsset::MeshAsset(const std::string& file_name)
         aiReturn_SUCCESS) {
       metalness = 0.0F;
     }
-
     auto roughness = 1.0F - glm::sqrt(shininess / 100.0F);
 
-    bool hasAlbedoMap = ai_material->GetTexture(
-                          aiTextureType_DIFFUSE, 0, &aiTexPath) == AI_SUCCESS;
-    bool fallback = !hasAlbedoMap;
-    if (hasAlbedoMap) {
-      Core::Ref<Image> texture;
-      if (auto embedded_texture =
-            scene->GetEmbeddedTexture(aiTexPath.C_Str())) {
-        Core::DataBuffer buffer{ embedded_texture->mWidth *
-                                 embedded_texture->mHeight * 4 };
-        buffer.write(embedded_texture->pcData,
-                     embedded_texture->mWidth * embedded_texture->mHeight * 4);
-        texture = Image::load_from_memory(embedded_texture->mWidth,
-                                          embedded_texture->mHeight,
-                                          std::move(buffer),
-                                          {
-                                            .use_mips = true,
-                                          });
-      } else {
-        std::filesystem::path path = file_name;
-        auto parent_path = path.parent_path();
-        parent_path /= std::string(aiTexPath.data);
-        std::string texture_path = parent_path.string();
-        texture = Image::load_from_file({
-          .path = texture_path,
-          .use_mips = true,
+    materials.at(i)->set("albedo_map", white_texture);
+    materials.at(i)->set("mat_pc.albedo_colour", glm::vec3(1.0F));
+    materials.at(i)->set("mat_pc.emission", 1.0F);
+
+    materials.at(i)->set("normal_map", white_texture);
+    materials.at(i)->set("mat_pc.use_normal_map", false);
+
+    materials.at(i)->set("specular_map", white_texture);
+
+    materials.at(i)->set("roughness_map", white_texture);
+    materials.at(i)->set("mat_pc.roughness", roughness);
+
+    static auto maybe_load_embedded_texture =
+      [k = i](auto& dispatcher,
+              TextureType T,
+              const aiTexture* embedded_texture,
+              auto& stagings,
+              auto& outputs,
+              auto& mutex) -> void {
+      if (embedded_texture == nullptr)
+        throw std::runtime_error("No texture");
+
+      const auto key = Key{
+        .type = T,
+        .index = static_cast<Core::u32>(k),
+      };
+
+      Core::DataBuffer buffer{ embedded_texture->mWidth *
+                               embedded_texture->mHeight * 4 };
+      buffer.write(embedded_texture->pcData,
+                   embedded_texture->mWidth * embedded_texture->mHeight * 4);
+
+      auto& staging_buffer = stagings[key];
+      staging_buffer = Core::make_scope<StagingBuffer>(std::move(buffer));
+
+      const auto width = embedded_texture->mWidth;
+      const auto height = embedded_texture->mHeight;
+
+      dispatcher.dispatch(
+        [=, &staging = staging_buffer, &images = outputs, &m = mutex](
+          auto* cmd) {
+          std::lock_guard lock(m);
+          images[key] = Image::load_from_memory(cmd,
+                                                width,
+                                                height,
+                                                *staging,
+                                                {
+                                                  .use_mips = true,
+                                                });
         });
-      }
+    };
 
-      if (texture) {
-        materials.at(i)->set("albedo_map", texture);
-        materials.at(i)->set("mat_pc.albedo_colour", glm::vec3(1.0F));
-        materials.at(i)->set("mat_pc.emission", 1.0F);
+    static auto load_texture_from_file =
+      [&, k = i](auto& dispatcher,
+                 TextureType T,
+                 const std::string& base_path,
+                 const std::string& texture_path,
+                 auto& stagings,
+                 auto& outputs,
+                 auto& mutex) -> void {
+      const auto key = Key{
+        .type = T,
+        .index = static_cast<Core::u32>(k),
+      };
+      std::filesystem::path path = base_path;
+      auto parent_path = path.parent_path();
+      parent_path /= texture_path;
+      std::string real_path = parent_path.string();
+
+      Core::u32 w{};
+      Core::u32 h{};
+
+      stagings[key] = Image::load_from_file_into_staging(real_path, &w, &h);
+      auto& created = stagings[key];
+
+      dispatcher.dispatch(
+        [=, &c = created, &images = outputs, &m = mutex](auto* cmd) {
+          std::lock_guard lock(m);
+          images[key] = Image::load_from_memory(cmd,
+                                                w,
+                                                h,
+                                                *c,
+                                                {
+                                                  .use_mips = true,
+                                                });
+        });
+    };
+
+    bool has_albedo_map = ai_material->GetTexture(
+                            aiTextureType_DIFFUSE, 0, &aiTexPath) == AI_SUCCESS;
+    if (has_albedo_map) {
+      if (const auto* embedded_texture =
+            scene->GetEmbeddedTexture(aiTexPath.C_Str())) {
+        maybe_load_embedded_texture(dispatcher,
+                                    TextureType::Albedo,
+                                    embedded_texture,
+                                    image_staging_buffers,
+                                    output_images,
+                                    mutex);
       } else {
-        fallback = true;
+        load_texture_from_file(dispatcher,
+                               TextureType::Albedo,
+                               file_name,
+                               aiTexPath.C_Str(),
+                               image_staging_buffers,
+                               output_images,
+                               mutex);
       }
-    }
-
-    if (fallback) {
-      materials.at(i)->set("albedo_map", white_texture);
-      materials.at(i)->set("mat_pc.albedo_colour", glm::vec3(1.0F));
-      materials.at(i)->set("mat_pc.emission", 1.0F);
     }
 
     // Normal maps
     bool has_normal_map = ai_material->GetTexture(
                             aiTextureType_NORMALS, 0, &aiTexPath) == AI_SUCCESS;
-    fallback = !has_normal_map;
     if (has_normal_map) {
-      Core::Ref<Image> texture;
       if (auto embedded_texture =
             scene->GetEmbeddedTexture(aiTexPath.C_Str())) {
-        Core::DataBuffer buffer{
-          embedded_texture->mWidth * embedded_texture->mHeight * 4,
-        };
-        buffer.write(std::span{
-          embedded_texture->pcData,
-          embedded_texture->mWidth * embedded_texture->mHeight * 4,
-        });
-        texture = Image::load_from_memory(embedded_texture->mWidth,
-                                          embedded_texture->mHeight,
-                                          std::move(buffer),
-                                          {
-                                            .use_mips = true,
-                                          });
+        maybe_load_embedded_texture(dispatcher,
+                                    TextureType::Normal,
+                                    embedded_texture,
+                                    image_staging_buffers,
+                                    output_images,
+                                    mutex);
       } else {
-        std::filesystem::path path = file_name;
-        auto parent_path = path.parent_path();
-        parent_path /= std::string(aiTexPath.data);
-        std::string texture_path = parent_path.string();
-        texture = Image::load_from_file({
-          .path = texture_path,
-          .use_mips = true,
-        });
+        load_texture_from_file(dispatcher,
+                               TextureType::Normal,
+                               file_name,
+                               aiTexPath.C_Str(),
+                               image_staging_buffers,
+                               output_images,
+                               mutex);
       }
-
-      if (texture) {
-        materials.at(i)->set("normal_map", texture);
-        materials.at(i)->set("mat_pc.use_normal_map", true);
-      } else {
-        fallback = true;
-      }
-    }
-    if (fallback) {
-      materials.at(i)->set("normal_map", white_texture);
-      materials.at(i)->set("mat_pc.use_normal_map", false);
     }
 
     // Normal maps
     bool has_specular_map =
       ai_material->GetTexture(aiTextureType_SPECULAR, 0, &aiTexPath) ==
       AI_SUCCESS;
-    fallback = !has_specular_map;
     if (has_specular_map) {
-      Core::Ref<Image> texture;
       if (auto embedded_texture =
             scene->GetEmbeddedTexture(aiTexPath.C_Str())) {
-        Core::DataBuffer buffer{ embedded_texture->mWidth *
-                                 embedded_texture->mHeight * 4 };
-        buffer.write(std::span{
-          embedded_texture->pcData,
-          embedded_texture->mWidth * embedded_texture->mHeight * 4,
-        });
-        texture = Image::load_from_memory(embedded_texture->mWidth,
-                                          embedded_texture->mHeight,
-                                          std::move(buffer),
-                                          {
-                                            .use_mips = true,
-                                          });
+        maybe_load_embedded_texture(dispatcher,
+                                    TextureType::Specular,
+                                    embedded_texture,
+                                    image_staging_buffers,
+                                    output_images,
+                                    mutex);
       } else {
-        std::filesystem::path path = file_name;
-        auto parent_path = path.parent_path();
-        parent_path /= std::string(aiTexPath.data);
-        std::string texture_path = parent_path.string();
-        texture = Image::load_from_file({
-          .path = texture_path,
-          .use_mips = true,
-        });
+        load_texture_from_file(dispatcher,
+                               TextureType::Specular,
+                               file_name,
+                               aiTexPath.C_Str(),
+                               image_staging_buffers,
+                               output_images,
+                               mutex);
       }
-
-      if (texture) {
-        materials.at(i)->set("specular_map", texture);
-      } else {
-        fallback = true;
-      }
-    }
-    if (fallback) {
-      materials.at(i)->set("specular_map", white_texture);
     }
 
     // Roughness map
@@ -388,53 +416,83 @@ MeshAsset::MeshAsset(const std::string& file_name)
       has_roughness_map = true;
     }
 
-    fallback = !has_roughness_map;
     if (has_roughness_map) {
-      Core::Ref<Image> texture;
-
       if (auto embedded_texture = scene->GetEmbeddedTexture(
             prefer_combined ? combined_roughness_metallic_file.C_Str()
                             : aiTexPath.C_Str())) {
-        Core::DataBuffer buffer{ embedded_texture->mWidth *
-                                 embedded_texture->mHeight * 4 };
-        buffer.write(embedded_texture->pcData,
-                     embedded_texture->mWidth * embedded_texture->mHeight * 4);
-        texture = Image::load_from_memory(embedded_texture->mWidth,
-                                          embedded_texture->mHeight,
-                                          std::move(buffer),
-                                          {
-                                            .use_mips = true,
-                                          });
+        maybe_load_embedded_texture(dispatcher,
+                                    TextureType::Roughness,
+                                    embedded_texture,
+                                    image_staging_buffers,
+                                    output_images,
+                                    mutex);
       } else {
-        std::filesystem::path path = file_name;
-        auto parent_path = path.parent_path();
-        parent_path /= std::string(aiTexPath.data);
-        std::string texture_path = parent_path.string();
-        texture = Image::load_from_file({
-          .path = texture_path,
-          .use_mips = true,
-        });
+        load_texture_from_file(dispatcher,
+                               TextureType::Roughness,
+                               file_name,
+                               prefer_combined
+                                 ? combined_roughness_metallic_file.C_Str()
+                                 : aiTexPath.C_Str(),
+                               image_staging_buffers,
+                               output_images,
+                               mutex);
       }
-
-      if (texture) {
-        materials.at(i)->set("roughness_map", texture);
-        materials.at(i)->set("mat_pc.roughness", 1.0F);
-      } else {
-        fallback = true;
-      }
-    }
-
-    if (fallback) {
-      materials.at(i)->set("roughness_map", white_texture);
-      materials.at(i)->set("mat_pc.roughness", roughness);
     }
 
     i++;
   }
 
+  dispatcher.execute();
+
   vertex_buffer = Core::make_scope<VertexBuffer>(std::span{ vertices });
   index_buffer = Core::make_scope<IndexBuffer>(indices.data(),
                                                indices.size() * sizeof(Index));
+
+  // Patch up material settings based on loaded textures
+  for (auto index = 0ULL; index < materials.size(); index++) {
+    auto& material = materials.at(index);
+
+    const auto albedo_key = Key{
+      .type = TextureType::Albedo,
+      .index = static_cast<Core::u32>(index),
+    };
+    const auto normal_key = Key{
+      .type = TextureType::Normal,
+      .index = static_cast<Core::u32>(index),
+    };
+    const auto specular_key = Key{
+      .type = TextureType::Specular,
+      .index = static_cast<Core::u32>(index),
+    };
+    const auto roughness_key = Key{
+      .type = TextureType::Roughness,
+      .index = static_cast<Core::u32>(index),
+    };
+
+    material->set("albedo_map",
+                  output_images[albedo_key] != white_texture
+                    ? output_images[albedo_key]
+                    : white_texture);
+    material->set("normal_map",
+                  output_images[normal_key] != white_texture
+                    ? output_images[normal_key]
+                    : white_texture);
+    material->set("specular_map",
+                  output_images[specular_key] != white_texture
+                    ? output_images[specular_key]
+                    : white_texture);
+    material->set("roughness_map",
+                  output_images[roughness_key] != white_texture
+                    ? output_images[roughness_key]
+                    : white_texture);
+
+    material->set("mat_pc.use_normal_map",
+                  output_images[normal_key] != white_texture);
+  }
+
+  // Clear out the staging buffers
+  image_staging_buffers.clear();
+  output_images.clear();
 }
 
 MeshAsset::~MeshAsset() = default;
