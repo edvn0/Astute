@@ -342,9 +342,8 @@ create_sampler(VkFilter min_filter,
 }
 
 auto
-create_sampler(VkFilter filter,
-               VkSamplerAddressMode mode,
-               VkBorderColor col) -> VkSampler
+create_sampler(VkFilter filter, VkSamplerAddressMode mode, VkBorderColor col)
+  -> VkSampler
 {
   return create_sampler(filter, filter, mode, mode, mode, col);
 }
@@ -584,7 +583,9 @@ Image::load_from_memory(const CommandBuffer* buffer,
     .sample_count = config.sample_count,
     .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
              VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-    .additional_name_data = std::format("LoadedFromMemory@{}", config.path) });
+    .additional_name_data = std::format("LoadedFromMemory@{}", config.path),
+    .path = config.path,
+  });
 
   transition_image_layout(buffer->get_command_buffer(),
                           image->image,
@@ -611,9 +612,12 @@ Image::load_from_memory(const CommandBuffer* buffer,
     1,
   };
 
-  info("Region extent: {}x{}",
+  const auto staging_buffer_size = staging_buffer.size();
+
+  info("Region extent: {}x{}. Staging buffer size: {}",
        region.imageExtent.width,
-       region.imageExtent.height);
+       region.imageExtent.height,
+       staging_buffer_size);
 
   vkCmdCopyBufferToImage(buffer->get_command_buffer(),
                          staging_buffer.get_buffer(),
@@ -641,15 +645,15 @@ Image::resolve_msaa(const Image&, const CommandBuffer*) -> Core::Scope<Image>
 }
 
 auto
-Image::reference_resolve_msaa(const Image&,
-                              const CommandBuffer*) -> Core::Ref<Image>
+Image::reference_resolve_msaa(const Image&, const CommandBuffer*)
+  -> Core::Ref<Image>
 {
   return nullptr;
 }
 
 auto
-Image::copy_image(const Image& source,
-                  const CommandBuffer& command_buffer) -> Core::Ref<Image>
+Image::copy_image(const Image& source, const CommandBuffer& command_buffer)
+  -> Core::Ref<Image>
 {
   auto image = Image::construct(source.configuration);
 

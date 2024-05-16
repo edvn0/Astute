@@ -78,6 +78,8 @@ struct ImageConfiguration
   const bool transition_directly{
     false,
   };
+
+  const std::string path{};
 };
 
 auto
@@ -175,20 +177,24 @@ public:
 
     return layer_image_views.at(index);
   }
-  auto create_specific_layer_image_views(
-    const std::span<const Core::u32> indices) -> void;
+  auto create_specific_layer_image_views(std::span<const Core::u32> indices)
+    -> void;
   auto invalidate() -> void;
   auto generate_mips(CommandBuffer&) -> void;
   auto generate_mips() -> void;
   auto generate_mips(VkCommandBuffer) -> void;
 
-  auto get_mip_levels() const { return configuration.mip_levels; }
-  auto get_sample_count() const { return configuration.sample_count; }
-  auto get_format() const { return configuration.format; }
-  auto get_tiling() const { return configuration.tiling; }
-  auto get_layout() const { return configuration.layout; }
-  auto get_usage() const { return configuration.usage; }
-  auto get_layer_count() const { return configuration.layers; }
+  [[nodiscard]] auto get_mip_levels() const { return configuration.mip_levels; }
+  [[nodiscard]] auto get_sample_count() const
+  {
+    return configuration.sample_count;
+  }
+  [[nodiscard]] auto get_format() const { return configuration.format; }
+  [[nodiscard]] auto get_tiling() const { return configuration.tiling; }
+  [[nodiscard]] auto get_layout() const { return configuration.layout; }
+  [[nodiscard]] auto get_usage() const { return configuration.usage; }
+  [[nodiscard]] auto get_layer_count() const { return configuration.layers; }
+  [[nodiscard]] auto get_path() const { return configuration.path; }
 
   auto write_to_file(std::string_view path) -> bool;
 
@@ -222,8 +228,8 @@ public:
   static auto reference_resolve_msaa(const Image&,
                                      const CommandBuffer* = nullptr)
     -> Core::Ref<Image>;
-  static auto copy_image(const Image& source,
-                         const CommandBuffer&) -> Core::Ref<Image>;
+  static auto copy_image(const Image& source, const CommandBuffer&)
+    -> Core::Ref<Image>;
 
   static auto construct(const ImageConfiguration&) -> Core::Ref<Image>;
 

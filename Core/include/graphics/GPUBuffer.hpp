@@ -30,7 +30,7 @@ public:
   GPUBuffer(GPUBufferType, Core::usize);
   ~GPUBuffer();
 
-  auto get_size() const -> Core::usize { return size; }
+  [[nodiscard]] constexpr auto get_size() const -> Core::usize { return size; }
 
   template<class T, Core::usize Extent = std::dynamic_extent>
   auto write(std::span<T, Extent> data) -> void
@@ -50,7 +50,7 @@ public:
     write(data.data(), data.size() * sizeof(T));
   }
 
-  auto get_buffer() const -> VkBuffer { return buffer; }
+  [[nodiscard]] auto get_buffer() const -> VkBuffer { return buffer; }
   auto copy_to(GPUBuffer&) -> void;
 
 private:
@@ -62,7 +62,7 @@ private:
 
   auto write(const void*, Core::usize) -> void;
   auto construct_buffer() -> void;
-  auto buffer_usage_flags() const -> VkBufferUsageFlags;
+  [[nodiscard]] auto buffer_usage_flags() const -> VkBufferUsageFlags;
 
   template<class T, GPUBufferType BufferType>
   friend class UniformBufferObject;
@@ -86,7 +86,10 @@ public:
   {
   }
 
-  [[nodiscard]] auto size() const -> Core::usize { return buffer.get_size(); }
+  [[nodiscard]] constexpr auto size() const -> Core::usize
+  {
+    return buffer.get_size();
+  }
   [[nodiscard]] auto get_buffer() const -> VkBuffer
   {
     return buffer.get_buffer();

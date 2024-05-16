@@ -32,6 +32,7 @@ struct Key
 {
   TextureType type;
   Core::u32 index;
+  std::string name;
 
   constexpr auto operator<=>(const Key&) const = default;
 };
@@ -44,8 +45,9 @@ struct std::hash<Engine::Graphics::Key>
   auto operator()(const Engine::Graphics::Key& key) const noexcept
     -> Engine::Core::usize
   {
+    static constexpr auto hasher = std::hash<const char*>();
     return std::hash<Engine::Graphics::TextureType>{}(key.type) ^
-           std::hash<Engine::Core::u32>{}(key.index);
+           std::hash<Engine::Core::u32>{}(key.index) ^ hasher(key.name.data());
   }
 };
 
@@ -81,8 +83,8 @@ public:
   Core::u32 index_count;
   Core::u32 vertex_count;
 
-  glm::mat4 transform{ 1.0f };
-  glm::mat4 local_transform{ 1.0f };
+  glm::mat4 transform{ 1.0F };
+  glm::mat4 local_transform{ 1.0F };
   Core::AABB bounding_box;
 
   std::string node_name;
@@ -96,32 +98,43 @@ public:
   explicit MeshAsset(const std::string&);
   ~MeshAsset();
 
-  auto get_submeshes() -> auto& { return submeshes; }
-  auto get_submeshes() const -> const auto& { return submeshes; }
+  [[nodiscard]] auto get_submeshes() -> auto& { return submeshes; }
+  [[nodiscard]] auto get_submeshes() const -> const auto& { return submeshes; }
 
-  auto get_vertices() const -> const auto& { return vertices; }
-  auto get_indices() const -> const auto& { return indices; }
+  [[nodiscard]] auto get_vertices() const -> const auto& { return vertices; }
+  [[nodiscard]] auto get_indices() const -> const auto& { return indices; }
 
-  auto get_materials() -> auto& { return materials; }
-  auto get_materials() const -> const auto& { return materials; }
-  auto get_file_path() const -> const std::string_view { return file_path; }
+  [[nodiscard]] auto get_materials() -> auto& { return materials; }
+  [[nodiscard]] auto get_materials() const -> const auto& { return materials; }
+  [[nodiscard]] auto get_file_path() const -> std::string_view
+  {
+    return file_path;
+  }
 
-  auto get_triangle_cache(Core::u32 index) const -> const auto&
+  [[nodiscard]] auto get_triangle_cache(Core::u32 index) const -> const auto&
   {
     return triangle_cache.at(index);
   }
 
-  auto get_vertex_buffer() const -> const auto& { return *vertex_buffer; }
-  auto get_index_buffer() const -> const auto& { return *index_buffer; }
+  [[nodiscard]] auto get_vertex_buffer() const -> const auto&
+  {
+    return *vertex_buffer;
+  }
+  [[nodiscard]] auto get_index_buffer() const -> const auto&
+  {
+    return *index_buffer;
+  }
 
-  const Core::AABB& get_bounding_box() const { return bounding_box; }
+  [[nodiscard]] auto get_bounding_box() const -> const Core::AABB&
+  {
+    return bounding_box;
+  }
 
 private:
-  void traverse_nodes(aiNode* node,
-                      const glm::mat4& parentTransform = glm::mat4(1.0f),
-                      Core::u32 level = 0);
+  void traverse_nodes(aiNode*,
+                      const glm::mat4& = glm::mat4(1.0F),
+                      Core::u32 = 0);
 
-private:
   std::vector<Submesh> submeshes;
 
   Core::Scope<Assimp::Importer> importer;
@@ -157,19 +170,25 @@ public:
   explicit Mesh(Core::Ref<MeshAsset> mesh_asset);
   Mesh(Core::Ref<MeshAsset> mesh_asset,
        const std::vector<Core::u32>& submeshes);
-  Mesh(const Core::Ref<Mesh>& other);
+  explicit Mesh(const Core::Ref<Mesh>& other);
   ~Mesh();
 
-  auto get_submeshes() -> auto& { return submeshes; }
-  auto get_submeshes() const -> const auto& { return submeshes; }
+  [[nodiscard]] auto get_submeshes() -> auto& { return submeshes; }
+  [[nodiscard]] auto get_submeshes() const -> const auto& { return submeshes; }
 
   void set_submeshes(const std::vector<Core::u32>& submeshes);
 
-  auto get_mesh_asset() -> auto& { return mesh_asset; }
-  auto get_mesh_asset() const -> const auto& { return mesh_asset; }
-  void set_mesh_asset(Core::Ref<MeshAsset> asset) { mesh_asset = asset; }
+  [[nodiscard]] auto get_mesh_asset() -> auto& { return mesh_asset; }
+  [[nodiscard]] auto get_mesh_asset() const -> const auto&
+  {
+    return mesh_asset;
+  }
+  void set_mesh_asset(Core::Ref<MeshAsset> asset)
+  {
+    mesh_asset = std::move(asset);
+  }
 
-  auto get_materials() const -> const auto&
+  [[nodiscard]] auto get_materials() const -> const auto&
   {
     return mesh_asset->get_materials();
   }
@@ -187,19 +206,25 @@ class StaticMesh
 public:
   explicit StaticMesh(Core::Ref<MeshAsset>);
   StaticMesh(Core::Ref<MeshAsset>, const std::vector<Core::u32>&);
-  StaticMesh(const Core::Ref<StaticMesh>&);
+  explicit StaticMesh(const Core::Ref<StaticMesh>&);
   ~StaticMesh() = default;
 
   auto get_submeshes() -> auto& { return submeshes; }
-  auto get_submeshes() const -> const auto& { return submeshes; }
+  [[nodiscard]] auto get_submeshes() const -> const auto& { return submeshes; }
 
   void set_submeshes(const std::vector<Core::u32>&);
 
   auto get_mesh_asset() -> auto& { return mesh_asset; }
-  auto get_mesh_asset() const -> const auto& { return mesh_asset; }
-  void set_mesh_asset(Core::Ref<MeshAsset> asset) { mesh_asset = asset; }
+  [[nodiscard]] auto get_mesh_asset() const -> const auto&
+  {
+    return mesh_asset;
+  }
+  void set_mesh_asset(Core::Ref<MeshAsset> asset)
+  {
+    mesh_asset = std::move(asset);
+  }
 
-  auto get_materials() const -> const auto&
+  [[nodiscard]] auto get_materials() const -> const auto&
   {
     return mesh_asset->get_materials();
   }

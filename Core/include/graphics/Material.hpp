@@ -45,11 +45,24 @@ public:
 
   auto get_descriptor_set() -> decltype(auto) { return descriptor_sets.get(); }
 
-  auto get_shader() const -> const auto* { return shader; }
+  [[nodiscard]] auto get_shader() const -> const auto* { return shader; }
   auto update_descriptor_write_sets(VkDescriptorSet) -> void;
   auto generate_and_update_descriptor_write_sets() -> VkDescriptorSet;
 
-  auto get_constant_buffer() const -> const auto& { return uniform_storage; }
+  [[nodiscard]] auto get_constant_buffer() const -> const auto&
+  {
+    return uniform_storage;
+  }
+
+  [[nodiscard]] auto find_image(const std::string_view name) const
+  {
+    for (const auto& [key, image] : images) {
+      if (name == key) {
+        return image;
+      }
+    }
+    return Core::Ref<Image>{ nullptr };
+  }
 
 private:
   const Shader* shader{ nullptr };
@@ -63,7 +76,7 @@ private:
   Core::DataBuffer uniform_storage;
 
   auto set(std::string_view, const void*, Core::usize) -> void;
-  auto find_resource_by_name(std::string_view) const
+  [[nodiscard]] auto find_resource_by_name(std::string_view) const
     -> const Reflection::ShaderResourceDeclaration*;
 };
 
