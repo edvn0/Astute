@@ -1,0 +1,4 @@
+add_subdirectory(ShaderCompilation)
+add_subdirectory(ThreadPool)
+add_subdirectory(Logging)
+add_subdirectory(Platform)

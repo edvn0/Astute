@@ -1,6 +1,8 @@
 #pragma once
 
-namespace Engine::Core {
+#include "logging/Logger.hpp"
+
+namespace ED::Logging {
 
 #ifndef RELEASE
 template<typename... Args>

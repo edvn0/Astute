@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -102,9 +103,7 @@ using FloatExtent = BasicExtent<f32>;
 namespace Detail {
 template<class T>
 concept Deleter = requires(T t, void* data) {
-  {
-    t.operator()(data)
-  } -> std::same_as<void>;
+  { t.operator()(data) } -> std::same_as<void>;
 };
 
 struct DefaultDelete

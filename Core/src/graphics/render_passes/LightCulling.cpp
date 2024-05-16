@@ -2,8 +2,8 @@
 
 #include "graphics/render_passes/LightCulling.hpp"
 
-#include "core/Logger.hpp"
 #include "core/Scene.hpp"
+#include "logging/Logger.hpp"
 
 #include "core/Application.hpp"
 #include "graphics/ComputePipeline.hpp"

@@ -20,4 +20,6 @@ class GraphicsPipeline;
 class Material;
 class RenderPass;
 
+enum class QueueType : Core::u8;
+
 }

@@ -2,13 +2,14 @@
 
 #include "graphics/InterfaceSystem.hpp"
 
-#include "core/Logger.hpp"
-#include "core/Platform.hpp"
+#include "platform/Platform.hpp"
+
 #include "graphics/CommandBuffer.hpp"
 #include "graphics/Device.hpp"
 #include "graphics/Instance.hpp"
 #include "graphics/Swapchain.hpp"
 #include "graphics/Window.hpp"
+#include "logging/Logger.hpp"
 
 #include <format>
 #include <fstream>
@@ -24,7 +25,7 @@ namespace Engine::Graphics {
 InterfaceSystem::InterfaceSystem(const Window& win)
   : window(&win)
 {
-  system_name = std::format("imgui_{}.ini", Core::Platform::get_system_name());
+  system_name = std::format("imgui_{}.ini", ED::Platform::get_system_name());
 
   std::array<VkDescriptorPoolSize, 11> pool_sizes = {
     VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },

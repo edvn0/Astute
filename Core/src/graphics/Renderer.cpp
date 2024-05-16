@@ -3,8 +3,8 @@
 #include "graphics/Renderer.hpp"
 
 #include "core/Application.hpp"
-#include "core/Logger.hpp"
 #include "core/Scene.hpp"
+#include "logging/Logger.hpp"
 
 #include "core/Clock.hpp"
 
@@ -213,8 +213,8 @@ Renderer::destruct() -> void
 }
 
 auto
-Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
-  -> void
+Renderer::begin_scene(Core::Scene& scene,
+                      const SceneRendererCamera& camera) -> void
 {
   if (old_size != size) {
     Device::the().wait();

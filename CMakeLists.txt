@@ -15,7 +15,7 @@ else(CCACHE_FOUND)
     message(STATUS "CCACHE is NOT found")
 endif(CCACHE_FOUND)
 
-add_subdirectory(ShaderCompilation)
+add_subdirectory(Modules)
 add_subdirectory(Library)
 add_subdirectory(Core)
 add_subdirectory(Application)

@@ -3,6 +3,8 @@
 #include "core/Types.hpp"
 #include "graphics/Device.hpp"
 
+#include <optional>
+
 #include <vulkan/vulkan.h>
 
 namespace Engine::Graphics {
@@ -15,6 +17,7 @@ public:
     const QueueType queue_type;
     const bool owned_by_swapchain{ false };
     const bool primary{ true };
+    const std::optional<Core::u32> image_count{ std::nullopt };
   };
 
   explicit CommandBuffer(const Properties&);
@@ -34,6 +37,7 @@ private:
   const Core::u32 queue_family_index;
   const bool owned_by_swapchain;
   const bool primary;
+  const bool image_count_from_application{ true };
 
   VkCommandPool command_pool{ nullptr };
   VkQueue queue{ nullptr }; // Owned by device

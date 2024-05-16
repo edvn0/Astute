@@ -3,7 +3,7 @@
 #include <string>
 #include <string_view>
 
-namespace Engine::Core::Platform {
+namespace ED::Platform {
 
 auto
 get_system_name() -> std::string;

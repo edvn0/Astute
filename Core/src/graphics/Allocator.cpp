@@ -2,7 +2,7 @@
 
 #include "graphics/Allocator.hpp"
 
-#include "core/Logger.hpp"
+#include "logging/Logger.hpp"
 
 #include <cassert>
 
@@ -149,8 +149,8 @@ Allocator::unmap_memory(VmaAllocation allocation)
 }
 
 auto
-Allocator::construct_allocator(const Device& device, const Instance& instance)
-  -> VmaAllocator
+Allocator::construct_allocator(const Device& device,
+                               const Instance& instance) -> VmaAllocator
 {
   VmaAllocatorCreateInfo allocator_create_info{};
   allocator_create_info.physicalDevice = device.physical();

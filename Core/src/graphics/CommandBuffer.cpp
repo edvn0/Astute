@@ -4,12 +4,16 @@
 #include "graphics/CommandBuffer.hpp"
 #include "graphics/Swapchain.hpp"
 
-#include "core/Logger.hpp"
+#include "logging/Logger.hpp"
 
 namespace Engine::Graphics {
 
 CommandBuffer::CommandBuffer(const Properties& props)
-  : image_count(Core::Application::the().get_image_count())
+
+  : image_count_from_application(props.image_count.has_value() ? false : true)
+  , image_count(props.image_count.has_value()
+                  ? *props.image_count
+                  : Core::Application::the().get_image_count())
   , queue_family_index(Device::the().get_family(props.queue_type))
   , owned_by_swapchain(props.owned_by_swapchain)
   , primary(props.primary)
@@ -95,7 +99,9 @@ CommandBuffer::begin(const VkCommandBufferBeginInfo* begin_info) -> void
   }
   default_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-  current_frame_index = Core::Application::the().current_frame_index();
+  current_frame_index = image_count_from_application
+                          ? Core::Application::the().current_frame_index()
+                          : 0;
   if (owned_by_swapchain) {
     active_command_buffer =
       Core::Application::the().get_swapchain().get_command_buffer(

@@ -1,14 +1,14 @@
 #include "pch/CorePCH.hpp"
 
-#include "core/Logger.hpp"
 #include "graphics/Device.hpp"
 #include "graphics/Instance.hpp"
+#include "logging/Logger.hpp"
 
 namespace Engine::Graphics {
 
 auto
-Device::is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface)
-  -> bool
+Device::is_device_suitable(VkPhysicalDevice device,
+                           VkSurfaceKHR surface) -> bool
 {
   Core::i32 graphics_family_index = -1;
   Core::i32 present_family_index = -1;
@@ -24,23 +24,25 @@ Device::is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface)
   for (auto i = 0ULL; i < families.size(); i++) {
 
     if (families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-      graphics_family_index = static_cast<Core::u32>(i);
+      graphics_family_index = static_cast<Core::i32>(i);
     }
 
     if (families[i].queueFlags & VK_QUEUE_COMPUTE_BIT) {
-      compute_family_index = static_cast<Core::u32>(i);
+      compute_family_index = static_cast<Core::i32>(i);
     }
 
     if (families[i].queueFlags & VK_QUEUE_TRANSFER_BIT) {
-      transfer_family_index = static_cast<Core::u32>(i);
+      transfer_family_index = static_cast<Core::i32>(i);
     }
 
     VkBool32 present_support = false;
-    vkGetPhysicalDeviceSurfaceSupportKHR(
-      device, static_cast<Core::u32>(i), surface, &present_support);
+    if (surface != nullptr) {
+      vkGetPhysicalDeviceSurfaceSupportKHR(
+        device, static_cast<Core::i32>(i), surface, &present_support);
+    }
 
     if (present_support == VK_TRUE) {
-      present_family_index = static_cast<Core::u32>(i);
+      present_family_index = static_cast<Core::i32>(i);
     }
   }
 
@@ -213,7 +215,9 @@ Device::create_device(VkSurfaceKHR surface) -> void
   auto queue_infos = create_queue_info_create_structures(queue_support);
 
   std::vector<const char*> device_extensions;
-  device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+  if (surface != nullptr) {
+    device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+  }
   if (check_memory_priority_support(vk_physical_device)) {
     device_extensions.push_back(VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME);
   }
@@ -257,18 +261,25 @@ Device::create_device(VkSurfaceKHR surface) -> void
                    queue_support.at(QueueType::Graphics).family_index,
                    0,
                    &queue_support.at(QueueType::Graphics).queue);
-  vkGetDeviceQueue(vk_device,
-                   queue_support.at(QueueType::Present).family_index,
-                   0,
-                   &queue_support.at(QueueType::Present).queue);
-  vkGetDeviceQueue(vk_device,
-                   queue_support.at(QueueType::Compute).family_index,
-                   0,
-                   &queue_support.at(QueueType::Compute).queue);
-  vkGetDeviceQueue(vk_device,
-                   queue_support.at(QueueType::Transfer).family_index,
-                   0,
-                   &queue_support.at(QueueType::Transfer).queue);
+  if (queue_support.contains(QueueType::Present)) {
+    vkGetDeviceQueue(vk_device,
+                     queue_support.at(QueueType::Present).family_index,
+                     0,
+                     &queue_support.at(QueueType::Present).queue);
+  }
+
+  if (queue_support.contains(QueueType::Compute)) {
+    vkGetDeviceQueue(vk_device,
+                     queue_support.at(QueueType::Compute).family_index,
+                     0,
+                     &queue_support.at(QueueType::Compute).queue);
+  }
+  if (queue_support.contains(QueueType::Transfer)) {
+    vkGetDeviceQueue(vk_device,
+                     queue_support.at(QueueType::Transfer).family_index,
+                     0,
+                     &queue_support.at(QueueType::Transfer).queue);
+  }
 
   VkCommandPoolCreateInfo command_pool_create_info = {};
   command_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;

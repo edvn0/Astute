@@ -4,7 +4,7 @@
 #include <string_view>
 #include <vulkan/vulkan.h>
 
-#include "core/Logger.hpp"
+#include "logging/Logger.hpp"
 
 namespace Engine::Core {
 

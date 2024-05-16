@@ -24,8 +24,9 @@ public:
   explicit DataBuffer(std::integral auto input_size)
     : buffer_size(static_cast<usize>(input_size))
   {
-    // Zero is valid here!
+    fill_zero();
   }
+
   DataBuffer(const u8* input_data, std::integral auto input_size)
     : buffer_size(static_cast<usize>(input_size))
   {
@@ -99,8 +100,8 @@ public:
   }
 
   template<typename T>
-  auto write(const std::vector<T>& input_data, std::integral auto input_size)
-    -> void
+  auto write(const std::vector<T>& input_data,
+             std::integral auto input_size) -> void
   {
     write(input_data.data(), input_size);
   }
@@ -124,8 +125,8 @@ public:
   }
 
   template<typename T, std::size_t Extent = std::dynamic_extent>
-  auto read(std::span<T, Extent> output, std::integral auto input_size) const
-    -> void
+  auto read(std::span<T, Extent> output,
+            std::integral auto input_size) const -> void
   {
     if (input_size > buffer_size) {
       throw WriteRangeException{ "DataBuffer::read: input_size > size" };
@@ -156,8 +157,8 @@ public:
    * @param input_count The number of elements to read
    */
   template<typename T>
-  auto read(std::vector<T>& output, std::integral auto input_count) const
-    -> void
+  auto read(std::vector<T>& output,
+            std::integral auto input_count) const -> void
   {
     const auto actual_size = input_count * sizeof(T);
     // check vector size too

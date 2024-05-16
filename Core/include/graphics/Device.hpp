@@ -1,18 +1,12 @@
 #pragma once
 
 #include "core/Types.hpp"
+#include "graphics/Types.hpp"
 
+#include <unordered_set>
 #include <vulkan/vulkan.h>
 
 namespace Engine::Graphics {
-
-enum class QueueType : Core::u8
-{
-  Graphics,
-  Compute,
-  Present,
-  Transfer
-};
 
 struct QueueInformation
 {

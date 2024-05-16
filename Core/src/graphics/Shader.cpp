@@ -3,10 +3,10 @@
 #include "graphics/Shader.hpp"
 
 #include "core/Exceptions.hpp"
-#include "core/Logger.hpp"
 #include "core/Verify.hpp"
 #include "graphics/DescriptorResource.hpp"
 #include "graphics/Device.hpp"
+#include "logging/Logger.hpp"
 
 #include <bit>
 #include <execution>

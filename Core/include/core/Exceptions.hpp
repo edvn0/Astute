@@ -5,8 +5,6 @@
 #include <stdexcept>
 #include <string_view>
 
-#include "core/Logger.hpp"
-
 namespace Engine::Core {
 
 class AstuteBaseException : public std::runtime_error

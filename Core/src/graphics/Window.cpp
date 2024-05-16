@@ -6,7 +6,7 @@
 #include "graphics/Window.hpp"
 
 #include "core/Input.hpp"
-#include "core/Logger.hpp"
+#include "logging/Logger.hpp"
 
 namespace Engine::Graphics {
 

@@ -1,7 +1,7 @@
-#include "pch/CorePCH.hpp"
+#include "pch/LoggingPCH.hpp"
 
-#include "core/Logger.hpp"
-#include "core/Platform.hpp"
+#include "logging/Logger.hpp"
+#include "platform/Platform.hpp"
 
 #include <cctype>
 #include <cstdlib>
@@ -9,7 +9,7 @@
 #include <string_view>
 #include <thread>
 
-namespace Engine::Core {
+namespace ED::Logging {
 
 Logger::Logger()
   : current_level(get_log_level_from_environment())
@@ -90,7 +90,7 @@ void
 Logger::process_single(const BackgroundLogMessage& message)
 {
   switch (message.level) {
-    using enum Core::LogLevel;
+    using enum ED::Logging::LogLevel;
     case Trace:
       std::cout << AnsiColor::Blue << "[TRACE] " << message.message
                 << AnsiColor::Reset << "\n";

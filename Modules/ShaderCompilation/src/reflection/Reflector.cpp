@@ -3,9 +3,9 @@
 #include "reflection/Reflector.hpp"
 
 #include "core/Exceptions.hpp"
-#include "core/Logger.hpp"
 #include "core/Verify.hpp"
 #include "graphics/Shader.hpp"
+#include "logging/Logger.hpp"
 
 #include <SPIRV-Cross/spirv_cross.hpp>
 #include <SPIRV-Cross/spirv_glsl.hpp>

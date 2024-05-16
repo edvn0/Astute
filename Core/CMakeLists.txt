@@ -15,9 +15,7 @@ add_library(Core STATIC
     include/core/FrameBasedCollection.hpp
     include/core/Input.hpp
     include/core/InputCodes.hpp
-    include/core/Logger.hpp
     include/core/Maths.hpp
-    include/core/Platform.hpp
     include/core/Random.hpp
     include/core/Scene.hpp
     include/core/Types.hpp
@@ -59,8 +57,6 @@ add_library(Core STATIC
     src/core/Clock.cpp
     src/core/DataBuffer.cpp
     src/core/Input.cpp
-    src/core/Logger.cpp
-    src/core/Platform.cpp
     src/core/Random.cpp
     src/core/Scene.cpp
     src/graphics/Allocator.cpp
@@ -105,7 +101,7 @@ target_include_directories(Core SYSTEM PRIVATE
     ${CMAKE_SOURCE_DIR}/Library/VulkanMemoryAllocator/include
     ${CMAKE_SOURCE_DIR}/Library/filewatch)
 
-target_link_libraries(Core PUBLIC ShaderCompilation glfw Vulkan::Vulkan PRIVATE imgui glm EnTT::EnTT stbimage::stbimage assimp FastNoise2)
+target_link_libraries(Core PUBLIC glfw Vulkan::Vulkan PRIVATE imgui glm EnTT::EnTT stbimage::stbimage assimp FastNoise2 ShaderCompilation Logging Platform)
 target_precompile_headers(Core PRIVATE include/pch/CorePCH.hpp)
 target_compile_definitions(Core PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)
 

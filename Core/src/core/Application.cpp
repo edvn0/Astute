@@ -2,7 +2,7 @@
 
 #include "core/Application.hpp"
 #include "core/Clock.hpp"
-#include "core/Logger.hpp"
+#include "logging/Logger.hpp"
 
 #include "graphics/Allocator.hpp"
 #include "graphics/DescriptorResource.hpp"

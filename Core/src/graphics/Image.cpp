@@ -341,8 +341,9 @@ create_sampler(VkFilter min_filter,
 }
 
 auto
-create_sampler(VkFilter filter, VkSamplerAddressMode mode, VkBorderColor col)
-  -> VkSampler
+create_sampler(VkFilter filter,
+               VkSamplerAddressMode mode,
+               VkBorderColor col) -> VkSampler
 {
   return create_sampler(filter, filter, mode, mode, mode, col);
 }
@@ -533,10 +534,71 @@ Image::resolve_msaa(const Image&, const CommandBuffer*) -> Core::Scope<Image>
 }
 
 auto
-Image::reference_resolve_msaa(const Image&, const CommandBuffer*)
-  -> Core::Ref<Image>
+Image::reference_resolve_msaa(const Image&,
+                              const CommandBuffer*) -> Core::Ref<Image>
 {
   return nullptr;
+}
+
+auto
+Image::copy_image(const Image& source,
+                  const CommandBuffer& command_buffer) -> Core::Ref<Image>
+{
+  auto image = Image::construct(source.configuration);
+
+  auto old_source_layout = source.get_layout();
+  transition_image_layout(command_buffer.get_command_buffer(),
+                          image->image,
+                          VK_IMAGE_LAYOUT_UNDEFINED,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                          image->get_aspect_flags(),
+                          image->get_mip_levels());
+  transition_image_layout(command_buffer.get_command_buffer(),
+                          source.image,
+                          old_source_layout,
+                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                          source.get_aspect_flags(),
+                          source.get_mip_levels());
+
+  VkImageCopy copy_region{};
+  copy_region.srcSubresource.aspectMask = image->get_aspect_flags();
+  copy_region.srcSubresource.mipLevel = 0;
+  copy_region.srcSubresource.baseArrayLayer = 0;
+  copy_region.srcSubresource.layerCount = 1;
+  copy_region.srcOffset = { 0, 0, 0 };
+  copy_region.dstSubresource.aspectMask = image->get_aspect_flags();
+  copy_region.dstSubresource.mipLevel = 0;
+  copy_region.dstSubresource.baseArrayLayer = 0;
+  copy_region.dstSubresource.layerCount = 1;
+  copy_region.dstOffset = { 0, 0, 0 };
+  copy_region.extent = {
+    source.configuration.width,
+    source.configuration.height,
+    1,
+  };
+
+  vkCmdCopyImage(command_buffer.get_command_buffer(),
+                 source.image,
+                 VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                 image->image,
+                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                 1,
+                 &copy_region);
+
+  transition_image_layout(command_buffer.get_command_buffer(),
+                          image->image,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                          image->get_layout(),
+                          image->get_aspect_flags(),
+                          image->get_mip_levels());
+  transition_image_layout(command_buffer.get_command_buffer(),
+                          source.image,
+                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                          old_source_layout,
+                          source.get_aspect_flags(),
+                          source.get_mip_levels());
+
+  return image;
 }
 
 static constexpr auto depth_formats = std::array{

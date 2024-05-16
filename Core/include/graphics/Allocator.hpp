@@ -1,7 +1,6 @@
 // N.B This class should technically only be included in cpp files.
 #pragma once
 
-#include "core/Logger.hpp"
 #include "core/Types.hpp"
 #include "graphics/Device.hpp"
 #include "graphics/Instance.hpp"
@@ -116,8 +115,9 @@ public:
                        VmaAllocationInfo&,
                        VkBufferCreateInfo&,
                        const AllocationProperties&) -> VmaAllocation;
-  auto allocate_image(VkImage&, VkImageCreateInfo&, const AllocationProperties&)
-    -> VmaAllocation;
+  auto allocate_image(VkImage&,
+                      VkImageCreateInfo&,
+                      const AllocationProperties&) -> VmaAllocation;
   auto allocate_image(VkImage&,
                       VmaAllocationInfo&,
                       VkImageCreateInfo&,

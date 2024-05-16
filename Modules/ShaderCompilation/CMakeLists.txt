@@ -9,7 +9,7 @@ set(SOURCES
     src/reflection/Reflector.cpp
 )
 add_library(ShaderCompilation STATIC ${SOURCES})
-target_link_libraries(ShaderCompilation Vulkan::Vulkan spirv-cross-core spirv-cross-glsl Vulkan::shaderc_combined)
+target_link_libraries(ShaderCompilation Vulkan::Vulkan spirv-cross-core spirv-cross-glsl Vulkan::shaderc_combined Logging)
 target_include_directories(ShaderCompilation PUBLIC
     ${CMAKE_SOURCE_DIR}/Library
     ${CMAKE_CURRENT_SOURCE_DIR}/include PRIVATE

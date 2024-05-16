@@ -2,8 +2,8 @@
 
 #include "graphics/Mesh.hpp"
 
-#include "core/Logger.hpp"
 #include "graphics/Renderer.hpp"
+#include "logging/Logger.hpp"
 
 #include <assimp/DefaultLogger.hpp>
 #include <assimp/Importer.hpp>

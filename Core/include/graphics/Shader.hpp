@@ -4,7 +4,6 @@
 
 #include "core/Exceptions.hpp"
 #include "core/Forward.hpp"
-#include "core/Logger.hpp"
 
 #include "compilation/ShaderCompiler.hpp"
 #include "reflection/ReflectionData.hpp"

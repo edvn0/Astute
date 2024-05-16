@@ -26,3 +26,6 @@
 [submodule "Library/FastNoise2"]
 	path = Library/FastNoise2
 	url = git@github.com:Auburn/FastNoise2.git
+[submodule "Library/thread-pool"]
+	path = Library/thread-pool
+	url = git@github.com:bshoshany/thread-pool.git

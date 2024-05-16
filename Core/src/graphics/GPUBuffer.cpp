@@ -4,6 +4,8 @@
 
 #include "graphics/Allocator.hpp"
 
+#include "logging/Logger.hpp"
+
 #include <vk_mem_alloc.h>
 
 namespace Engine::Graphics {

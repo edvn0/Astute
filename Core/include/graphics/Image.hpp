@@ -198,6 +198,7 @@ public:
     const bool use_mips{ false };
   };
   static auto load_from_file(const Configuration&) -> Core::Ref<Image>;
+
   static auto load_from_memory(Core::u32,
                                Core::u32,
                                const Core::DataBuffer&,
@@ -207,6 +208,8 @@ public:
   static auto reference_resolve_msaa(const Image&,
                                      const CommandBuffer* = nullptr)
     -> Core::Ref<Image>;
+  static auto copy_image(const Image& source,
+                         const CommandBuffer&) -> Core::Ref<Image>;
 
   static auto construct(const ImageConfiguration&) -> Core::Ref<Image>;
 

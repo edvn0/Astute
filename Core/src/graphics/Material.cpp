@@ -6,6 +6,8 @@
 #include "graphics/DescriptorResource.hpp"
 #include "graphics/Device.hpp"
 
+#include "logging/Logger.hpp"
+
 #include <ranges>
 
 namespace Engine::Graphics {
@@ -29,8 +31,8 @@ Material::Material(Configuration config)
 }
 
 auto
-Material::set(const std::string_view name, const Core::Ref<Image>& image)
-  -> bool
+Material::set(const std::string_view name,
+              const Core::Ref<Image>& image) -> bool
 {
   if (!image) {
     return false;
@@ -140,8 +142,9 @@ Material::find_resource_by_name(const std::string_view name) const
 }
 
 auto
-Material::set(const std::string_view name, const void* data, Core::usize size)
-  -> void
+Material::set(const std::string_view name,
+              const void* data,
+              Core::usize size) -> void
 {
   const auto& shader_buffers = shader->get_reflection_data().constant_buffers;
   const Engine::Reflection::ShaderUniform* found = nullptr;

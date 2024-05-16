@@ -1,7 +1,7 @@
 #include "pch/CorePCH.hpp"
 
-#include "core/Logger.hpp"
 #include "graphics/Instance.hpp"
+#include "logging/Logger.hpp"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -49,23 +49,24 @@ debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
                const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
                void*) -> VkBool32
 {
-  Core::LogLevel log_level = Core::LogLevel::None;
+  using namespace ED::Logging;
+  LogLevel log_level = LogLevel::None;
   if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-    log_level = Core::LogLevel::Error;
+    log_level = LogLevel::Error;
   } else if (message_severity &
              VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-    log_level = Core::LogLevel::Warn;
+    log_level = LogLevel::Warn;
   } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
-    log_level = Core::LogLevel::Info;
+    log_level = LogLevel::Info;
   } else if (message_severity &
              VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
-    log_level = Core::LogLevel::Debug;
+    log_level = LogLevel::Debug;
   }
 
   std::string message = "Validation layer: ";
   message += callback_data->pMessage;
 
-  Engine::Core::Logger::get_instance().log(std::move(message), log_level);
+  Logger::get_instance().log(std::move(message), log_level);
 
   return VK_FALSE;
 }

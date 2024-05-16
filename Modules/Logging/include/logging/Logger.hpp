@@ -8,7 +8,7 @@
 #include <string>
 #include <thread>
 
-namespace Engine::Core {
+namespace ED::Logging {
 
 enum class LogLevel
 {
@@ -79,40 +79,38 @@ template<typename... Args>
 void
 info(std::format_string<Args...> format, Args&&... args) noexcept
 {
-  Engine::Core::Logger::get_instance().info(format,
-                                            std::forward<Args>(args)...);
+  ED::Logging::Logger::get_instance().info(format, std::forward<Args>(args)...);
 }
 
 template<typename... Args>
 void
 debug(std::format_string<Args...> format, Args&&... args) noexcept
 {
-  Engine::Core::Logger::get_instance().debug(format,
-                                             std::forward<Args>(args)...);
+  ED::Logging::Logger::get_instance().debug(format,
+                                            std::forward<Args>(args)...);
 }
 
 template<typename... Args>
 void
 trace(std::format_string<Args...> format, Args&&... args) noexcept
 {
-  Engine::Core::Logger::get_instance().trace(format,
-                                             std::forward<Args>(args)...);
+  ED::Logging::Logger::get_instance().trace(format,
+                                            std::forward<Args>(args)...);
 }
 
 template<typename... Args>
 void
 warn(std::format_string<Args...> format, Args&&... args) noexcept
 {
-  Engine::Core::Logger::get_instance().warn(format,
-                                            std::forward<Args>(args)...);
+  ED::Logging::Logger::get_instance().warn(format, std::forward<Args>(args)...);
 }
 
 template<typename... Args>
 void
 error(std::format_string<Args...> format, Args&&... args) noexcept
 {
-  Engine::Core::Logger::get_instance().error(format,
-                                             std::forward<Args>(args)...);
+  ED::Logging::Logger::get_instance().error(format,
+                                            std::forward<Args>(args)...);
 }
 
-#include "inline/core/Logger.inl"
+#include "logging/Logger.inl"

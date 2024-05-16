@@ -5,6 +5,8 @@
 #include "core/Exceptions.hpp"
 #include "graphics/Shader.hpp"
 
+#include "logging/Logger.hpp"
+
 #include <fstream>
 #include <istream>
 #include <shaderc/shaderc.hpp>

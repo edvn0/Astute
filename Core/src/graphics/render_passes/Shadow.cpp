@@ -3,8 +3,8 @@
 #include "graphics/Renderer.hpp"
 
 #include "core/Application.hpp"
-#include "core/Logger.hpp"
 #include "core/Scene.hpp"
+#include "logging/Logger.hpp"
 
 #include "graphics/DescriptorResource.hpp"
 #include "graphics/Framebuffer.hpp"
