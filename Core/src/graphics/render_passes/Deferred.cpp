@@ -131,11 +131,11 @@ DeferredRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
     get_renderer().get_render_pass("Shadow").get_depth_attachment());
   deferred_material->set("noise_map", noise_map);
 
-  auto renderer_desc_set =
+  auto* renderer_desc_set =
     get_renderer().generate_and_update_descriptor_write_sets(
       *deferred_material);
 
-  auto material_set =
+  auto* material_set =
     deferred_material->generate_and_update_descriptor_write_sets();
 
   std::array desc_sets{ renderer_desc_set, material_set };

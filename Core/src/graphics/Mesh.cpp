@@ -17,7 +17,84 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/quaternion.hpp>
 
+#include <memory>
+#include <utility>
 namespace Engine::Graphics {
+
+static constexpr auto maybe_load_embedded_texture =
+  [](auto& dispatcher,
+     auto index,
+     TextureType T,
+     const std::string& name,
+     const aiTexture* embedded_texture,
+     auto& outputs,
+     auto& mutex,
+     auto& cache) -> void {
+  if (embedded_texture == nullptr) {
+    throw std::runtime_error("No texture");
+  }
+
+  Core::DataBuffer buffer{ embedded_texture->mWidth *
+                           embedded_texture->mHeight * 4 };
+  buffer.write(embedded_texture->pcData,
+               embedded_texture->mWidth * embedded_texture->mHeight * 4);
+
+  std::unique_lock lock(mutex);
+  auto& back = cache.emplace_back();
+  back = Core::make_ref<StagingBuffer>(std::move(buffer));
+  lock.unlock();
+
+  const auto width = embedded_texture->mWidth;
+  const auto height = embedded_texture->mHeight;
+
+  dispatcher.dispatch(
+    [=, staging = back, &images = outputs, &m = mutex](auto* cmd) {
+      std::lock_guard lock(m);
+      images[index][T] = Image::load_from_memory(cmd,
+                                                 width,
+                                                 height,
+                                                 staging,
+                                                 {
+                                                   .path = name,
+                                                   .use_mips = true,
+                                                 });
+    });
+};
+
+static constexpr auto load_texture_from_file =
+  [](auto& dispatcher,
+     auto index,
+     TextureType T,
+     const std::string& base_path,
+     const std::string& texture_path,
+     auto& outputs,
+     auto& mutex,
+     auto& cache) -> void {
+  std::filesystem::path path = base_path;
+  auto parent_path = path.parent_path();
+  parent_path /= texture_path;
+  std::string real_path = parent_path.string();
+
+  Core::u32 w{};
+  Core::u32 h{};
+
+  std::unique_lock lock(mutex);
+  auto& back = cache.emplace_back();
+  back = Image::load_from_file_into_staging(real_path, &w, &h);
+  lock.unlock();
+
+  dispatcher.dispatch([=, c = back, &images = outputs, &m = mutex](auto* cmd) {
+    std::lock_guard lock(m);
+    images[index][T] = Image::load_from_memory(cmd,
+                                               w,
+                                               h,
+                                               c,
+                                               {
+                                                 .path = real_path,
+                                                 .use_mips = true,
+                                               });
+  });
+};
 
 struct AssimpLogStream : public Assimp::LogStream
 {
@@ -41,7 +118,7 @@ struct AssimpLogStream : public Assimp::LogStream
     if (strncmp(message, "Debug", 5) == 0) {
       trace("Assimp: {}", msg);
     } else if (strncmp(message, "Info", 4) == 0) {
-      info("Assimp: {}", msg);
+      trace("Assimp: {}", msg);
     } else if (strncmp(message, "Warn", 4) == 0) {
       warn("Assimp: {}", msg);
     } else {
@@ -222,6 +299,9 @@ MeshAsset::MeshAsset(const std::string& file_name)
     return;
   }
 
+  std::vector<Core::Ref<StagingBuffer>> cache;
+  cache.reserve(150);
+
   std::span scene_mats{ scene->mMaterials, scene->mNumMaterials };
   materials.resize(scene_mats.size());
   const auto& white_texture = Renderer::get_white_texture();
@@ -251,87 +331,7 @@ MeshAsset::MeshAsset(const std::string& file_name)
 
     materials.at(i)->set("mat_pc.roughness", roughness);
 
-    static auto maybe_load_embedded_texture =
-      [k = i](auto& dispatcher,
-              TextureType T,
-              const std::string& name,
-              const aiTexture* embedded_texture,
-              auto& stagings,
-              auto& outputs,
-              auto& mutex) -> void {
-      if (embedded_texture == nullptr) {
-        throw std::runtime_error("No texture");
-      }
-
-      const auto key = Key{
-        .type = T,
-        .index = static_cast<Core::u32>(k),
-        .name = name,
-      };
-
-      Core::DataBuffer buffer{ embedded_texture->mWidth *
-                               embedded_texture->mHeight * 4 };
-      buffer.write(embedded_texture->pcData,
-                   embedded_texture->mWidth * embedded_texture->mHeight * 4);
-
-      auto& staging_buffer = stagings[key];
-      staging_buffer = Core::make_scope<StagingBuffer>(std::move(buffer));
-
-      const auto width = embedded_texture->mWidth;
-      const auto height = embedded_texture->mHeight;
-
-      dispatcher.dispatch(
-        [=, &staging = staging_buffer, &images = outputs, &m = mutex](
-          auto* cmd) {
-          std::lock_guard lock(m);
-          images[key] = Image::load_from_memory(cmd,
-                                                width,
-                                                height,
-                                                *staging,
-                                                {
-                                                  .path = name,
-                                                  .use_mips = true,
-                                                });
-        });
-    };
-
-    static auto load_texture_from_file =
-      [&, k = i](auto& dispatcher,
-                 TextureType T,
-                 const std::string& base_path,
-                 const std::string& texture_path,
-                 auto& stagings,
-                 auto& outputs,
-                 auto& mutex) -> void {
-      std::filesystem::path path = base_path;
-      auto parent_path = path.parent_path();
-      parent_path /= texture_path;
-      std::string real_path = parent_path.string();
-      const auto key = Key{
-        .type = T,
-        .index = static_cast<Core::u32>(k),
-        .name = real_path,
-      };
-
-      Core::u32 w{};
-      Core::u32 h{};
-
-      stagings[key] = Image::load_from_file_into_staging(real_path, &w, &h);
-      auto& created = stagings[key];
-
-      dispatcher.dispatch(
-        [=, &c = created, &images = outputs, &m = mutex](auto* cmd) {
-          std::lock_guard lock(m);
-          images[key] = Image::load_from_memory(cmd,
-                                                w,
-                                                h,
-                                                *c,
-                                                {
-                                                  .path = real_path,
-                                                  .use_mips = true,
-                                                });
-        });
-    };
+    const auto casted_index = static_cast<Core::u32>(i);
 
     bool has_albedo_map =
       ai_material->GetTexture(aiTextureType_DIFFUSE, 0, &ai_tex_path) ==
@@ -340,20 +340,22 @@ MeshAsset::MeshAsset(const std::string& file_name)
       if (const auto* embedded_texture =
             scene->GetEmbeddedTexture(ai_tex_path.C_Str())) {
         maybe_load_embedded_texture(dispatcher,
+                                    casted_index,
                                     TextureType::Albedo,
                                     std::string{ ai_tex_path.C_Str() },
                                     embedded_texture,
-                                    image_staging_buffers,
                                     output_images,
-                                    mutex);
+                                    mutex,
+                                    cache);
       } else {
         load_texture_from_file(dispatcher,
+                               casted_index,
                                TextureType::Albedo,
                                file_name,
                                ai_tex_path.C_Str(),
-                               image_staging_buffers,
                                output_images,
-                               mutex);
+                               mutex,
+                               cache);
       }
     }
 
@@ -365,24 +367,26 @@ MeshAsset::MeshAsset(const std::string& file_name)
       if (const auto* embedded_texture =
             scene->GetEmbeddedTexture(ai_tex_path.C_Str())) {
         maybe_load_embedded_texture(dispatcher,
+                                    casted_index,
                                     TextureType::Normal,
                                     std::string{ ai_tex_path.C_Str() },
                                     embedded_texture,
-                                    image_staging_buffers,
                                     output_images,
-                                    mutex);
+                                    mutex,
+                                    cache);
       } else {
         load_texture_from_file(dispatcher,
+                               casted_index,
                                TextureType::Normal,
                                file_name,
                                ai_tex_path.C_Str(),
-                               image_staging_buffers,
                                output_images,
-                               mutex);
+                               mutex,
+                               cache);
       }
     }
 
-    // Normal maps
+    // Specular maps
     bool has_specular_map =
       ai_material->GetTexture(aiTextureType_SPECULAR, 0, &ai_tex_path) ==
       AI_SUCCESS;
@@ -390,20 +394,23 @@ MeshAsset::MeshAsset(const std::string& file_name)
       if (const auto* embedded_texture =
             scene->GetEmbeddedTexture(ai_tex_path.C_Str())) {
         maybe_load_embedded_texture(dispatcher,
+                                    casted_index,
                                     TextureType::Specular,
                                     std::string{ ai_tex_path.C_Str() },
                                     embedded_texture,
-                                    image_staging_buffers,
                                     output_images,
-                                    mutex);
+                                    mutex,
+                                    cache);
       } else {
         load_texture_from_file(dispatcher,
+                               casted_index,
                                TextureType::Specular,
                                file_name,
                                ai_tex_path.C_Str(),
-                               image_staging_buffers,
+
                                output_images,
-                               mutex);
+                               mutex,
+                               cache);
       }
     }
 
@@ -427,22 +434,24 @@ MeshAsset::MeshAsset(const std::string& file_name)
             prefer_combined ? combined_roughness_metallic_file.C_Str()
                             : ai_tex_path.C_Str())) {
         maybe_load_embedded_texture(dispatcher,
+                                    casted_index,
                                     TextureType::Roughness,
                                     std::string{ ai_tex_path.C_Str() },
                                     embedded_texture,
-                                    image_staging_buffers,
                                     output_images,
-                                    mutex);
+                                    mutex,
+                                    cache);
       } else {
         load_texture_from_file(dispatcher,
+                               casted_index,
                                TextureType::Roughness,
                                file_name,
                                prefer_combined
                                  ? combined_roughness_metallic_file.C_Str()
                                  : ai_tex_path.C_Str(),
-                               image_staging_buffers,
                                output_images,
-                               mutex);
+                               mutex,
+                               cache);
       }
     }
 
@@ -455,61 +464,40 @@ MeshAsset::MeshAsset(const std::string& file_name)
   index_buffer = Core::make_scope<IndexBuffer>(indices.data(),
                                                indices.size() * sizeof(Index));
 
-  static auto search = [&](const auto& map_name) {
-    for (const auto& [key, value] : output_images) {
-      if (value->get_path() == map_name) {
-        return value;
-      }
-    }
-    return Core::Ref<Image>(nullptr);
-  };
-
   // Patch up material settings based on loaded textures
-  for (auto index = 0ULL; index < materials.size(); index++) {
+  for (auto index = 0U; index < materials.size(); index++) {
     auto& material = materials.at(index);
+    material->set("albedo_map", white_texture);
+    material->set("normal_map", white_texture);
+    material->set("specular_map", white_texture);
+    material->set("roughness_map", white_texture);
 
-    const auto search_albedo = search("albedo_map");
-
-    const auto albedo_key = Key{
-      .type = TextureType::Albedo,
-      .index = static_cast<Core::u32>(index),
-      .name = material->find_image("albedo_map")->get_path(),
-    };
-    const auto normal_key = Key{
-      .type = TextureType::Normal,
-      .index = static_cast<Core::u32>(index),
-      .name = material->find_image("normal_map")->get_path(),
-    };
-    const auto specular_key = Key{
-      .type = TextureType::Specular,
-      .index = static_cast<Core::u32>(index),
-      .name = material->find_image("specular_map")->get_path(),
-    };
-    const auto roughness_key = Key{
-      .type = TextureType::Roughness,
-      .index = static_cast<Core::u32>(index),
-      .name = material->find_image("roughness_map")->get_path(),
-    };
-
-    if (output_images.contains(albedo_key)) {
-      material->set("albedo_map", output_images[albedo_key]);
-    }
-    if (output_images.contains(normal_key)) {
-      material->set("normal_map", output_images[normal_key]);
-    }
-    if (output_images.contains(specular_key)) {
-      material->set("specular_map", output_images[specular_key]);
-    }
-    if (output_images.contains(roughness_key)) {
-      material->set("roughness_map", output_images[roughness_key]);
+    if (!output_images.contains(index)) {
+      continue;
     }
 
-    material->set("mat_pc.use_normal_map",
-                  output_images[normal_key] != white_texture);
+    auto& current_images = output_images.at(index);
+
+    if (current_images.contains(TextureType::Albedo)) {
+      material->override_property("albedo_map",
+                                  current_images.at(TextureType::Albedo));
+    }
+    if (current_images.contains(TextureType::Normal)) {
+      material->override_property("normal_map",
+                                  current_images.at(TextureType::Normal));
+      material->set("mat_pc.use_normal_map", true);
+    }
+    if (current_images.contains(TextureType::Specular)) {
+      material->override_property("specular_map",
+                                  current_images.at(TextureType::Specular));
+    }
+    if (current_images.contains(TextureType::Roughness)) {
+      material->override_property("roughness_map",
+                                  current_images.at(TextureType::Roughness));
+    }
   }
 
   // Clear out the staging buffers
-  image_staging_buffers.clear();
   output_images.clear();
 }
 
@@ -523,8 +511,6 @@ MeshAsset::traverse_nodes(aiNode* node,
   if (node == nullptr) {
     return;
   }
-
-  info("Node: {0} Level: {1}", node->mName.C_Str(), level);
 
   glm::mat4 local_transform =
     Utils::mat4_from_assimp_matrix4(node->mTransformation);
@@ -541,7 +527,7 @@ MeshAsset::traverse_nodes(aiNode* node,
 
   const auto span = std::span{ node->mChildren, node->mNumChildren };
   for (const auto& child : span) {
-    if (!child) {
+    if (child == nullptr) {
       continue;
     }
 
@@ -550,7 +536,7 @@ MeshAsset::traverse_nodes(aiNode* node,
 }
 
 StaticMesh::StaticMesh(Core::Ref<MeshAsset> asset)
-  : mesh_asset(asset)
+  : mesh_asset(std::move(asset))
 {
   set_submeshes({});
 }
@@ -563,8 +549,9 @@ StaticMesh::set_submeshes(const std::vector<Core::u32>& new_submeshes)
   } else {
     const auto& old_submeshes = mesh_asset->get_submeshes();
     submeshes.resize(old_submeshes.size());
-    for (Core::u32 i = 0; i < old_submeshes.size(); i++)
+    for (Core::u32 i = 0; i < old_submeshes.size(); i++) {
       submeshes[i] = i;
+    }
   }
 }
 

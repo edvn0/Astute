@@ -31,8 +31,8 @@ Material::Material(Configuration config)
 }
 
 auto
-Material::set(const std::string_view name,
-              const Core::Ref<Image>& image) -> bool
+Material::set(const std::string_view name, const Core::Ref<Image>& image)
+  -> bool
 {
   if (!image) {
     return false;
@@ -45,11 +45,6 @@ Material::set(const std::string_view name,
 
   const auto as_string = std::string{ name };
   const auto contains = images.contains(as_string);
-#ifdef ASTUTE_DEBUG
-  if (contains) {
-    error("Could not map new image into type '{}'", as_string);
-  }
-#endif
 
   if (contains && images[as_string]->hash() != image->hash()) {
     images.at(as_string) = image;
@@ -58,6 +53,34 @@ Material::set(const std::string_view name,
   } else if (!contains) {
     images[as_string] = image;
   }
+
+  write_descriptors.for_each([&](const auto&, auto& container) {
+    auto& desc = container[resource->get_register()];
+    desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    desc.descriptorCount = 1;
+    desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    desc.dstBinding = resource->get_register();
+    desc.pImageInfo = &images.at(as_string)->descriptor_info;
+  });
+
+  return true;
+}
+
+auto
+Material::override_property(const std::string_view name,
+                            const Core::Ref<Image>& image) -> bool
+{
+  if (!image) {
+    return false;
+  }
+  const auto* resource = find_resource_by_name(name);
+  if (resource == nullptr) {
+    error("Could not find {} as a uniform.", name);
+    return false;
+  }
+
+  const auto as_string = std::string{ name };
+  images[as_string] = image;
 
   write_descriptors.for_each([&](const auto&, auto& container) {
     auto& desc = container[resource->get_register()];
@@ -142,9 +165,8 @@ Material::find_resource_by_name(const std::string_view name) const
 }
 
 auto
-Material::set(const std::string_view name,
-              const void* data,
-              Core::usize size) -> void
+Material::set(const std::string_view name, const void* data, Core::usize size)
+  -> void
 {
   const auto& shader_buffers = shader->get_reflection_data().constant_buffers;
   const Engine::Reflection::ShaderUniform* found = nullptr;

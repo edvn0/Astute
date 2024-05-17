@@ -6,12 +6,8 @@
 #include "logging/Logger.hpp"
 
 #include "core/Application.hpp"
-#include "graphics/DescriptorResource.hpp"
 #include "graphics/Framebuffer.hpp"
-#include "graphics/GPUBuffer.hpp"
-#include "graphics/Image.hpp"
-#include "graphics/Swapchain.hpp"
-#include "graphics/Window.hpp"
+#include "graphics/GraphicsPipeline.hpp"
 
 #include "graphics/RendererExtensions.hpp"
 
@@ -50,8 +46,6 @@ MainGeometryRenderPass::construct() -> void
       .framebuffer = main_geometry_framebuffer.get(),
       .shader = main_geometry_shader.get(),
       .sample_count = VK_SAMPLE_COUNT_1_BIT,
-      .cull_mode = VK_CULL_MODE_BACK_BIT,
-      .face_mode = VK_FRONT_FACE_COUNTER_CLOCKWISE,
       .depth_comparator = VK_COMPARE_OP_EQUAL,
     });
   main_geometry_material = Core::make_scope<Material>(Material::Configuration{
@@ -67,7 +61,7 @@ MainGeometryRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                main_geometry_pipeline,
                main_geometry_material] = get_data();
 
-  auto renderer_desc_set =
+  auto* renderer_desc_set =
     generate_and_update_descriptor_write_sets(*main_geometry_material);
 
   main_geometry_material->update_descriptor_write_sets(renderer_desc_set);
@@ -84,7 +78,7 @@ MainGeometryRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
     const auto& submesh = mesh_asset->get_submeshes().at(submesh_index);
 
     const auto& material = mesh->get_materials().at(submesh.material_index);
-    auto material_descriptor_set =
+    auto* material_descriptor_set =
       material->generate_and_update_descriptor_write_sets();
 
     RendererExtensions::bind_vertex_buffer(

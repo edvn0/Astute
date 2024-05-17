@@ -126,13 +126,16 @@ create_view(VkImage&,
             Core::u32 mips = 1,
             Core::u32 layer = 1) -> VkImageView;
 
-auto create_sampler(VkFilter, VkSamplerAddressMode, VkBorderColor) -> VkSampler;
-auto create_sampler(VkFilter,
-                    VkFilter,
-                    VkSamplerAddressMode,
-                    VkSamplerAddressMode,
-                    VkSamplerAddressMode,
-                    VkBorderColor) -> VkSampler;
+auto create_sampler(VkFilter, VkSamplerAddressMode, VkBorderColor, Core::u32)
+  -> VkSampler;
+auto
+create_sampler(VkFilter,
+               VkFilter,
+               VkSamplerAddressMode,
+               VkSamplerAddressMode,
+               VkSamplerAddressMode,
+               VkBorderColor,
+               Core::u32 mips = 1) -> VkSampler;
 
 struct ImageImpl;
 class Image
@@ -210,7 +213,7 @@ public:
   static auto load_from_file_into_staging(std::string_view,
                                           Core::u32* = nullptr,
                                           Core::u32* = nullptr)
-    -> Core::Scope<StagingBuffer>;
+    -> Core::Ref<StagingBuffer>;
 
   static auto load_from_memory(Core::u32,
                                Core::u32,
@@ -220,7 +223,7 @@ public:
   static auto load_from_memory(const CommandBuffer*,
                                Core::u32,
                                Core::u32,
-                               const Graphics::StagingBuffer&,
+                               Core::Ref<Graphics::StagingBuffer>,
                                const Configuration&) -> Core::Ref<Image>;
 
   static auto resolve_msaa(const Image&, const CommandBuffer* = nullptr)

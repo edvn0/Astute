@@ -100,7 +100,7 @@ AstuteApplication::interface() -> void
                    });
   });
 
-  UI::scope("Shadow projection", [s = scene]() {
+  UI::scope("Light Environment", [s = scene]() {
     auto& light_environment = s->get_light_environment();
     const std::string label =
       light_environment.is_perspective ? "Perspective" : "Ortho";
@@ -134,6 +134,25 @@ AstuteApplication::interface() -> void
       ImGui::InputFloat("Far", &far);
       auto projection = glm::perspective(glm::radians(fov), aspect, near, far);
       light_environment.shadow_projection = projection;
+    }
+
+    auto& light_colour = light_environment.colour_and_intensity;
+    if (ImGui::DragFloat3(
+          "Light colour", glm::value_ptr(light_colour), 0.05F, 0.0F, 1.0F)) {
+    }
+    if (ImGui::DragFloat("Strength", &light_colour.w, 0.1F, 0.0F, 100.0F)) {
+    }
+
+    auto& specular_light_colour =
+      light_environment.specular_colour_and_intensity;
+    if (ImGui::DragFloat3("Specular Light colour",
+                          glm::value_ptr(specular_light_colour),
+                          0.05F,
+                          0.0F,
+                          1.0F)) {
+    }
+    if (ImGui::DragFloat(
+          "Specular Strength", &specular_light_colour.w, 0.1F, 0.0F, 100.0F)) {
     }
   });
 

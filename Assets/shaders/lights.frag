@@ -14,7 +14,7 @@ layout(location = 5) in vec4 shadow_space_fragment_position;
 layout(location = 6) in vec4 colour;
 
 layout(location = 0) out vec4 fragment_colour;
-layout(set = 0, binding = 7) uniform sampler2DShadow predepth_map;
+layout(set = 0, binding = 7) uniform sampler2D predepth_map;
 
 layout(set = 1, binding = 5) uniform sampler2D normal_map;
 layout(set = 1, binding = 6) uniform sampler2D albedo_map;

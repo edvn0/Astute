@@ -15,8 +15,8 @@ struct RendererUBO
   glm::mat4 view{};
   glm::mat4 proj{};
   glm::mat4 view_proj{};
-  glm::vec4 colour_and_intensity{};
-  glm::vec4 specular_colour_and_intensity{};
+  glm::vec4 colour_and_intensity{ 0.5F, 0.5F, 0.5F, 2.0F };
+  glm::vec4 specular_colour_and_intensity{ 0.5F, 0.5F, 0.5F, 2.0F };
   glm::vec3 camera_pos{};
 
   static constexpr std::string_view name = "RendererUBO";

@@ -15,7 +15,7 @@ public:
     const Shader* shader;
     const VkSampleCountFlagBits sample_count{ VK_SAMPLE_COUNT_1_BIT };
     const VkCullModeFlags cull_mode{ VK_CULL_MODE_BACK_BIT };
-    const VkFrontFace face_mode{ VK_FRONT_FACE_COUNTER_CLOCKWISE };
+    const VkFrontFace face_mode{ VK_FRONT_FACE_CLOCKWISE };
     const VkCompareOp depth_comparator{ VK_COMPARE_OP_GREATER_OR_EQUAL };
     const Core::f32 clear_depth_value{ 0.0F };
     const std::optional<std::vector<VkVertexInputAttributeDescription>>
@@ -29,9 +29,15 @@ public:
 
   auto on_resize(const Core::Extent&) -> void override;
 
-  auto get_pipeline() const -> VkPipeline override { return pipeline; }
-  auto get_layout() const -> VkPipelineLayout override { return layout; }
-  auto get_bind_point() const -> VkPipelineBindPoint override
+  [[nodiscard]] auto get_pipeline() const -> VkPipeline override
+  {
+    return pipeline;
+  }
+  [[nodiscard]] auto get_layout() const -> VkPipelineLayout override
+  {
+    return layout;
+  }
+  [[nodiscard]] auto get_bind_point() const -> VkPipelineBindPoint override
   {
     return VK_PIPELINE_BIND_POINT_GRAPHICS;
   }

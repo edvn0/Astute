@@ -21,7 +21,7 @@ Scene::Scene(const std::string_view name_view)
 
   info("Creating scene: {}", name);
   auto sponza_mesh =
-    Graphics::StaticMesh::construct("Assets/meshes/sponza/sponza.obj");
+    Graphics::StaticMesh::construct("Assets/meshes/sponza_new/sponza.gltf");
 
   auto sponza = registry.create();
   registry.emplace<MeshComponent>(sponza, sponza_mesh);
@@ -65,6 +65,8 @@ Scene::Scene(const std::string_view name_view)
     light_data.angle_attenuation = Random::random<Core::f32>(1.0, 5.0);
     light_data.intensity = Random::random<Core::f32>(0.5, 1.0);
   }
+
+  light_environment.sun_position = { -30.0, -70.0, 30.0, 1.0 };
 }
 
 auto
@@ -78,15 +80,6 @@ Scene::on_update_editor(f64) -> void
     }
   }
 
-  // Improved gradient for color based on rotation
-  // Using different frequencies and phases for color channels
-  light_environment.colour_and_intensity = {
-    0.5, 0.5, 0.5, 1
-  }; // Base intensity
-
-  light_environment.specular_colour_and_intensity = {
-    0.1, 0.1, 0.1, 1
-  }; // Base specular intensity
   light_environment.spot_lights.clear();
   light_environment.point_lights.clear();
 
@@ -142,11 +135,9 @@ Scene::on_update_editor(f64) -> void
 }
 
 auto
-Scene::on_render_editor(Graphics::Renderer& renderer,
-                        const Camera& camera) -> void
+Scene::on_render_editor(Graphics::Renderer& renderer, const Camera& camera)
+  -> void
 {
-  light_environment.sun_position = { camera.get_position(), 1.0F };
-
   renderer.begin_scene(*this,
                        {
                          camera,

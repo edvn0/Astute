@@ -28,31 +28,6 @@ enum class TextureType : Core::u8
   Roughness,
 };
 
-struct Key
-{
-  TextureType type;
-  Core::u32 index;
-  std::string name;
-
-  constexpr auto operator<=>(const Key&) const = default;
-};
-
-}
-
-template<>
-struct std::hash<Engine::Graphics::Key>
-{
-  auto operator()(const Engine::Graphics::Key& key) const noexcept
-    -> Engine::Core::usize
-  {
-    static constexpr auto hasher = std::hash<const char*>();
-    return std::hash<Engine::Graphics::TextureType>{}(key.type) ^
-           std::hash<Engine::Core::u32>{}(key.index) ^ hasher(key.name.data());
-  }
-};
-
-namespace Engine::Graphics {
-
 struct Index
 {
   Core::u32 V1, V2, V3;
@@ -89,7 +64,6 @@ public:
 
   std::string node_name;
   std::string mesh_name;
-  // bool IsRigged = false;
 };
 
 class MeshAsset
@@ -157,8 +131,9 @@ private:
 
   ED::CommandBufferDispatcher dispatcher;
   std::mutex mutex;
-  std::unordered_map<Key, Core::Scope<StagingBuffer>> image_staging_buffers;
-  std::unordered_map<Key, Core::Ref<Image>> output_images;
+  std::unordered_map<Core::u32,
+                     std::unordered_map<TextureType, Core::Ref<Image>>>
+    output_images;
 
   friend class Core::Scene;
   friend class Renderer;

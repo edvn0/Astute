@@ -3,7 +3,6 @@
 #include "graphics/RendererExtensions.hpp"
 
 #include "graphics/CommandBuffer.hpp"
-#include "graphics/Framebuffer.hpp"
 #include "graphics/GPUBuffer.hpp"
 #include "graphics/Image.hpp"
 
@@ -42,7 +41,7 @@ begin_renderpass(const CommandBuffer& command_buffer,
   viewport.minDepth = 1.0F;
   viewport.maxDepth = 0.0F;
 
-  if (flip) {
+  if (!flip) {
     viewport.y = 0.0F;
     viewport.height = static_cast<float>(height);
   }

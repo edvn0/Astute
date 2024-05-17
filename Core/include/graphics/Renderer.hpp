@@ -5,13 +5,10 @@
 #include "core/Types.hpp"
 
 #include "graphics/CommandBuffer.hpp"
-#include "graphics/Framebuffer.hpp"
 #include "graphics/GPUBuffer.hpp"
-#include "graphics/GraphicsPipeline.hpp"
 #include "graphics/Material.hpp"
 #include "graphics/Mesh.hpp"
 #include "graphics/RenderPass.hpp"
-#include "graphics/Shader.hpp"
 
 #include "graphics/ShaderBuffers.hpp"
 
@@ -110,21 +107,22 @@ public:
   auto submit_static_mesh(Core::Ref<StaticMesh>&, const glm::mat4&) -> void;
   auto submit_static_light(Core::Ref<StaticMesh>&, const glm::mat4&) -> void;
 
-  auto get_output_image(Core::u32 attachment = 0) const -> const Image*
+  [[nodiscard]] auto get_output_image(Core::u32 attachment = 0) const
+    -> const Image*
   {
     return render_passes.at("MainGeometry")
       ->get_framebuffer()
       ->get_colour_attachment(attachment)
       .get();
   }
-  auto get_shadow_output_image() const -> const Image*
+  [[nodiscard]] auto get_shadow_output_image() const -> const Image*
   {
     return render_passes.at("Shadow")
       ->get_framebuffer()
       ->get_depth_attachment()
       .get();
   }
-  auto get_final_output() const -> const Image*
+  [[nodiscard]] auto get_final_output() const -> const Image*
   {
     return render_passes.at("Lights")
       ->get_framebuffer()
@@ -143,12 +141,13 @@ public:
     return black_texture;
   }
 
-  auto get_size() const -> const Core::Extent& { return size; }
+  [[nodiscard]] auto get_size() const -> const Core::Extent& { return size; }
   auto get_render_pass(const std::string& name) -> RenderPass&
   {
     return *render_passes.at(name);
   }
-  auto get_render_pass(const std::string& name) const -> const RenderPass&
+  [[nodiscard]] auto get_render_pass(const std::string& name) const
+    -> const RenderPass&
   {
     return *render_passes.at(name);
   }
@@ -229,6 +228,9 @@ std::hash<Engine::Graphics::CommandKey>::operator()(
     return seed;
   };
   std::size_t seed{ 0 };
-  return combine(
-    seed, key.vertex_buffer, key.index_buffer, key.material, key.submesh_index);
+  return combine(seed,
+                 std::bit_cast<std::size_t>(key.vertex_buffer),
+                 std::bit_cast<std::size_t>(key.index_buffer),
+                 std::bit_cast<std::size_t>(key.material),
+                 key.submesh_index);
 }

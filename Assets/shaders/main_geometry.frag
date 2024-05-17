@@ -46,14 +46,14 @@ main()
     fragment_normals = vec4(N, 0.0);
   }
 
-  vec3 albedo_color =
-    texture(albedo_map, fragment_uvs).rgb * mat_pc.albedo_colour;
+  vec4 sampled_albedo = texture(albedo_map, fragment_uvs);
+  vec3 albedo_color = sampled_albedo.rgb * mat_pc.albedo_colour;
+
   float specular_strength = texture(specular_map, fragment_uvs).r;
   float roughness_value =
     texture(roughness_map, fragment_uvs).r * mat_pc.roughness;
 
-  fragment_albedo_spec.rgb =
-    albedo_color + mat_pc.emission * mat_pc.albedo_colour;
+  fragment_albedo_spec.rgb = albedo_color;
   fragment_albedo_spec.a = specular_strength * roughness_value;
 
   fragment_position = vec4(world_space_fragment_position, 1.0);

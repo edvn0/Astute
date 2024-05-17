@@ -3,16 +3,10 @@
 #include "graphics/Renderer.hpp"
 
 #include "core/Application.hpp"
-#include "core/Scene.hpp"
-#include "logging/Logger.hpp"
-
-#include "graphics/DescriptorResource.hpp"
 #include "graphics/Framebuffer.hpp"
 #include "graphics/GPUBuffer.hpp"
-#include "graphics/Swapchain.hpp"
-#include "graphics/Window.hpp"
 
-#include "graphics/RendererExtensions.hpp"
+#include "graphics/GraphicsPipeline.hpp"
 
 #include "graphics/render_passes/Shadow.hpp"
 
@@ -39,8 +33,6 @@ ShadowRenderPass::construct() -> void
       .framebuffer = shadow_framebuffer.get(),
       .shader = shadow_shader.get(),
       .sample_count = VK_SAMPLE_COUNT_1_BIT,
-      .cull_mode = VK_CULL_MODE_BACK_BIT,
-      .face_mode = VK_FRONT_FACE_COUNTER_CLOCKWISE,
       .depth_comparator = VK_COMPARE_OP_GREATER_OR_EQUAL,
       .override_vertex_attributes = { {
         { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },

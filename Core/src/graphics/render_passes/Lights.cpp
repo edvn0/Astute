@@ -1,20 +1,13 @@
 #include "pch/CorePCH.hpp"
 
-#include "graphics/Renderer.hpp"
+#include "graphics/render_passes/Lights.hpp"
 
 #include "core/Application.hpp"
-#include "core/Scene.hpp"
-#include "logging/Logger.hpp"
 
-#include "graphics/DescriptorResource.hpp"
 #include "graphics/Framebuffer.hpp"
-#include "graphics/GPUBuffer.hpp"
-#include "graphics/Swapchain.hpp"
-#include "graphics/Window.hpp"
-
+#include "graphics/GraphicsPipeline.hpp"
+#include "graphics/Renderer.hpp"
 #include "graphics/RendererExtensions.hpp"
-
-#include "graphics/render_passes/Lights.hpp"
 
 namespace Engine::Graphics {
 
@@ -28,9 +21,20 @@ LightsRenderPass::construct() -> void
     .height = get_renderer().get_size().height,
     .clear_colour_on_load = false,
     .clear_depth_on_load = false,
-    .attachments = { { VK_FORMAT_R32G32B32A32_SFLOAT } },
+    .attachments = { { VK_FORMAT_R32G32B32A32_SFLOAT, VK_FORMAT_D32_SFLOAT } },
     .samples = VK_SAMPLE_COUNT_1_BIT,
-    .existing_images = { {0, get_renderer().get_render_pass("Deferred").get_colour_attachment(0),}, },
+    .existing_images = { {
+                           0,
+                           get_renderer()
+                             .get_render_pass("Deferred")
+                             .get_colour_attachment(0),
+                         },
+                         {
+                           1,
+                           get_renderer()
+                             .get_render_pass("Predepth")
+                             .get_depth_attachment(),
+                         } },
     .debug_name = "Lights",
   });
   lights_shader = Shader::compile_graphics_scoped("Assets/shaders/lights.vert",
@@ -42,7 +46,6 @@ LightsRenderPass::construct() -> void
       .sample_count = VK_SAMPLE_COUNT_1_BIT,
       .cull_mode = VK_CULL_MODE_FRONT_BIT,
       .face_mode = VK_FRONT_FACE_COUNTER_CLOCKWISE,
-      .depth_comparator = VK_COMPARE_OP_GREATER,
     });
 
   lights_material = Core::make_scope<Material>(Material::Configuration{
@@ -62,7 +65,7 @@ LightsRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                lights_pipeline,
                lights_material] = get_data();
 
-  auto renderer_desc_set =
+  auto* renderer_desc_set =
     generate_and_update_descriptor_write_sets(*lights_material);
 
   lights_material->update_descriptor_write_sets(renderer_desc_set);
@@ -79,7 +82,7 @@ LightsRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
     const auto& submesh = mesh_asset->get_submeshes().at(submesh_index);
 
     const auto& material = mesh->get_materials().at(submesh.material_index);
-    auto material_descriptor_set =
+    auto* material_descriptor_set =
       material->generate_and_update_descriptor_write_sets();
 
     RendererExtensions::bind_vertex_buffer(
@@ -125,23 +128,6 @@ LightsRenderPass::on_resize(const Core::Extent& ext) -> void
 
   fb->on_resize(ext);
   pipe->on_resize(ext);
-}
-
-auto
-LightsRenderPass::bind(CommandBuffer& command_buffer) -> void
-{
-  auto&& [_, __, pipeline, ___] = get_data();
-  RendererExtensions::begin_renderpass(
-    command_buffer, *get_framebuffer(), true);
-  vkCmdBindPipeline(command_buffer.get_command_buffer(),
-                    pipeline->get_bind_point(),
-                    pipeline->get_pipeline());
-}
-
-auto
-LightsRenderPass::unbind(CommandBuffer& command_buffer) -> void
-{
-  RendererExtensions::end_renderpass(command_buffer);
 }
 
 } // namespace Engine::Graphics

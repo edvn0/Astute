@@ -33,6 +33,18 @@
 
 namespace Engine::Graphics {
 
+static constexpr auto update_lights = []<class Light>(Light& light_ubo,
+                                                      auto& env_lights) {
+  auto i = 0ULL;
+  auto& [count, lights] = light_ubo.get_data();
+  count = static_cast<Core::i32>(env_lights.size());
+  for (const auto& light : env_lights) {
+    lights.at(i) = light;
+    i++;
+  }
+  light_ubo.update();
+};
+
 auto
 Renderer::generate_and_update_descriptor_write_sets(Material& material)
   -> VkDescriptorSet
@@ -222,8 +234,8 @@ Renderer::destruct() -> void
 }
 
 auto
-Renderer::begin_scene(Core::Scene& scene,
-                      const SceneRendererCamera& camera) -> void
+Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
+  -> void
 {
   if (old_size != size) {
     Device::the().wait();
@@ -243,10 +255,10 @@ Renderer::begin_scene(Core::Scene& scene,
 
     const glm::uvec2 viewport_size{ size.width, size.height };
 
-    constexpr uint32_t TILE_SIZE = 16u;
+    constexpr uint32_t tile_size = 16U;
     glm::uvec2 vp_size = viewport_size;
-    vp_size += TILE_SIZE - viewport_size % TILE_SIZE;
-    light_culling_work_groups = { vp_size / TILE_SIZE, 1 };
+    vp_size += tile_size - viewport_size % tile_size;
+    light_culling_work_groups = { vp_size / tile_size, 1 };
 
     visible_point_lights_ssbo.resize(light_culling_work_groups.x *
                                      light_culling_work_groups.y * 4 * 1024);
@@ -273,26 +285,14 @@ Renderer::begin_scene(Core::Scene& scene,
     shadow_ubo.get_data();
   auto projection = light_environment.shadow_projection;
   auto view_matrix = glm::lookAt(glm::vec3{ light_environment.sun_position },
-                                 glm::vec3(0.0f),
-                                 glm::vec3(0.0f, 1.0f, 0.0f));
+                                 glm::vec3(0.0F),
+                                 glm::vec3(0.0F, 1.0F, 0.0F));
   light_view = view_matrix;
   light_proj = projection;
   light_view_proj = projection * view_matrix;
   light_pos = light_environment.sun_position;
-  light_dir = glm::vec4(light_environment.sun_direction, 1.0F);
+  light_dir = glm::normalize(-light_environment.sun_position);
   shadow_ubo.update();
-
-  static constexpr auto update_lights = []<class Light>(Light& light_ubo,
-                                                        auto& env_lights) {
-    auto i = 0ULL;
-    auto& [count, lights] = light_ubo.get_data();
-    count = static_cast<Core::i32>(env_lights.size());
-    for (const auto& light : env_lights) {
-      lights.at(i) = light;
-      i++;
-    }
-    light_ubo.update();
-  };
 
   update_lights(point_light_ubo, light_environment.point_lights);
   update_lights(spot_light_ubo, light_environment.spot_lights);
@@ -301,8 +301,10 @@ Renderer::begin_scene(Core::Scene& scene,
   auto& screen_data = screen_data_ubo.get_data();
   screen_data.full_resolution = glm::vec2{ size.width, size.height };
   screen_data.half_resolution = glm::vec2{ size.width / 2, size.height / 2 };
-  screen_data.inv_resolution =
-    glm::vec2{ 1.0f / size.width, 1.0f / size.height };
+  screen_data.inv_resolution = glm::vec2{
+    1.0F / static_cast<Core::f32>(size.width),
+    1.0F / static_cast<Core::f32>(size.height),
+  };
 
   float depth_linearize_mul = -projection[3][2];
   float depth_linearize_add = projection[2][2];

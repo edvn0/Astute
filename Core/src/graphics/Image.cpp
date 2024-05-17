@@ -315,7 +315,8 @@ create_sampler(VkFilter min_filter,
                VkSamplerAddressMode u_address_mode,
                VkSamplerAddressMode v_address_mode,
                VkSamplerAddressMode w_address_mode,
-               VkBorderColor border_color) -> VkSampler
+               VkBorderColor border_color,
+               Core::u32 mips) -> VkSampler
 {
   VkSamplerCreateInfo sampler_info{};
   sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -333,7 +334,7 @@ create_sampler(VkFilter min_filter,
   sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
   sampler_info.mipLodBias = 0.0F;
   sampler_info.minLod = 0.0F;
-  sampler_info.maxLod = 1.0F;
+  sampler_info.maxLod = static_cast<Core::f32>(mips);
 
   VkSampler sampler;
   VK_CHECK(
@@ -342,10 +343,12 @@ create_sampler(VkFilter min_filter,
 }
 
 auto
-create_sampler(VkFilter filter, VkSamplerAddressMode mode, VkBorderColor col)
-  -> VkSampler
+create_sampler(VkFilter filter,
+               VkSamplerAddressMode mode,
+               VkBorderColor col,
+               Core::u32 mips) -> VkSampler
 {
-  return create_sampler(filter, filter, mode, mode, mode, col);
+  return create_sampler(filter, filter, mode, mode, mode, col, mips);
 }
 
 struct ImageImpl
@@ -398,8 +401,7 @@ Image::hash() const -> Core::usize
 auto
 Image::load_from_file_into_staging(const std::string_view path,
                                    Core::u32* out_w,
-                                   Core::u32* out_h)
-  -> Core::Scope<StagingBuffer>
+                                   Core::u32* out_h) -> Core::Ref<StagingBuffer>
 {
   std::filesystem::path whole_path{ path };
 
@@ -417,19 +419,19 @@ Image::load_from_file_into_staging(const std::string_view path,
   Core::DataBuffer data_buffer{ width * height * STBI_rgb_alpha };
   data_buffer.write(std::span{
     pixel_data, static_cast<Core::usize>(width * height * STBI_rgb_alpha) });
-  info("Loaded image from file '{}', size: {}",
-       whole_path.string(),
-       data_buffer.size());
+  trace("Loaded image from file '{}', size: {}",
+        whole_path.string(),
+        data_buffer.size());
   stbi_image_free(pixel_data);
 
-  if (out_w) {
+  if (out_w != nullptr) {
     *out_w = static_cast<Core::u32>(width);
   }
-  if (out_h) {
+  if (out_h != nullptr) {
     *out_h = static_cast<Core::u32>(height);
   }
 
-  return Core::make_scope<StagingBuffer>(std::move(data_buffer));
+  return Core::make_ref<StagingBuffer>(std::move(data_buffer));
 }
 
 auto
@@ -568,7 +570,7 @@ auto
 Image::load_from_memory(const CommandBuffer* buffer,
                         Core::u32 width,
                         Core::u32 height,
-                        const Graphics::StagingBuffer& staging_buffer,
+                        Core::Ref<Graphics::StagingBuffer> staging_buffer,
                         const Configuration& config) -> Core::Ref<Image>
 {
   static constexpr auto compute_mips_from_width_height = [](auto w, auto h) {
@@ -612,15 +614,8 @@ Image::load_from_memory(const CommandBuffer* buffer,
     1,
   };
 
-  const auto staging_buffer_size = staging_buffer.size();
-
-  info("Region extent: {}x{}. Staging buffer size: {}",
-       region.imageExtent.width,
-       region.imageExtent.height,
-       staging_buffer_size);
-
   vkCmdCopyBufferToImage(buffer->get_command_buffer(),
-                         staging_buffer.get_buffer(),
+                         staging_buffer->get_buffer(),
                          image->image,
                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                          1,
@@ -776,7 +771,8 @@ Image::invalidate() -> void
                            configuration.address_mode_u,
                            configuration.address_mode_v,
                            configuration.address_mode_w,
-                           configuration.border_colour);
+                           configuration.border_colour,
+                           configuration.mip_levels);
 
   descriptor_info.imageLayout = configuration.layout;
   descriptor_info.imageView = view;

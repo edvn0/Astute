@@ -25,6 +25,7 @@ public:
   ~Material();
 
   auto set(std::string_view, const Core::Ref<Image>&) -> bool;
+  auto override_property(std::string_view, const Core::Ref<Image>&) -> bool;
 
   template<glm::length_t L, typename T, glm::qualifier Q>
   auto set(const std::string_view name, const glm::vec<L, T, Q>& vec)
