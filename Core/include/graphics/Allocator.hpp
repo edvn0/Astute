@@ -1,7 +1,6 @@
 // N.B This class should technically only be included in cpp files.
 #pragma once
 
-#include "core/Logger.hpp"
 #include "core/Types.hpp"
 #include "graphics/Device.hpp"
 #include "graphics/Instance.hpp"
@@ -25,6 +24,7 @@ enum class Usage : Core::u32
 };
 enum class Creation : Core::u32
 {
+  None = 0,
   DEDICATED_MEMORY_BIT = 0x00000001,
   NEVER_ALLOCATE_BIT = 0x00000002,
   MAPPED_BIT = 0x00000004,
@@ -90,6 +90,7 @@ struct AllocationProperties
   Usage usage{ Usage::AUTO };
   Creation creation{ Creation::HOST_ACCESS_RANDOM_BIT };
   RequiredFlags flags{ RequiredFlags::FLAG_BITS_MAX_ENUM };
+  float priority{ 0.1f };
 };
 
 class Allocator
@@ -114,8 +115,9 @@ public:
                        VmaAllocationInfo&,
                        VkBufferCreateInfo&,
                        const AllocationProperties&) -> VmaAllocation;
-  auto allocate_image(VkImage&, VkImageCreateInfo&, const AllocationProperties&)
-    -> VmaAllocation;
+  auto allocate_image(VkImage&,
+                      VkImageCreateInfo&,
+                      const AllocationProperties&) -> VmaAllocation;
   auto allocate_image(VkImage&,
                       VmaAllocationInfo&,
                       VkImageCreateInfo&,

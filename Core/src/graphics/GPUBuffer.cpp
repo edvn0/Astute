@@ -4,6 +4,10 @@
 
 #include "graphics/Allocator.hpp"
 
+#include "logging/Logger.hpp"
+
+#include <vk_mem_alloc.h>
+
 namespace Engine::Graphics {
 
 static auto
@@ -19,15 +23,24 @@ to_string(GPUBufferType buffer_type) -> std::string
       return "Storage";
     case Uniform:
       return "Uniform";
+    case Staging:
+      return "Staging";
     default:
       return "Unknown";
   }
 }
 
+struct GPUBufferImpl
+{
+  VmaAllocation allocation{};
+  VmaAllocationInfo allocation_info{};
+};
+
 GPUBuffer::GPUBuffer(GPUBufferType type, Core::usize input_size)
   : size(input_size)
   , buffer_type(type)
 {
+  alloc_impl = Core::make_scope<GPUBufferImpl>();
   construct_buffer();
 }
 
@@ -36,7 +49,7 @@ GPUBuffer::~GPUBuffer()
   Allocator allocator{
     std::format("GPUBuffer::~GPUBuffer({}, {})", to_string(buffer_type), size),
   };
-  allocator.deallocate_buffer(allocation, buffer);
+  allocator.deallocate_buffer(alloc_impl->allocation, buffer);
 }
 
 auto
@@ -45,13 +58,16 @@ GPUBuffer::buffer_usage_flags() const -> VkBufferUsageFlags
   switch (buffer_type) {
     using enum Engine::Graphics::GPUBufferType;
     case Vertex:
-      return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+      return VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+             VK_BUFFER_USAGE_TRANSFER_DST_BIT;
     case Index:
       return VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
     case Storage:
       return VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
     case Uniform:
       return VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    case Staging:
+      return VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     default:
       return 0;
   }
@@ -69,32 +85,34 @@ GPUBuffer::construct_buffer() -> void
         to_string(buffer_type),
         Core::human_readable_size(size));
 
+  std::array family_indices{
+    Device::the().get_family(QueueType::Graphics),
+    Device::the().get_family(QueueType::Transfer),
+  };
   VkBufferCreateInfo buffer_info{
     .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
     .pNext = nullptr,
     .flags = 0,
     .size = size,
     .usage = buffer_usage_flags(),
-    .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-    .queueFamilyIndexCount = 0,
-    .pQueueFamilyIndices = nullptr,
+    .sharingMode = VK_SHARING_MODE_CONCURRENT,
+    .queueFamilyIndexCount = static_cast<Core::u32>(family_indices.size()),
+    .pQueueFamilyIndices = family_indices.data(),
   };
 
-  const auto is_uniform = buffer_type == GPUBufferType::Uniform;
+  auto usage = (buffer_type == GPUBufferType::Staging)
+                 ? Usage::AUTO_PREFER_HOST
+                 : Usage::AUTO_PREFER_DEVICE;
+  auto creation = Creation::MAPPED_BIT | Creation::HOST_ACCESS_RANDOM_BIT;
 
-  auto usage = is_uniform ? Usage::AUTO_PREFER_HOST : Usage::AUTO_PREFER_DEVICE;
-  auto creation = Creation::MAPPED_BIT;
-  if (is_uniform) {
-    creation |= Creation::HOST_ACCESS_RANDOM_BIT;
-  }
-
-  allocation = allocator.allocate_buffer(buffer,
-                                         allocation_info,
-                                         buffer_info,
-                                         {
-                                           .usage = usage,
-                                           .creation = creation,
-                                         });
+  alloc_impl->allocation =
+    allocator.allocate_buffer(buffer,
+                              alloc_impl->allocation_info,
+                              buffer_info,
+                              {
+                                .usage = usage,
+                                .creation = creation,
+                              });
 }
 
 auto
@@ -107,13 +125,24 @@ GPUBuffer::write(const void* write_data, const Core::usize write_size) -> void
     throw std::runtime_error("Data size is larger than buffer size");
   }
 
-  if (this->allocation_info.pMappedData != nullptr) {
-    std::memcpy(this->allocation_info.pMappedData, write_data, write_size);
+  if (alloc_impl->allocation_info.pMappedData != nullptr) {
+    std::memcpy(
+      alloc_impl->allocation_info.pMappedData, write_data, write_size);
   } else {
-    auto* mapped = allocator.map_memory(this->allocation);
+    auto* mapped = allocator.map_memory(alloc_impl->allocation);
     std::memcpy(mapped, write_data, write_size);
-    allocator.unmap_memory(this->allocation);
+    allocator.unmap_memory(alloc_impl->allocation);
   }
+}
+
+auto
+GPUBuffer::copy_to(GPUBuffer& dest) -> void
+{
+  Device::the().execute_immediate(QueueType::Transfer, [&](auto* cmd) {
+    VkBufferCopy copy_region = {};
+    copy_region.size = size;
+    vkCmdCopyBuffer(cmd, buffer, dest.get_buffer(), 1, &copy_region);
+  });
 }
 
 } // namespace Engine::Graphic

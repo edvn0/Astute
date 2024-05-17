@@ -3,9 +3,10 @@
 #include "graphics/Shader.hpp"
 
 #include "core/Exceptions.hpp"
-#include "core/Logger.hpp"
 #include "core/Verify.hpp"
+#include "graphics/DescriptorResource.hpp"
 #include "graphics/Device.hpp"
+#include "logging/Logger.hpp"
 
 #include <bit>
 #include <execution>
@@ -117,6 +118,9 @@ Shader::Shader(std::unordered_map<Type, std::vector<Core::u32>> spirv_stages,
     name_hash ^= vector_hasher(parsed_spirv_per_stage_u32.at(Type::Fragment));
   }
 
+  name_hash ^=
+    string_hasher(std::bit_cast<const char*>(std::bit_cast<const void*>(this)));
+
   hash_value = name_hash;
 }
 
@@ -198,9 +202,8 @@ Shader::get_descriptor_set(std::string_view descriptor_name,
 
   const auto& shader_descriptor_set =
     reflection_data.shader_descriptor_sets[set];
-  auto as_string = std::string{ descriptor_name };
+  const auto as_string = std::string{ descriptor_name };
   if (shader_descriptor_set.write_descriptor_sets.contains(as_string)) {
-    const auto as_string = std::string{ descriptor_name };
     return &shader_descriptor_set.write_descriptor_sets.at(as_string);
   }
 
@@ -221,16 +224,19 @@ Shader::allocate_descriptor_set(Core::u32 set) const
     return result;
   }
 
-  // TODO: We'll need to disable this until we can figure out how to handle
-  // TODO: the descriptor set allocation properly.
-  /* VkDescriptorSetAllocateInfo allocation_info = {};
-   allocation_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-   allocation_info.descriptorSetCount = 1;
-   allocation_info.pSetLayouts = &descriptor_set_layouts[set];
-   auto& allocated_set = result.descriptor_sets.emplace_back();
-   allocated_set =
-     device.get_descriptor_resource()->allocate_descriptor_set(allocation_info);
-     */
+  if (set >= reflection_data.shader_descriptor_sets.size()) {
+    error("Shader {0} does not contain descriptor set {1}", name, set);
+    return result;
+  }
+
+  VkDescriptorSetAllocateInfo allocation_info = {};
+  allocation_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  allocation_info.descriptorSetCount = 1;
+  allocation_info.pSetLayouts = &descriptor_set_layouts[set];
+  auto& allocated_set = result.descriptor_sets.emplace_back();
+  allocated_set =
+    DescriptorResource::the().allocate_descriptor_set(allocation_info);
+
   return result;
 }
 
@@ -246,8 +252,7 @@ Shader::create_descriptor_set_layouts() -> void
     std::vector<VkDescriptorSetLayoutBinding> layout_bindings{};
     for (const auto& [binding, uniform_buffer] :
          shader_descriptor_set.uniform_buffers) {
-      VkDescriptorSetLayoutBinding& layout_binding =
-        layout_bindings.emplace_back();
+      auto& layout_binding = layout_bindings.emplace_back();
       layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
       layout_binding.descriptorCount = 1;
       layout_binding.stageFlags = uniform_buffer.shader_stage;
@@ -265,8 +270,8 @@ Shader::create_descriptor_set_layouts() -> void
 
     for (const auto& [binding, storage_buffer] :
          shader_descriptor_set.storage_buffers) {
-      VkDescriptorSetLayoutBinding& layout_binding =
-        layout_bindings.emplace_back();
+
+      auto& layout_binding = layout_bindings.emplace_back();
       layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       layout_binding.descriptorCount = 1;
       layout_binding.stageFlags = storage_buffer.shader_stage;
@@ -286,6 +291,7 @@ Shader::create_descriptor_set_layouts() -> void
 
     for (const auto& [binding, image_sampler] :
          shader_descriptor_set.sampled_images) {
+
       auto& layout_binding = layout_bindings.emplace_back();
       layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
       layout_binding.descriptorCount = image_sampler.array_size;
@@ -309,6 +315,7 @@ Shader::create_descriptor_set_layouts() -> void
 
     for (const auto& [binding, image_sampler] :
          shader_descriptor_set.separate_textures) {
+
       auto& layout_binding = layout_bindings.emplace_back();
       layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
       layout_binding.descriptorCount = image_sampler.array_size;
@@ -361,6 +368,8 @@ Shader::create_descriptor_set_layouts() -> void
 
     for (const auto& [binding_and_set, image_sampler] :
          shader_descriptor_set.storage_images) {
+      static constexpr auto max_set = std::numeric_limits<Core::u32>::max();
+      Core::u32 binding = binding_and_set & max_set;
       auto& layout_binding = layout_bindings.emplace_back();
       layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
       layout_binding.descriptorCount = image_sampler.array_size;
@@ -368,9 +377,7 @@ Shader::create_descriptor_set_layouts() -> void
       layout_binding.pImmutableSamplers = nullptr;
 
       // Name a variable which has the value 0xFFFFFFFF
-      static constexpr auto max_set = std::numeric_limits<Core::u32>::max();
 
-      Core::u32 binding = binding_and_set & max_set;
       layout_binding.binding = binding;
 
       Core::ensure(!shader_descriptor_set.uniform_buffers.contains(binding),
@@ -459,11 +466,12 @@ to_shader_type(const std::filesystem::path& path)
 
 auto
 Shader::compile_graphics(const std::filesystem::path& vertex_path,
-                         const std::filesystem::path& fragment_path)
-  -> Core::Ref<Shader>
+                         const std::filesystem::path& fragment_path,
+                         bool force_recompile) -> Core::Ref<Shader>
 {
   Core::ensure(compiler != nullptr, "ShaderCompiler is not initialized!");
-  return compiler->compile_graphics(vertex_path, fragment_path);
+  return compiler->compile_graphics(
+    vertex_path, fragment_path, force_recompile);
 }
 
 auto
@@ -476,11 +484,12 @@ Shader::compile_compute(const std::filesystem::path& compute_path)
 
 auto
 Shader::compile_graphics_scoped(const std::filesystem::path& vertex_path,
-                                const std::filesystem::path& fragment_path)
-  -> Core::Scope<Shader>
+                                const std::filesystem::path& fragment_path,
+                                bool force_recompile) -> Core::Scope<Shader>
 {
   Core::ensure(compiler != nullptr, "ShaderCompiler is not initialized!");
-  return compiler->compile_graphics_scoped(vertex_path, fragment_path);
+  return compiler->compile_graphics_scoped(
+    vertex_path, fragment_path, force_recompile);
 }
 
 auto

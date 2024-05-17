@@ -3,6 +3,8 @@
 #include "core/Types.hpp"
 #include "graphics/Device.hpp"
 
+#include <optional>
+
 #include <vulkan/vulkan.h>
 
 namespace Engine::Graphics {
@@ -12,13 +14,13 @@ class CommandBuffer
 public:
   struct Properties
   {
-    const Core::u32 image_count;
     const QueueType queue_type;
     const bool owned_by_swapchain{ false };
     const bool primary{ true };
+    const std::optional<Core::u32> image_count{ std::nullopt };
   };
 
-  explicit CommandBuffer(Properties);
+  explicit CommandBuffer(const Properties&);
   ~CommandBuffer();
 
   auto begin(const VkCommandBufferBeginInfo* = nullptr) -> void;
@@ -35,6 +37,7 @@ private:
   const Core::u32 queue_family_index;
   const bool owned_by_swapchain;
   const bool primary;
+  const bool image_count_from_application{ true };
 
   VkCommandPool command_pool{ nullptr };
   VkQueue queue{ nullptr }; // Owned by device
@@ -48,6 +51,8 @@ private:
   auto create_fences() -> void;
 
   auto destroy() -> void;
+
+  auto is_secondary() const -> bool { return !primary; } 
 };
 
 } // namespace Engine::Graphics

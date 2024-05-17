@@ -2,13 +2,14 @@
 
 #include "graphics/InterfaceSystem.hpp"
 
-#include "core/Logger.hpp"
-#include "core/Platform.hpp"
+#include "platform/Platform.hpp"
+
 #include "graphics/CommandBuffer.hpp"
 #include "graphics/Device.hpp"
 #include "graphics/Instance.hpp"
 #include "graphics/Swapchain.hpp"
 #include "graphics/Window.hpp"
+#include "logging/Logger.hpp"
 
 #include <format>
 #include <fstream>
@@ -24,7 +25,7 @@ namespace Engine::Graphics {
 InterfaceSystem::InterfaceSystem(const Window& win)
   : window(&win)
 {
-  system_name = std::format("imgui_{}.ini", Core::Platform::get_system_name());
+  system_name = std::format("imgui_{}.ini", ED::Platform::get_system_name());
 
   std::array<VkDescriptorPoolSize, 11> pool_sizes = {
     VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
@@ -50,7 +51,11 @@ InterfaceSystem::InterfaceSystem(const Window& win)
   const auto& device = Device::the();
 
   vkCreateDescriptorPool(device.device(), &pool_info, nullptr, &pool);
-  vkCreateDescriptorPool(device.device(), &pool_info, nullptr, &image_pool);
+
+  image_pool = Core::make_scope<Core::FrameBasedCollection<VkDescriptorPool>>();
+  image_pool->for_each([&](const auto&, auto& v) {
+    vkCreateDescriptorPool(device.device(), &pool_info, nullptr, &v);
+  });
 
   ImGui::CreateContext();
 
@@ -99,7 +104,7 @@ auto
 InterfaceSystem::begin_frame() -> void
 {
   const auto& device = Device::the();
-  vkResetDescriptorPool(device.device(), image_pool, 0);
+  vkResetDescriptorPool(device.device(), image_pool->get(), 0);
 
   ImGui_ImplVulkan_NewFrame();
   ImGui_ImplGlfw_NewFrame();
@@ -166,7 +171,7 @@ InterfaceSystem::end_frame() -> void
   // DebugMarker::begin_region(draw_command_buffer, "Interface", { 1, 0, 0, 1
   // });
 
-  Device::the().reset_command_pools();
+  // Device::the().reset_command_pools();
 
   vkCmdBeginRenderPass(draw_command_buffer,
                        &render_pass_begin_info,
@@ -236,7 +241,10 @@ InterfaceSystem::~InterfaceSystem()
   ImGui::DestroyContext();
 
   vkDestroyDescriptorPool(device.device(), pool, nullptr);
-  vkDestroyDescriptorPool(device.device(), image_pool, nullptr);
+
+  image_pool->for_each([&](auto, auto& v) {
+    vkDestroyDescriptorPool(device.device(), v, nullptr);
+  });
 }
 
 } // namespace Core

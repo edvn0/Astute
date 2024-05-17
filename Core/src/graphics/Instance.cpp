@@ -1,7 +1,7 @@
 #include "pch/CorePCH.hpp"
 
-#include "core/Logger.hpp"
 #include "graphics/Instance.hpp"
+#include "logging/Logger.hpp"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -49,23 +49,24 @@ debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
                const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
                void*) -> VkBool32
 {
-  Core::LogLevel log_level = Core::LogLevel::None;
+  using namespace ED::Logging;
+  LogLevel log_level = LogLevel::None;
   if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-    log_level = Core::LogLevel::Error;
+    log_level = LogLevel::Error;
   } else if (message_severity &
              VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-    log_level = Core::LogLevel::Warn;
+    log_level = LogLevel::Warn;
   } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
-    log_level = Core::LogLevel::Info;
+    log_level = LogLevel::Info;
   } else if (message_severity &
              VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
-    log_level = Core::LogLevel::Debug;
+    log_level = LogLevel::Debug;
   }
 
   std::string message = "Validation layer: ";
   message += callback_data->pMessage;
 
-  Engine::Core::Logger::get_instance().log(std::move(message), log_level);
+  Logger::get_instance().log(std::move(message), log_level);
 
   return VK_FALSE;
 }
@@ -137,14 +138,14 @@ Instance::setup_debug_callback() -> void
 
 auto
 Instance::check_validation_layer_support(
-  const std::vector<const char*>& validation_layers) -> bool
+  const std::vector<const char*>& input_layers) -> bool
 {
   uint32_t layer_count;
   vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
   std::vector<VkLayerProperties> available_layers(layer_count);
   vkEnumerateInstanceLayerProperties(&layer_count, available_layers.data());
 
-  for (const char* layer_name : validation_layers) {
+  for (const char* layer_name : input_layers) {
     std::string_view view = { layer_name };
     bool layer_found = false;
 
@@ -166,19 +167,11 @@ Instance::check_validation_layer_support(
 
 Instance::Instance()
 {
-  VkApplicationInfo application_info{
-    .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-    .pApplicationName = "Astute",
-    .applicationVersion = VK_MAKE_API_VERSION(1, 1, 0, 0),
-    .pEngineName = "AstuteEngine",
-    .engineVersion = VK_MAKE_API_VERSION(1, 1, 0, 0),
-    .apiVersion = VK_API_VERSION_1_3,
-  };
-
-  if (enable_validation_layers &&
-      !check_validation_layer_support(validation_layers)) {
-    throw std::runtime_error("Validation layers requested, but not available!");
-  }
+  if constexpr (enable_validation_layers)
+    if (!check_validation_layer_support(validation_layers)) {
+      throw std::runtime_error(
+        "Validation layers requested, but not available!");
+    }
 
   create_instance();
 
@@ -197,6 +190,10 @@ Instance::deinitialise() -> void
 auto
 Instance::destroy() -> void
 {
+  if (!impl) {
+    return;
+  }
+
   impl->deinitialise();
   impl.reset();
 }

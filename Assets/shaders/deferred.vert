@@ -2,6 +2,8 @@
 
 layout(location = 0) out vec2 outUV;
 
+invariant precise gl_Position;
+
 void
 main()
 {

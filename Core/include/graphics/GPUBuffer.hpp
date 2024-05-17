@@ -6,7 +6,6 @@
 #include <span>
 #include <type_traits>
 #include <vector>
-#include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
 namespace Engine::Graphics {
@@ -18,18 +17,20 @@ enum class GPUBufferType : Core::u8
   Index,
   Uniform,
   Storage,
+  Staging,
 };
 
 template<class T, GPUBufferType BufferType>
 class UniformBufferObject;
 
+struct GPUBufferImpl;
 class GPUBuffer
 {
 public:
   GPUBuffer(GPUBufferType, Core::usize);
   ~GPUBuffer();
 
-  auto get_size() const -> Core::usize { return size; }
+  [[nodiscard]] constexpr auto get_size() const -> Core::usize { return size; }
 
   template<class T, Core::usize Extent = std::dynamic_extent>
   auto write(std::span<T, Extent> data) -> void
@@ -49,22 +50,54 @@ public:
     write(data.data(), data.size() * sizeof(T));
   }
 
-  auto get_buffer() const -> VkBuffer { return buffer; }
+  [[nodiscard]] auto get_buffer() const -> VkBuffer { return buffer; }
+  auto copy_to(GPUBuffer&) -> void;
 
 private:
   Core::usize size;
 
   GPUBufferType buffer_type{ GPUBufferType::Invalid };
   VkBuffer buffer;
-  VmaAllocation allocation;
-  VmaAllocationInfo allocation_info;
+  Core::Scope<GPUBufferImpl> alloc_impl;
 
   auto write(const void*, Core::usize) -> void;
   auto construct_buffer() -> void;
-  auto buffer_usage_flags() const -> VkBufferUsageFlags;
+  [[nodiscard]] auto buffer_usage_flags() const -> VkBufferUsageFlags;
 
   template<class T, GPUBufferType BufferType>
   friend class UniformBufferObject;
+  friend class VertexBuffer;
+  friend class IndexBuffer;
+  friend class StagingBuffer;
+};
+
+class StagingBuffer
+{
+public:
+  template<class T>
+  explicit StagingBuffer(const std::span<T> data)
+    : buffer(GPUBufferType::Staging, data.size_bytes())
+  {
+    buffer.write(data);
+  }
+
+  explicit StagingBuffer(Core::DataBuffer&& data)
+    : StagingBuffer(data.span())
+  {
+  }
+
+  [[nodiscard]] constexpr auto size() const -> Core::usize
+  {
+    return buffer.get_size();
+  }
+  [[nodiscard]] auto get_buffer() const -> VkBuffer
+  {
+    return buffer.get_buffer();
+  }
+
+private:
+  GPUBuffer buffer;
+
   friend class VertexBuffer;
 };
 
@@ -75,28 +108,32 @@ public:
   explicit VertexBuffer(std::span<VertexType, Extent> vertices)
     : buffer(GPUBufferType::Vertex, vertices.size_bytes())
   {
-    buffer.write(vertices);
+    auto temp = StagingBuffer{ vertices };
+    temp.buffer.copy_to(buffer);
   }
 
   template<class VertexType, Core::usize Extent = std::dynamic_extent>
   explicit VertexBuffer(std::span<const VertexType, Extent> vertices)
     : buffer(GPUBufferType::Vertex, vertices.size_bytes())
   {
-    buffer.write(vertices);
+    auto temp = StagingBuffer{ vertices };
+    temp.buffer.copy_to(buffer);
   }
 
   template<class VertexType>
   explicit VertexBuffer(std::span<VertexType> vertices)
     : buffer(GPUBufferType::Vertex, vertices.size_bytes())
   {
-    buffer.write(vertices);
+    auto temp = StagingBuffer{ vertices };
+    temp.buffer.copy_to(buffer);
   }
 
   template<class VertexType>
   explicit VertexBuffer(std::span<const VertexType> vertices)
     : buffer(GPUBufferType::Vertex, vertices.size_bytes())
   {
-    buffer.write(vertices);
+    auto temp = StagingBuffer{ vertices };
+    temp.buffer.copy_to(buffer);
   }
 
   explicit VertexBuffer(Core::usize new_size)
@@ -133,6 +170,12 @@ public:
     : buffer(GPUBufferType::Index, indices.size_bytes())
   {
     buffer.write(indices);
+  }
+
+  explicit IndexBuffer(const void* indices, Core::usize size)
+    : buffer(GPUBufferType::Index, size)
+  {
+    buffer.write(indices, size);
   }
 
   auto size() const -> Core::usize { return buffer.get_size(); }
@@ -196,7 +239,8 @@ class UniformBufferObject : public IShaderBindable
 public:
   explicit UniformBufferObject(const T& data,
                                const std::string_view input_identifier)
-    : identifier(input_identifier)
+    : pod_data(data)
+    , identifier(input_identifier)
   {
     buffer = Core::make_scope<GPUBuffer>(BufferType, sizeof(T));
     buffer->write(&pod_data, sizeof(T));
@@ -235,6 +279,19 @@ public:
   }
 
   ~UniformBufferObject() override = default;
+
+  auto resize(Core::usize new_size) -> void
+  {
+    buffer = Core::make_scope<GPUBuffer>(BufferType, new_size);
+    Core::DataBuffer zero{ new_size };
+    zero.fill_zero();
+    buffer->write(zero.raw(), new_size);
+    descriptor_info = VkDescriptorBufferInfo{
+      .buffer = buffer->get_buffer(),
+      .offset = 0,
+      .range = new_size,
+    };
+  }
 
   auto size() const -> Core::usize override { return buffer->get_size(); }
   auto get_buffer() const -> VkBuffer override { return buffer->get_buffer(); }

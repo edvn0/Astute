@@ -121,6 +121,7 @@ public:
                float far_plane,
                const EditorCamera* previous_camera = nullptr);
   void init(const EditorCamera* previous_camera = nullptr);
+  ~EditorCamera() override = default;
 
   void focus(const glm::vec3& focus_point) final;
   void on_update(float time_step) final;
@@ -150,7 +151,7 @@ public:
         return;
       }
     } else {
-      auto as_u32 = extent.as<u32>();
+      auto as_u32 = extent.template as<u32>();
       if (viewport.width == as_u32.width && viewport.height == as_u32.height) {
         return;
       }

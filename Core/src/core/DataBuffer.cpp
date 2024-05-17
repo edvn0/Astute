@@ -2,7 +2,7 @@
 
 #include "core/DataBuffer.hpp"
 
-#include "core/Logger.hpp"
+#include "logging/Logger.hpp"
 
 namespace Engine::Core {
 

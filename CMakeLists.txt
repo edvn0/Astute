@@ -15,7 +15,7 @@ else(CCACHE_FOUND)
     message(STATUS "CCACHE is NOT found")
 endif(CCACHE_FOUND)
 
-add_subdirectory(ShaderCompilation)
+add_subdirectory(Modules)
 add_subdirectory(Library)
 add_subdirectory(Core)
 add_subdirectory(Application)
@@ -31,3 +31,16 @@ target_compile_definitions(Core PRIVATE
     $<$<AND:$<CONFIG:Debug>,$<BOOL:${ENABLE_VALIDATION_LAYERS}>>:ENABLE_VALIDATION_LAYERS>)
 target_compile_definitions(App PRIVATE
     $<$<AND:$<CONFIG:Debug>,$<BOOL:${ENABLE_VALIDATION_LAYERS}>>:ENABLE_VALIDATION_LAYERS>)
+
+target_compile_options(Core PRIVATE
+    $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror>
+)
+
+target_compile_options(App PRIVATE
+    $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror>
+)
+
+add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+add_link_options(-fsanitize=address -fno-omit-frame-pointer)

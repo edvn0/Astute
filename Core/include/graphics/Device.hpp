@@ -1,18 +1,19 @@
 #pragma once
 
 #include "core/Types.hpp"
+#include "graphics/Types.hpp"
 
+#include <functional>
+#include <unordered_set>
 #include <vulkan/vulkan.h>
 
-namespace Engine::Graphics {
+#include "thread_pool/ThreadPool.hpp"
 
-enum class QueueType : Core::u8
-{
-  Graphics,
-  Compute,
-  Present,
-  Transfer
-};
+#ifdef ASTUTE_USE_MUTEX_ACCESS
+#include <mutex>
+#endif
+
+namespace Engine::Graphics {
 
 struct QueueInformation
 {
@@ -26,13 +27,28 @@ public:
   static auto the() -> Device&;
   static auto destroy() -> void;
   static auto initialise(VkSurfaceKHR = nullptr) -> void;
-  auto device() const -> const VkDevice& { return vk_device; }
-  auto device() -> VkDevice { return vk_device; }
+  auto device() const -> const VkDevice&
+  {
+#ifdef ASTUTE_USE_MUTEX_ACCESS
+    static std::mutex mutex;
+    std::scoped_lock lock{ mutex };
+#endif
+    return vk_device;
+  }
+  auto device() -> VkDevice
+  {
+#ifdef ASTUTE_USE_MUTEX_ACCESS
+    static std::mutex mutex;
+    std::scoped_lock lock{ mutex };
+#endif
+    return vk_device;
+  }
   auto physical() -> VkPhysicalDevice { return vk_physical_device; }
   auto physical() const -> const VkPhysicalDevice&
   {
     return vk_physical_device;
   }
+  auto wait() -> void;
 
   auto get_queue(QueueType t) { return queue_support.at(t).queue; }
   auto get_queue(QueueType t) const { return queue_support.at(t).queue; }
@@ -58,6 +74,11 @@ public:
   auto create_secondary_command_buffer() -> VkCommandBuffer;
   auto reset_command_pools() -> void;
 
+  auto supports(std::string_view extension) const -> bool
+  {
+    return extension_support.contains(extension.data());
+  }
+
 private:
   auto deinitialise() -> void;
 
@@ -74,8 +95,10 @@ private:
   VkDevice vk_device;
   VkPhysicalDevice vk_physical_device;
   VkCommandPool graphics_command_pool;
+  VkCommandPool transfer_command_pool;
   VkCommandPool compute_command_pool;
 
+  std::unordered_set<std::string> extension_support;
   std::unordered_map<QueueType, QueueInformation> queue_support;
 };
 

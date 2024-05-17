@@ -1,5 +1,6 @@
 {
-  "sonarlint.pathToCompileCommands": "${workspaceFolder}\\compile_commands.json",
+  "sonarlint.pathToCompileCommands":
+    "${workspaceFolder}\\compile_commands.json",
   "C_Cpp.default.compileCommands": "${workspaceFolder}\\compile_commands.json",
   "C_Cpp.codeAnalysis.clangTidy.useBuildPath": true,
   "cSpell.words": [
@@ -16,6 +17,7 @@
     "skybox",
     "ssbos",
     "SUBPASS",
+    "Subpasses",
     "subresource",
     "ubos",
     "Unremovable"
@@ -130,5 +132,8 @@
     "*.glsl": "glsl",
     "cassert": "cpp",
     "*.rh": "cpp"
+  },
+  "[glsl]": {
+    "files.autoSave": "off"
   }
 }

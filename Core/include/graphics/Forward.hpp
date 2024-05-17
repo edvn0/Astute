@@ -12,9 +12,15 @@ class Swapchain;
 class Window;
 class Image;
 class Framebuffer;
+class IFramebuffer;
 class Renderer;
 class Shader;
 class VertexBuffer;
 class IndexBuffer;
+class GraphicsPipeline;
+class Material;
+class RenderPass;
+
+enum class QueueType : Core::u8;
 
 }

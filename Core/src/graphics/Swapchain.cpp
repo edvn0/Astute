@@ -158,6 +158,10 @@ Swapchain::create(const Core::Extent& input_size, bool vsync) -> void
 auto
 Swapchain::destroy() -> void
 {
+  if (destroyed) {
+    return;
+  }
+
   auto device = Device::the().device();
   vkDeviceWaitIdle(device);
 
@@ -188,6 +192,8 @@ Swapchain::destroy() -> void
     vkDestroyFence(device, fence, nullptr);
 
   vkDeviceWaitIdle(device);
+
+  destroyed = true;
 }
 
 Swapchain::Swapchain(const Window* window)
@@ -226,19 +232,15 @@ Swapchain::acquire_next_image() -> Core::Maybe<Core::u32>
   return image_index;
 }
 
-static constexpr Core::u64 DEFAULT_FENCE_TIMEOUT = 100000000000;
 auto
 Swapchain::begin_frame() -> bool
 {
-  const auto& device = Device::the().device();
 
   auto acquired = acquire_next_image();
   if (!acquired)
     return false;
 
   current_image_index = acquired.value();
-
-  vkResetCommandPool(device, command_buffers[current_buffer_index].pool, 0);
 
   return true;
 }
@@ -288,7 +290,6 @@ Swapchain::present() -> void
 
   if (result != VK_SUCCESS) {
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-      info("Resizing from present.");
       auto new_size = recompute_size(backpointer->get_native());
       on_resize(new_size);
     } else {

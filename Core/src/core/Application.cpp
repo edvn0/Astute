@@ -2,7 +2,7 @@
 
 #include "core/Application.hpp"
 #include "core/Clock.hpp"
-#include "core/Logger.hpp"
+#include "logging/Logger.hpp"
 
 #include "graphics/Allocator.hpp"
 #include "graphics/DescriptorResource.hpp"
@@ -18,9 +18,9 @@ auto
 Application::forward_incoming_events(Event& event) -> void
 {
   EventDispatcher dispatcher(event);
-  dispatcher.dispatch<WindowResizeEvent>([](const WindowResizeEvent& ev) {
+  dispatcher.dispatch<WindowResizeEvent>([this](const WindowResizeEvent& ev) {
     const BasicExtent extent{ ev.get_width(), ev.get_height() };
-    // on_resize(extent.as<u32>());
+    on_resize(extent.as<u32>());
     return true;
   });
 
@@ -29,7 +29,7 @@ Application::forward_incoming_events(Event& event) -> void
   handle_events(event);
 }
 
-Application::Application(Configuration conf)
+Application::Application(const Configuration& conf)
   : config(conf)
 {
   info("Astute Engine initialisation.");
@@ -43,8 +43,6 @@ Application::Application(Configuration conf)
     [this](Event& event) { forward_incoming_events(event); });
 
   Graphics::Allocator::construct();
-
-  interface_system = make_scope<Graphics::InterfaceSystem>(*window);
 
   instance = this;
 }
@@ -66,6 +64,8 @@ Application::run() -> i32
   constexpr auto delta_time = 1.0 / 60.0;
   auto accumulator = 0.0;
   i32 frame_count = 0;
+
+  interface_system = make_scope<Graphics::InterfaceSystem>(*window);
 
   construct();
 
@@ -111,6 +111,18 @@ Application::run() -> i32
     }
 
     Graphics::DescriptorResource::the().end_frame();
+
+    std::scoped_lock lock(post_frame_mutex);
+    for (auto& func : post_frame_funcs) {
+      func();
+    }
+    post_frame_funcs.clear();
+  }
+
+  interface_system.reset();
+
+  for (const auto& func : deferred_destruction) {
+    func();
   }
 
   Graphics::DescriptorResource::the().destroy();
@@ -124,12 +136,8 @@ Application::run() -> i32
 }
 
 auto
-Application::on_resize(const Extent& new_size) -> void
+Application::on_resize(const Extent&) -> void
 {
-  info("Resizing from Application::on_resize to {} x {}",
-       new_size.width,
-       new_size.height);
-  get_swapchain().on_resize(new_size);
 }
 
 auto

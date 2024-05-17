@@ -1,0 +1,213 @@
+#version 460
+
+#extension GL_EXT_debug_printf : enable
+
+#include "buffers.glsl"
+
+layout(set = 1, binding = 15) uniform sampler2D predepth_map;
+
+#define TILE_SIZE 16
+
+struct Sphere
+{
+  vec3 c;  // Center point.
+  float r; // Radius.
+};
+
+bool
+TestFrustumSides(vec3 c,
+                 float r,
+                 vec3 plane0,
+                 vec3 plane1,
+                 vec3 plane2,
+                 vec3 plane3)
+{
+  bool intersectingOrInside0 = dot(c, plane0) < r;
+  bool intersectingOrInside1 = dot(c, plane1) < r;
+  bool intersectingOrInside2 = dot(c, plane2) < r;
+  bool intersectingOrInside3 = dot(c, plane3) < r;
+
+  return (intersectingOrInside0 && intersectingOrInside1 &&
+          intersectingOrInside2 && intersectingOrInside3);
+}
+
+// From XeGTAO
+float
+ScreenSpaceToViewSpaceDepth(const float screenDepth)
+{
+  float depthLinearizeMul = screen_data.depth_constants.x;
+  float depthLinearizeAdd = screen_data.depth_constants.y;
+  return depthLinearizeMul / (depthLinearizeAdd - screenDepth);
+}
+// Shared values between all the threads in the group
+shared uint shared_min_depth_int;
+shared uint shared_max_depth_int;
+shared uint shared_visible_point_light_count;
+shared uint shared_visible_spot_light_count;
+shared vec4 frustum_planes[6];
+
+// Shared local storage for visible indices, will be written out to the global
+// buffer at the end
+shared int share_visible_point_lights[MAX_LIGHT_COUNT];
+shared int share_visible_spot_lights[MAX_LIGHT_COUNT];
+
+layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
+void
+main()
+{
+
+  ivec2 location = ivec2(gl_GlobalInvocationID.xy);
+  ivec2 itemID = ivec2(gl_LocalInvocationID.xy);
+  ivec2 tileID = ivec2(gl_WorkGroupID.xy);
+  ivec2 tileNumber = ivec2(gl_NumWorkGroups.xy);
+  uint index = tileID.y * tileNumber.x + tileID.x;
+
+  debugPrintfEXT("Location: %d %d. Index: %d. TileNumber: %d %d",
+                 location.x,
+                 location.y,
+                 index,
+                 tileNumber.x,
+                 tileNumber.y);
+
+  // Initialize shared global values for depth and light count
+  if (gl_LocalInvocationIndex == 0) {
+    shared_min_depth_int = 0xFFFFFFFF;
+    shared_max_depth_int = 0;
+    shared_visible_point_light_count = 0;
+    shared_visible_spot_light_count = 0;
+  }
+
+  barrier();
+
+  // Step 1: Calculate the minimum and maximum depth values (from the depth
+  // buffer) for this group's tile
+  vec2 tc = vec2(location) / screen_data.full_resolution;
+  vec4 lod = textureLod(predepth_map, tc, 0);
+  float linearDepth = ScreenSpaceToViewSpaceDepth(lod.r);
+
+  // Convert depth to uint so we can do atomic min and max comparisons between
+  // the threads
+  uint depthInt = floatBitsToUint(linearDepth);
+  atomicMin(shared_min_depth_int, depthInt);
+  atomicMax(shared_max_depth_int, depthInt);
+
+  barrier();
+
+  // Step 2: One thread should calculate the frustum planes to be used for this
+  // tile
+  if (gl_LocalInvocationIndex == 0) {
+    // Convert the min and max across the entire tile back to float
+    float minDepth = uintBitsToFloat(shared_min_depth_int);
+    float maxDepth = uintBitsToFloat(shared_max_depth_int);
+
+    // Steps based on tile sale
+    vec2 negativeStep = (2.0 * vec2(tileID)) / vec2(tileNumber);
+    vec2 positiveStep = (2.0 * vec2(tileID + ivec2(1, 1))) / vec2(tileNumber);
+
+    // Set up starting values for planes using steps and min and max z values
+    frustum_planes[0] = vec4(1.0, 0.0, 0.0, 1.0 - negativeStep.x);   // Left
+    frustum_planes[1] = vec4(-1.0, 0.0, 0.0, -1.0 + positiveStep.x); // Right
+    frustum_planes[2] = vec4(0.0, 1.0, 0.0, 1.0 - negativeStep.y);   // Bottom
+    frustum_planes[3] = vec4(0.0, -1.0, 0.0, -1.0 + positiveStep.y); // Top
+    frustum_planes[4] = vec4(0.0, 0.0, -1.0, -minDepth);             // Near
+    frustum_planes[5] = vec4(0.0, 0.0, 1.0, maxDepth);               // Far
+
+    // Transform the first four planes
+    for (uint i = 0; i < 4; i++) {
+      frustum_planes[i] *= renderer.view_projection;
+      frustum_planes[i] /= length(frustum_planes[i].xyz);
+    }
+
+    // Transform the depth planes
+    frustum_planes[4] *= renderer.view;
+    frustum_planes[4] /= length(frustum_planes[4].xyz);
+    frustum_planes[5] *= renderer.view;
+    frustum_planes[5] /= length(frustum_planes[5].xyz);
+  }
+
+  barrier();
+
+  // Step 3: Cull lights.
+  // Parallelize the threads against the lights now.
+  // Can handle 256 simultaniously. Anymore lights than that and additional
+  // passes are performed
+  const uint threadCount = TILE_SIZE * TILE_SIZE;
+  uint passCount = (point_lights.count + threadCount - 1) / threadCount;
+  for (uint i = 0; i < passCount; i++) {
+    // Get the lightIndex to test for this thread / pass. If the index is >=
+    // light count, then this thread can stop testing lights
+    uint lightIndex = i * threadCount + gl_LocalInvocationIndex;
+    if (lightIndex >= point_lights.count)
+      break;
+
+    vec4 position = vec4(point_lights.lights[lightIndex].pos, 1.0f);
+    float radius = point_lights.lights[lightIndex].radius;
+    radius += radius * 0.3f;
+
+    // Check if light radius is in frustum
+    float dist = 0.0;
+    for (uint j = 0; j < 6; j++) {
+      dist = dot(position, frustum_planes[j]) + radius;
+      if (dist <= 0.0) // No intersection
+        break;
+    }
+
+    // If greater than zero, then it is a visible light
+    if (dist > 0.0) {
+      // Add index to the shared array of visible indices
+      uint offset = atomicAdd(shared_visible_point_light_count, 1);
+      share_visible_point_lights[offset] = int(lightIndex);
+    }
+  }
+
+  passCount = (spot_lights.count + threadCount - 1) / threadCount;
+  for (uint i = 0; i < passCount; i++) {
+    // Get the lightIndex to test for this thread / pass. If the index is >=
+    // light count, then this thread can stop testing lights
+    uint lightIndex = i * threadCount + gl_LocalInvocationIndex;
+    if (lightIndex >= spot_lights.count)
+      break;
+
+    SpotLight light = spot_lights.lights[lightIndex];
+    float radius = light.range;
+    // Check if light radius is in frustum
+    float dist = 0.0;
+    for (uint j = 0; j < 6; j++) {
+      dist = dot(vec4(light.pos - light.direction * (light.range * 0.7), 1.0),
+                 frustum_planes[j]) +
+             radius * 1.3;
+      if (dist < 0.0) // No intersection
+        break;
+    }
+
+    // If greater than zero, then it is a visible light
+    if (dist > 0.0) {
+      // Add index to the shared array of visible indices
+      uint offset = atomicAdd(shared_visible_spot_light_count, 1);
+      share_visible_spot_lights[offset] = int(lightIndex);
+    }
+  }
+
+  barrier();
+
+  if (gl_LocalInvocationIndex == 0) {
+    const uint offset = index * MAX_LIGHT_COUNT;
+    for (uint i = 0; i < shared_visible_point_light_count; i++) {
+      visible_point_lights.indices[offset + i] = share_visible_point_lights[i];
+    }
+
+    for (uint i = 0; i < shared_visible_spot_light_count; i++) {
+      visible_spot_lights.indices[offset + i] = share_visible_spot_lights[i];
+    }
+
+    if (shared_visible_point_light_count != MAX_LIGHT_COUNT) {
+      visible_point_lights.indices[offset + shared_visible_point_light_count] =
+        -1;
+    }
+
+    if (shared_visible_spot_light_count != MAX_LIGHT_COUNT) {
+      visible_spot_lights.indices[offset + shared_visible_spot_light_count] =
+        -1;
+    }
+  }
+}

@@ -3,41 +3,37 @@
 #include "graphics/Renderer.hpp"
 
 #include "core/Application.hpp"
-#include "core/Logger.hpp"
-#include "core/Scene.hpp"
-
-#include "graphics/DescriptorResource.hpp"
+#include "graphics/Framebuffer.hpp"
 #include "graphics/GPUBuffer.hpp"
-#include "graphics/Swapchain.hpp"
-#include "graphics/Window.hpp"
 
-#include "graphics/RendererExtensions.hpp"
+#include "graphics/GraphicsPipeline.hpp"
+
+#include "graphics/render_passes/Shadow.hpp"
 
 namespace Engine::Graphics {
 
 auto
-Renderer::construct_shadow_pass(const Window* window,
-                                Core::u32 shadow_pass_size) -> void
+ShadowRenderPass::construct() -> void
 {
-  auto& [shadow_framebuffer, shadow_shader, shadow_pipeline, shadow_material] =
-    shadow_render_pass;
-  shadow_framebuffer =
-    Core::make_scope<Framebuffer>(Framebuffer::Configuration{
-      .size = {
-        shadow_pass_size,
-        shadow_pass_size,
-      },
-      .depth_attachment_format = VK_FORMAT_D32_SFLOAT,
-      .sample_count = VK_SAMPLE_COUNT_1_BIT,
-      .resizable = false,
-      .name = "Shadow",
-    });
+  auto&& [shadow_framebuffer, shadow_shader, shadow_pipeline, shadow_material] =
+    get_data();
+  shadow_framebuffer = Core::make_scope<Framebuffer>(FramebufferSpecification{
+    .width = size,
+    .height = size,
+    .clear_depth_on_load = true,
+    .attachments = { { VK_FORMAT_D32_SFLOAT } },
+    .samples = VK_SAMPLE_COUNT_1_BIT,
+    .no_resize = true,
+    .debug_name = "Shadow",
+  });
   shadow_shader = Shader::compile_graphics_scoped("Assets/shaders/shadow.vert",
-                                                  "Assets/shaders/shadow.frag");
+                                                  "Assets/shaders/empty.frag");
   shadow_pipeline =
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
       .framebuffer = shadow_framebuffer.get(),
       .shader = shadow_shader.get(),
+      .sample_count = VK_SAMPLE_COUNT_1_BIT,
+      .depth_comparator = VK_COMPARE_OP_GREATER_OR_EQUAL,
       .override_vertex_attributes = { {
         { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
       } },
@@ -49,33 +45,18 @@ Renderer::construct_shadow_pass(const Window* window,
 }
 
 auto
-Renderer::shadow_pass() -> void
+ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 {
   const auto& [shadow_framebuffer,
                shadow_shader,
                shadow_pipeline,
-               shadow_material] = shadow_render_pass;
-  VkRenderPassBeginInfo render_pass_info{};
-  render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-  render_pass_info.renderPass = shadow_framebuffer->get_renderpass();
-  render_pass_info.framebuffer = shadow_framebuffer->get_framebuffer();
-  render_pass_info.renderArea.offset = { 0, 0 };
-  render_pass_info.renderArea.extent = shadow_framebuffer->get_extent();
-  const auto& clear_values = shadow_framebuffer->get_clear_values();
-  render_pass_info.clearValueCount =
-    static_cast<Core::u32>(clear_values.size());
-  render_pass_info.pClearValues = clear_values.data();
+               shadow_material] = get_data();
 
-  RendererExtensions::begin_renderpass(*command_buffer, *shadow_framebuffer);
-
-  vkCmdBindPipeline(command_buffer->get_command_buffer(),
-                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    shadow_pipeline->get_pipeline());
   auto descriptor_set =
     generate_and_update_descriptor_write_sets(*shadow_material);
 
-  vkCmdBindDescriptorSets(command_buffer->get_command_buffer(),
-                          VK_PIPELINE_BIND_POINT_GRAPHICS,
+  vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
+                          shadow_pipeline->get_bind_point(),
                           shadow_pipeline->get_layout(),
                           0,
                           1,
@@ -83,45 +64,61 @@ Renderer::shadow_pass() -> void
                           0,
                           nullptr);
 
-  for (const auto& [key, command] : shadow_draw_commands) {
-    const auto& [vertex_buffer,
-                 index_buffer,
-                 material,
-                 submesh_index,
-                 instance_count] = command;
+  static constexpr float depthBiasConstant = 1.25f;
+  static constexpr float depthBiasSlope = 1.75f;
 
-    auto vertex_buffers = std::array{ vertex_buffer->get_buffer() };
+  vkCmdSetDepthBias(command_buffer.get_command_buffer(),
+                    depthBiasConstant,
+                    0.0f,
+                    depthBiasSlope);
+
+  for (const auto& [key, command] : get_renderer().shadow_draw_commands) {
+    const auto& [mesh, submesh_index, instance_count] = command;
+
+    const auto& mesh_asset = mesh->get_mesh_asset();
+    auto vertex_buffers =
+      std::array{ mesh_asset->get_vertex_buffer().get_buffer() };
     auto offsets = std::array<VkDeviceSize, 1>{ 0 };
-    vkCmdBindVertexBuffers(command_buffer->get_command_buffer(),
+    vkCmdBindVertexBuffers(command_buffer.get_command_buffer(),
                            0,
                            1,
                            vertex_buffers.data(),
                            offsets.data());
 
     const auto& transform_vertex_buffer =
-      transform_buffers.at(Core::Application::the().current_frame_index())
+      get_renderer()
+        .transform_buffers.at(Core::Application::the().current_frame_index())
         .transform_buffer;
     auto vb = transform_vertex_buffer->get_buffer();
-    auto offset = mesh_transform_map.at(key).offset;
+    auto offset = get_renderer().mesh_transform_map.at(key).offset;
+    const auto& submesh = mesh_asset->get_submeshes().at(submesh_index);
 
     offsets = std::array{ VkDeviceSize{ offset } };
 
     vkCmdBindVertexBuffers(
-      command_buffer->get_command_buffer(), 1, 1, &vb, offsets.data());
+      command_buffer.get_command_buffer(), 1, 1, &vb, offsets.data());
 
-    vkCmdBindIndexBuffer(command_buffer->get_command_buffer(),
-                         index_buffer->get_buffer(),
+    vkCmdBindIndexBuffer(command_buffer.get_command_buffer(),
+                         mesh_asset->get_index_buffer().get_buffer(),
                          0,
                          VK_INDEX_TYPE_UINT32);
-    vkCmdDrawIndexed(command_buffer->get_command_buffer(),
-                     static_cast<Core::u32>(index_buffer->count()),
+
+    vkCmdDrawIndexed(command_buffer.get_command_buffer(),
+                     submesh.index_count,
                      instance_count,
-                     0,
-                     0,
+                     submesh.base_index,
+                     submesh.base_vertex,
                      0);
   }
+}
 
-  RendererExtensions::end_renderpass(*command_buffer);
+auto
+ShadowRenderPass::on_resize(const Core::Extent& ext) -> void
+{
+  auto&& [fb, _, pipe, __] = get_data();
+
+  fb->on_resize(ext);
+  pipe->on_resize(ext);
 }
 
 } // namespace Engine::Graphics

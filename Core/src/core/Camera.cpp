@@ -109,7 +109,6 @@ EditorCamera::EditorCamera(const float degree_fov,
   direction = glm::eulerAngles(orientation) * pi_to_rad;
   view_matrix =
     glm::translate(glm::mat4(1.0F), position) * glm::mat4(orientation);
-  view_matrix = glm::inverse(view_matrix);
 }
 
 void
@@ -133,7 +132,6 @@ EditorCamera::init(const EditorCamera* previous_camera)
   direction = glm::eulerAngles(orientation) * (180.0F / glm::pi<float>());
   view_matrix =
     glm::translate(glm::mat4(1.0F), position) * glm::mat4(orientation);
-  view_matrix = glm::inverse(view_matrix);
 }
 
 void

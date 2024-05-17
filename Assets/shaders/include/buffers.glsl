@@ -19,14 +19,15 @@ layout(std140, set = 0, binding = 1) uniform ShadowUBO
   mat4 view;
   mat4 projection;
   mat4 view_projection;
-  vec3 sun_position;
+  vec4 sun_position;
+  vec4 sun_direction;
 }
 shadow;
 
 struct PointLight
 {
   vec3 pos;
-  float multiplier;
+  float intensity;
   vec3 radiance;
   float min_radius;
   float radius;
@@ -44,7 +45,7 @@ point_lights;
 struct SpotLight
 {
   vec3 pos;
-  float multiplier;
+  float intensity;
   vec3 direction;
   float angle_attenuation;
   vec3 radiance;
@@ -60,5 +61,30 @@ layout(std140, set = 0, binding = 3) uniform SpotLightUBO
   SpotLight lights[MAX_LIGHT_COUNT];
 }
 spot_lights;
+
+layout(std140, set = 0, binding = 4) buffer VisiblePointLightSSBO
+{
+  int indices[MAX_LIGHT_COUNT];
+}
+visible_point_lights;
+
+layout(std140, set = 0, binding = 5) buffer VisibleSpotLightSSBO
+{
+  int indices[MAX_LIGHT_COUNT];
+}
+visible_spot_lights;
+
+layout(std140, set = 0, binding = 6) uniform ScreenDataUBO
+{
+  vec2 full_resolution;
+  vec2 half_resolution;
+  vec2 inv_resolution;
+  vec2 depth_constants;
+  float near_plane;
+  float far_plane;
+  float time;
+  uint tile_count_x;
+}
+screen_data;
 
 #endif

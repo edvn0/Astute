@@ -13,7 +13,7 @@ determine_present_mode(const VkPhysicalDevice& physical_device,
     physical_device, surface, &present_mode_count, present_modes.data());
 
   if (!vsync) {
-    for (auto i = 0; i < present_mode_count; i++) {
+    for (auto i = 0U; i < present_mode_count; i++) {
       if (present_modes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
         present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
         break;
@@ -157,6 +157,8 @@ create_command_pools_and_buffers(const VkDevice& device,
 {
   VkCommandPoolCreateInfo cmd_pool_info{};
   cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+  cmd_pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT |
+                        VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
   cmd_pool_info.queueFamilyIndex = queue_family_index;
 
   command_buffers.resize(image_count);

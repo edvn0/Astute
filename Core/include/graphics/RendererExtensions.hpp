@@ -2,13 +2,16 @@
 
 #include "graphics/Forward.hpp"
 
-using BufferBinding = Engine::Core::usize;
-using BufferOffset = Engine::Core::usize;
+#include "graphics/IFramebuffer.hpp"
+
+using BufferBinding = Engine::Core::u32;
+using BufferOffset = Engine::Core::u32;
 
 namespace Engine::Graphics::RendererExtensions {
 
 auto
-begin_renderpass(const CommandBuffer&, const Framebuffer&) -> void;
+begin_renderpass(const CommandBuffer&, const IFramebuffer&, bool flip = false)
+  -> void;
 auto
 end_renderpass(const CommandBuffer&) -> void;
 auto
@@ -23,6 +26,8 @@ bind_index_buffer(const CommandBuffer&,
                   BufferOffset = 0) -> void;
 
 auto
-explicitly_clear_framebuffer(const CommandBuffer&, const Framebuffer&) -> void;
+explicitly_clear_framebuffer(const CommandBuffer&,
+                             const IFramebuffer&,
+                             bool clear_depth = true) -> void;
 
 }

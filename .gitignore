@@ -1,6 +1,9 @@
 # Prerequisites
 *.d
 
+test_output
+vs2022
+
 vscode-build
 build
 out

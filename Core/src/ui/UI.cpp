@@ -9,7 +9,7 @@
 #include <initializer_list>
 #include <span>
 
-namespace Engine::UI {
+namespace Engine::Core::UI {
 
 namespace {
 
@@ -53,23 +53,11 @@ convert_to_imvec(const Core::Vector<T, N>& vector)
 }
 
 auto
-convert_to_imvec(const Core::Extent& extent)
-{
-  return ImVec2{ static_cast<float>(extent.width),
-                 static_cast<float>(extent.height) };
-}
-
-auto
 convert_to_imvec(const Core::FloatExtent& extent)
 {
   return ImVec2{ extent.width, extent.height };
 }
 
-auto
-to_vector(const ImVec4& vec)
-{
-  return Core::Vec4{ vec.x, vec.y, vec.z, vec.w };
-}
 auto
 to_vector(const ImVec2& vec)
 {
@@ -111,8 +99,9 @@ make_id(Args&&... data)
 }
 
 auto
-add_image(VkSampler sampler, VkImageView image_view, VkImageLayout layout)
-  -> VkDescriptorSet
+add_image(VkSampler sampler,
+          VkImageView image_view,
+          VkImageLayout layout) -> VkDescriptorSet
 {
   auto pool = Graphics::InterfaceSystem::get_image_pool();
   auto set = ImGui_ImplVulkan_AddTexture(sampler, image_view, layout, pool);
@@ -169,8 +158,11 @@ image(const Graphics::Image& image,
   ImGui::PushID(made.c_str());
   static constexpr auto uv0 = ImVec2(0, 0);
   static constexpr auto uv1 = ImVec2(1, 1);
-  ImGui::Image(
-    set, convert_to_imvec(extent), flipped ? uv1 : uv0, flipped ? uv0 : uv1);
+  ImGui::Image(set,
+               convert_to_imvec(extent),
+               flipped ? uv1 : uv0,
+               flipped ? uv0 : uv1,
+               convert_to_imvec(colour));
   ImGui::PopID();
 }
 

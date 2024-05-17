@@ -5,11 +5,10 @@
 #include "core/Types.hpp"
 
 #include "graphics/CommandBuffer.hpp"
-#include "graphics/Framebuffer.hpp"
 #include "graphics/GPUBuffer.hpp"
-#include "graphics/GraphicsPipeline.hpp"
 #include "graphics/Material.hpp"
-#include "graphics/Shader.hpp"
+#include "graphics/Mesh.hpp"
+#include "graphics/RenderPass.hpp"
 
 #include "graphics/ShaderBuffers.hpp"
 
@@ -29,6 +28,27 @@ struct std::hash<Engine::Graphics::CommandKey>
 
 namespace Engine::Graphics {
 
+namespace Detail {
+template<typename... Bases>
+struct overload : Bases...
+{
+  using is_transparent = void;
+  using Bases::operator()...;
+};
+
+struct CharPointerHash
+{
+  auto operator()(const char* ptr) const noexcept
+  {
+    return std::hash<std::string_view>{}(ptr);
+  }
+};
+
+using transparent_string_hash = overload<std::hash<std::string>,
+                                         std::hash<std::string_view>,
+                                         CharPointerHash>;
+}
+
 struct TransformVertexData
 {
   std::array<glm::vec4, 3> transform_rows{};
@@ -44,29 +64,13 @@ struct SubmeshTransformBuffer
   Core::Scope<Core::DataBuffer> data_buffer{ nullptr };
 };
 
-struct RenderPass
-{
-  Core::Scope<Framebuffer> framebuffer{ nullptr };
-  Core::Scope<Shader> shader{ nullptr };
-  Core::Scope<GraphicsPipeline> pipeline{ nullptr };
-  Core::Scope<Material> material{ nullptr };
-
-  auto destruct() -> void
-  {
-    framebuffer.reset();
-    shader.reset();
-    pipeline.reset();
-    material.reset();
-  }
-};
-
 struct SceneRendererCamera
 {
   const Core::Camera& camera;
-  glm::mat4 view_matrix;
-  Core::f32 near;
-  Core::f32 far;
-  Core::f32 fov;
+  glm::mat4 view_matrix{};
+  Core::f32 near{};
+  Core::f32 far{};
+  Core::f32 fov{};
 };
 
 struct CommandKey
@@ -77,6 +81,12 @@ struct CommandKey
   Core::u32 submesh_index{ 0 };
 
   auto operator<=>(const CommandKey&) const = default;
+};
+
+enum class RendererTechnique : Core::u8
+{
+  Deferred,
+  ForwardPlus
 };
 
 class Renderer
@@ -94,25 +104,30 @@ public:
   auto begin_scene(Core::Scene&, const SceneRendererCamera&) -> void;
   auto end_scene() -> void;
 
-  auto submit_static_mesh(const Graphics::VertexBuffer&,
-                          const Graphics::IndexBuffer&,
-                          Graphics::Material&,
-                          const glm::mat4&,
-                          const glm::vec4& = { 1, 1, 1, 1 }) -> void;
+  auto submit_static_mesh(Core::Ref<StaticMesh>&, const glm::mat4&) -> void;
+  auto submit_static_light(Core::Ref<StaticMesh>&, const glm::mat4&) -> void;
 
-  auto get_output_image(Core::u32 attachment = 0) const -> const Image*
+  [[nodiscard]] auto get_output_image(Core::u32 attachment = 0) const
+    -> const Image*
   {
-    return main_geometry_render_pass.framebuffer
+    return render_passes.at("MainGeometry")
+      ->get_framebuffer()
       ->get_colour_attachment(attachment)
       .get();
   }
-  auto get_shadow_output_image() const -> const Image*
+  [[nodiscard]] auto get_shadow_output_image() const -> const Image*
   {
-    return shadow_render_pass.framebuffer->get_depth_attachment().get();
+    return render_passes.at("Shadow")
+      ->get_framebuffer()
+      ->get_depth_attachment()
+      .get();
   }
-  auto get_final_output() const -> const Image*
+  [[nodiscard]] auto get_final_output() const -> const Image*
   {
-    return deferred_render_pass.framebuffer->get_colour_attachment(0).get();
+    return render_passes.at("Lights")
+      ->get_framebuffer()
+      ->get_colour_attachment(0)
+      .get();
   }
 
   auto on_resize(const Core::Extent&) -> void;
@@ -126,26 +141,32 @@ public:
     return black_texture;
   }
 
+  [[nodiscard]] auto get_size() const -> const Core::Extent& { return size; }
+  auto get_render_pass(const std::string& name) -> RenderPass&
+  {
+    return *render_passes.at(name);
+  }
+  [[nodiscard]] auto get_render_pass(const std::string& name) const
+    -> const RenderPass&
+  {
+    return *render_passes.at(name);
+  }
+
+  auto set_technique(RendererTechnique tech) -> void { technique = tech; }
+
+  static auto get_thread_pool() -> ED::ThreadPool& { return *thread_pool; }
+
 private:
   Core::Extent size{ 0, 0 };
+  Core::Extent old_size{ 0, 0 };
   Core::Scope<CommandBuffer> command_buffer{ nullptr };
+  Core::Scope<CommandBuffer> compute_command_buffer{ nullptr };
 
-  RenderPass predepth_render_pass{};
-  RenderPass main_geometry_render_pass{};
-  RenderPass shadow_render_pass{};
-  RenderPass deferred_render_pass{};
-
-  auto construct_predepth_pass(const Window*) -> void;
-  auto predepth_pass() -> void;
-
-  auto construct_main_geometry_pass(const Window*, Core::Ref<Image>) -> void;
-  auto main_geometry_pass() -> void;
-
-  auto construct_shadow_pass(const Window*, Core::u32) -> void;
-  auto shadow_pass() -> void;
-
-  auto construct_deferred_pass(const Window*, const Framebuffer&) -> void;
-  auto deferred_pass() -> void;
+  std::unordered_map<std::string,
+                     Core::Scope<RenderPass>,
+                     Detail::transparent_string_hash,
+                     std::equal_to<>>
+    render_passes;
 
   auto flush_draw_lists() -> void;
 
@@ -156,32 +177,48 @@ private:
   UniformBufferObject<ShadowUBO> shadow_ubo{};
   UniformBufferObject<PointLightUBO> point_light_ubo{};
   UniformBufferObject<SpotLightUBO> spot_light_ubo{};
+  UniformBufferObject<VisiblePointLightSSBO, GPUBufferType::Storage>
+    visible_point_lights_ssbo{};
+  UniformBufferObject<VisibleSpotLightSSBO, GPUBufferType::Storage>
+    visible_spot_lights_ssbo{};
+  UniformBufferObject<ScreenDataUBO> screen_data_ubo{};
+
+  glm::uvec3 light_culling_work_groups{};
 
   struct DrawCommand
   {
-    const Graphics::VertexBuffer* vertex_buffer;
-    const Graphics::IndexBuffer* index_buffer;
-    Graphics::Material* material;
+    Core::Ref<StaticMesh> static_mesh{};
     Core::u32 submesh_index{ 0 };
     Core::u32 instance_count{ 0 };
   };
 
   std::unordered_map<CommandKey, DrawCommand> draw_commands;
   std::unordered_map<CommandKey, DrawCommand> shadow_draw_commands;
+  std::unordered_map<CommandKey, DrawCommand> lights_draw_commands;
 
   std::vector<SubmeshTransformBuffer> transform_buffers;
   std::unordered_map<CommandKey, TransformMapData> mesh_transform_map;
 
   static inline Core::Ref<Image> white_texture;
   static inline Core::Ref<Image> black_texture;
+
+  RendererTechnique technique{ RendererTechnique::Deferred };
+
+  static inline Core::Scope<ED::ThreadPool> thread_pool{ nullptr };
+
+  friend class RenderPass;
+  friend class DeferredRenderPass;
+  friend class MainGeometryRenderPass;
+  friend class ShadowRenderPass;
+  friend class PredepthRenderPass;
+  friend class LightCullingRenderPass;
+  friend class LightsRenderPass;
 };
 
 }
 
-namespace std {
-
 inline auto
-hash<Engine::Graphics::CommandKey>::operator()(
+std::hash<Engine::Graphics::CommandKey>::operator()(
   const Engine::Graphics::CommandKey& key) const noexcept -> Engine::Core::usize
 {
   static constexpr auto combine = []<class... T>(auto& seed,
@@ -191,8 +228,9 @@ hash<Engine::Graphics::CommandKey>::operator()(
     return seed;
   };
   std::size_t seed{ 0 };
-  return combine(
-    seed, key.vertex_buffer, key.index_buffer, key.material, key.submesh_index);
+  return combine(seed,
+                 std::bit_cast<std::size_t>(key.vertex_buffer),
+                 std::bit_cast<std::size_t>(key.index_buffer),
+                 std::bit_cast<std::size_t>(key.material),
+                 key.submesh_index);
 }
-
-} // namespace std

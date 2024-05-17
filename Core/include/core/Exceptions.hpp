@@ -14,6 +14,12 @@ public:
     : std::runtime_error(std::format("Astute Exception: {}", data))
   {
   }
+
+  template<typename... Args>
+  AstuteBaseException(std::format_string<Args...> fmt, Args&&... args)
+    : AstuteBaseException(std::format(fmt, std::forward<Args>(args)...))
+  {
+  }
 };
 
 class NoDeviceFoundException : public AstuteBaseException
@@ -47,6 +53,12 @@ public:
 };
 
 class FileCouldNotBeOpened : public AstuteBaseException
+{
+public:
+  using AstuteBaseException::AstuteBaseException;
+};
+
+class InvalidOperationException : public AstuteBaseException
 {
 public:
   using AstuteBaseException::AstuteBaseException;

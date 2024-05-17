@@ -4,6 +4,12 @@
 
 #include "AstuteApplication.hpp"
 
+#ifdef ASTUTE_BASE_PATH
+static constexpr std::string_view base_path = ASTUTE_BASE_PATH;
+#else  // ASTUTE_BASE_PATH
+static constexpr std::string_view base_path = "C:\\D\\Dev\\AstuteEngine";
+#endif // ASTUTE_BASE_PATH
+
 auto
 main(int argc, char** argv) -> int
 {
@@ -49,6 +55,7 @@ main(int argc, char** argv) -> int
     .fullscreen = fullscreen_opt->value_or(false),
   };
 
+  std::filesystem::current_path(base_path);
   info("Current path: {}", std::filesystem::current_path().string());
 
   AstuteApplication application{ config };

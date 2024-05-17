@@ -17,3 +17,15 @@
 [submodule "Library/SPIRV-Cross"]
 	path = Library/SPIRV-Cross
 	url = git@github.com:KhronosGroup/SPIRV-Cross.git
+[submodule "Library/assimp"]
+	path = Library/assimp
+	url = git@github.com:assimp/assimp.git
+[submodule "Library/filewatch"]
+	path = Library/filewatch
+	url = git@github.com:ThomasMonkman/filewatch.git
+[submodule "Library/FastNoise2"]
+	path = Library/FastNoise2
+	url = git@github.com:Auburn/FastNoise2.git
+[submodule "Library/thread-pool"]
+	path = Library/thread-pool
+	url = git@github.com:bshoshany/thread-pool.git

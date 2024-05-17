@@ -5,13 +5,15 @@
 using namespace Engine::Core;
 using namespace Engine::Graphics;
 
+#include "Widgets/SceneWidget.hpp"
+
 class AstuteApplication : public Application
 {
 public:
   ~AstuteApplication() override;
   explicit AstuteApplication(Application::Configuration);
 
-  auto construct() -> void override {}
+  auto construct() -> void override;
   auto destruct() -> void override;
   auto update(f64 time_step) -> void override;
   auto interpolate(f64 superfluous_time_step) -> void override;
@@ -32,5 +34,8 @@ private:
   Scope<Camera> camera;
 
   SceneState scene_state{ SceneState::Edit };
-  Ref<Scene> scene{ nullptr };
+  Ref<Engine::Core::Scene> scene{ nullptr };
+
+  using WidgetTuple = std::tuple<Scope<Widgets::SceneWidget>>;
+  WidgetTuple widgets;
 };

@@ -3,30 +3,60 @@
 #include "graphics/Renderer.hpp"
 
 #include "core/Application.hpp"
-#include "core/Logger.hpp"
 #include "core/Scene.hpp"
+#include "logging/Logger.hpp"
 
+#include "core/Clock.hpp"
+
+#include "core/Random.hpp"
 #include "graphics/DescriptorResource.hpp"
 #include "graphics/GPUBuffer.hpp"
 #include "graphics/Swapchain.hpp"
 #include "graphics/Window.hpp"
 
-#include "graphics/RendererExtensions.hpp"
+#include "graphics/Framebuffer.hpp"
 
+#include "graphics/RendererExtensions.hpp"
+#include "graphics/TextureGenerator.hpp"
+
+#include "graphics/render_passes/Deferred.hpp"
+#include "graphics/render_passes/LightCulling.hpp"
+#include "graphics/render_passes/Lights.hpp"
+#include "graphics/render_passes/MainGeometry.hpp"
+#include "graphics/render_passes/Predepth.hpp"
+#include "graphics/render_passes/Shadow.hpp"
+
+#include <cstddef>
+#include <glm/gtc/quaternion.hpp>
 #include <ranges>
 #include <span>
 
 namespace Engine::Graphics {
 
+static constexpr auto update_lights = []<class Light>(Light& light_ubo,
+                                                      auto& env_lights) {
+  auto i = 0ULL;
+  auto& [count, lights] = light_ubo.get_data();
+  count = static_cast<Core::i32>(env_lights.size());
+  for (const auto& light : env_lights) {
+    lights.at(i) = light;
+    i++;
+  }
+  light_ubo.update();
+};
+
 auto
 Renderer::generate_and_update_descriptor_write_sets(Material& material)
   -> VkDescriptorSet
 {
-  static std::array<IShaderBindable*, 4> structure_identifiers = {
+  static std::array<IShaderBindable*, 7> structure_identifiers = {
     &renderer_ubo,
     &shadow_ubo,
     &point_light_ubo,
     &spot_light_ubo,
+    &visible_point_lights_ssbo,
+    &visible_spot_lights_ssbo,
+    &screen_data_ubo,
   };
   const auto& shader = material.get_shader();
 
@@ -66,8 +96,8 @@ Renderer::generate_and_update_descriptor_write_sets(Material& material)
   VkDescriptorSetAllocateInfo alloc_info{};
   alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
   const auto& layouts = shader->get_descriptor_set_layouts();
-  alloc_info.descriptorSetCount = static_cast<Core::u32>(layouts.size());
-  alloc_info.pSetLayouts = layouts.data();
+  alloc_info.descriptorSetCount = 1;
+  alloc_info.pSetLayouts = &layouts.at(0);
   auto allocated =
     DescriptorResource::the().allocate_descriptor_set(alloc_info);
 
@@ -81,14 +111,12 @@ Renderer::generate_and_update_descriptor_write_sets(Material& material)
                          0,
                          nullptr);
 
-  // Material specific writes now.
-  material.generate_and_update_descriptor_write_sets(allocated);
-
   return allocated;
 }
 
 Renderer::Renderer(Configuration config, const Window* window)
   : size(window->get_swapchain().get_size())
+  , old_size(size)
 {
   Shader::initialise_compiler(Compilation::ShaderCompilerConfiguration{
     .optimisation_level = 2,
@@ -99,16 +127,44 @@ Renderer::Renderer(Configuration config, const Window* window)
   });
 
   command_buffer = Core::make_scope<CommandBuffer>(CommandBuffer::Properties{
-    .image_count = window->get_swapchain().get_image_count(),
     .queue_type = QueueType::Graphics,
     .primary = true,
   });
+  compute_command_buffer =
+    Core::make_scope<CommandBuffer>(CommandBuffer::Properties{
+      .queue_type = QueueType::Compute,
+      .primary = true,
+    });
 
-  construct_predepth_pass(window);
-  construct_main_geometry_pass(
-    window, predepth_render_pass.framebuffer->get_depth_attachment());
-  construct_shadow_pass(window, config.shadow_pass_size);
-  construct_deferred_pass(window, *main_geometry_render_pass.framebuffer);
+  std::unordered_map<RendererTechnique, std::vector<std::string>>
+    technique_construction_order;
+  technique_construction_order[RendererTechnique::Deferred] = {
+    "Shadow", "Predepth", "MainGeometry", "Deferred", "Lights",
+  };
+
+  render_passes["MainGeometry"] =
+    Core::make_scope<MainGeometryRenderPass>(*this);
+  render_passes["Shadow"] =
+    Core::make_scope<ShadowRenderPass>(*this, config.shadow_pass_size);
+  render_passes["Deferred"] = Core::make_scope<DeferredRenderPass>(*this);
+  render_passes["Predepth"] = Core::make_scope<PredepthRenderPass>(*this);
+  render_passes["Lights"] = Core::make_scope<LightsRenderPass>(*this);
+
+  for (const auto& k :
+       technique_construction_order.at(RendererTechnique::Deferred)) {
+    render_passes.at(k)->construct();
+  }
+
+  technique_construction_order[RendererTechnique::ForwardPlus] = {
+    "LightCulling",
+  };
+
+  render_passes["LightCulling"] =
+    Core::make_scope<LightCullingRenderPass>(*this, light_culling_work_groups);
+  for (const auto& k :
+       technique_construction_order.at(RendererTechnique::ForwardPlus)) {
+    render_passes.at(k)->construct();
+  }
 
   transform_buffers.resize(3);
   static constexpr auto total_size = 100 * 1000 * sizeof(TransformVertexData);
@@ -118,15 +174,46 @@ Renderer::Renderer(Configuration config, const Window* window)
     transform_buffer->fill_zero();
   }
 
-  Core::DataBuffer data_buffer{ sizeof(Core::u32) };
-  Core::u32 white_data{ 0x11111111 };
+  Core::DataBuffer data_buffer{
+    sizeof(Core::u32),
+  };
+  static constexpr auto white_data = 0xFFFFFFFF;
   data_buffer.write(&white_data, sizeof(Core::u32), 0U);
 
-  white_texture = Image::load_from_memory(1, 1, data_buffer);
+  white_texture = Image::load_from_memory(1,
+                                          1,
+                                          data_buffer,
+                                          {
+                                            .path = "white-default-texture",
+                                          });
 
   Core::u32 black_data{ 0 };
   data_buffer.write(&black_data, sizeof(Core::u32), 0U);
-  black_texture = Image::load_from_memory(1, 1, data_buffer);
+  black_texture = Image::load_from_memory(
+    1, 1, data_buffer, { .path = "black-default-texture" });
+
+  const glm::uvec2 viewport_size{ size.width, size.height };
+
+  constexpr uint32_t tile_size = 16U;
+  glm::uvec2 vp_size = viewport_size;
+  vp_size += tile_size - viewport_size % tile_size;
+  light_culling_work_groups = { vp_size / tile_size, 1 };
+
+  visible_point_lights_ssbo.resize(
+    static_cast<Core::usize>(light_culling_work_groups.x *
+                             light_culling_work_groups.y) *
+    4 * 1024);
+  visible_spot_lights_ssbo.resize(
+    static_cast<Core::usize>(light_culling_work_groups.x *
+                             light_culling_work_groups.y) *
+    4 * 1024);
+
+  struct
+  {
+    auto get_device() const -> VkDevice { return Device::the().device(); }
+    auto get_queue_type() const -> QueueType { return QueueType::Graphics; }
+  } a{};
+  thread_pool = Core::make_scope<ED::ThreadPool>(a, 4U);
 }
 
 Renderer::~Renderer() = default;
@@ -137,18 +224,48 @@ Renderer::destruct() -> void
   white_texture->destroy();
   black_texture->destroy();
 
-  predepth_render_pass.destruct();
-  main_geometry_render_pass.destruct();
-  shadow_render_pass.destruct();
-  deferred_render_pass.destruct();
+  for (auto& [k, v] : render_passes) {
+    v->destruct();
+  }
 
   command_buffer.reset();
+
+  thread_pool.reset();
 }
 
 auto
 Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
   -> void
 {
+  if (old_size != size) {
+    Device::the().wait();
+    old_size = size;
+    // We've been resized.
+
+    auto& shadow_render_pass = get_render_pass("Shadow");
+    auto& main_geom = get_render_pass("MainGeometry");
+    auto& deferred = get_render_pass("Deferred");
+    auto& predepth = get_render_pass("Predepth");
+    auto& lights = get_render_pass("Lights");
+    predepth.on_resize(size);
+    shadow_render_pass.on_resize(size);
+    main_geom.on_resize(size);
+    deferred.on_resize(size);
+    lights.on_resize(size);
+
+    const glm::uvec2 viewport_size{ size.width, size.height };
+
+    constexpr uint32_t tile_size = 16U;
+    glm::uvec2 vp_size = viewport_size;
+    vp_size += tile_size - viewport_size % tile_size;
+    light_culling_work_groups = { vp_size / tile_size, 1 };
+
+    visible_point_lights_ssbo.resize(light_culling_work_groups.x *
+                                     light_culling_work_groups.y * 4 * 1024);
+    visible_spot_lights_ssbo.resize(light_culling_work_groups.x *
+                                    light_culling_work_groups.y * 4 * 1024);
+  }
+
   const auto& light_environment = scene.get_light_environment();
   auto& [view,
          proj,
@@ -164,77 +281,139 @@ Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
   specular_colour_intensity = light_environment.specular_colour_and_intensity;
   renderer_ubo.update();
 
-  auto& [light_view, light_proj, light_view_proj, light_pos] =
+  auto& [light_view, light_proj, light_view_proj, light_pos, light_dir] =
     shadow_ubo.get_data();
-  auto projection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 0.1F, 20.0F);
-  auto view_matrix = glm::lookAt(light_environment.sun_position,
-                                 glm::vec3(0.0f),
-                                 glm::vec3(0.0f, 1.0f, 0.0f));
+  auto projection = light_environment.shadow_projection;
+  auto view_matrix = glm::lookAt(glm::vec3{ light_environment.sun_position },
+                                 glm::vec3(0.0F),
+                                 glm::vec3(0.0F, 1.0F, 0.0F));
   light_view = view_matrix;
   light_proj = projection;
   light_view_proj = projection * view_matrix;
   light_pos = light_environment.sun_position;
+  light_dir = glm::normalize(-light_environment.sun_position);
   shadow_ubo.update();
-
-  static constexpr auto update_lights = []<class Light>(Light& light_ubo,
-                                                        auto& env_lights) {
-    auto i = 0ULL;
-    auto& [count, lights] = light_ubo.get_data();
-    count = static_cast<Core::i32>(env_lights.size());
-    for (const auto& light : env_lights) {
-      lights.at(i) = light;
-      i++;
-    }
-    light_ubo.update();
-  };
 
   update_lights(point_light_ubo, light_environment.point_lights);
   update_lights(spot_light_ubo, light_environment.spot_lights);
+
+  // Visible spot lights
+  auto& screen_data = screen_data_ubo.get_data();
+  screen_data.full_resolution = glm::vec2{ size.width, size.height };
+  screen_data.half_resolution = glm::vec2{ size.width / 2, size.height / 2 };
+  screen_data.inv_resolution = glm::vec2{
+    1.0F / static_cast<Core::f32>(size.width),
+    1.0F / static_cast<Core::f32>(size.height),
+  };
+
+  float depth_linearize_mul = -projection[3][2];
+  float depth_linearize_add = projection[2][2];
+  if (depth_linearize_mul * depth_linearize_add < 0) {
+    depth_linearize_add = -depth_linearize_add;
+  }
+  screen_data.depth_constants = { depth_linearize_mul, depth_linearize_add };
+  screen_data.near_plane = camera.camera.get_near_clip();
+  screen_data.far_plane = camera.camera.get_far_clip();
+  screen_data.tile_count_x = light_culling_work_groups.x;
+  static auto begin = Core::Clock::now();
+  screen_data.time = static_cast<Core::f32>(Core::Clock::now() - begin);
+  screen_data_ubo.update();
 }
 
 auto
-Renderer::submit_static_mesh(const Graphics::VertexBuffer& vertex_buffer,
-                             const Graphics::IndexBuffer& index_buffer,
-                             Graphics::Material& material,
-                             const glm::mat4& transform,
-                             const glm::vec4& tint) -> void
+Renderer::submit_static_mesh(Core::Ref<StaticMesh>& static_mesh,
+                             const glm::mat4& transform) -> void
 {
-  CommandKey key{ &vertex_buffer, &index_buffer, &material, 0 };
+  const auto& source = static_mesh->get_mesh_asset();
+  const auto& submesh_data = source->get_submeshes();
+  for (const auto submesh_index : static_mesh->get_submeshes()) {
+    glm::mat4 submesh_transform =
+      transform * submesh_data[submesh_index].transform;
 
-  auto& mesh_transform = mesh_transform_map[key].transforms.emplace_back();
-  mesh_transform.transform_rows[0] = {
-    transform[0][0],
-    transform[1][0],
-    transform[2][0],
-    transform[3][0],
-  };
-  mesh_transform.transform_rows[1] = {
-    transform[0][1],
-    transform[1][1],
-    transform[2][1],
-    transform[3][1],
-  };
-  mesh_transform.transform_rows[2] = {
-    transform[0][2],
-    transform[1][2],
-    transform[2][2],
-    transform[3][2],
-  };
+    const auto& vertex_buffer = source->get_vertex_buffer();
+    const auto& index_buffer = source->get_index_buffer();
+    const auto& material =
+      source->get_materials().at(submesh_data[submesh_index].material_index);
 
-  auto& command = draw_commands[key];
-  command.vertex_buffer = &vertex_buffer;
-  command.index_buffer = &index_buffer;
-  command.material = &material;
-  command.submesh_index = 0;
-  command.instance_count++;
+    CommandKey key{
+      &vertex_buffer, &index_buffer, material.get(), submesh_index
+    };
+    auto& mesh_transform = mesh_transform_map[key].transforms.emplace_back();
+    mesh_transform.transform_rows[0] = {
+      submesh_transform[0][0],
+      submesh_transform[1][0],
+      submesh_transform[2][0],
+      submesh_transform[3][0],
+    };
+    mesh_transform.transform_rows[1] = {
+      submesh_transform[0][1],
+      submesh_transform[1][1],
+      submesh_transform[2][1],
+      submesh_transform[3][1],
+    };
+    mesh_transform.transform_rows[2] = {
+      submesh_transform[0][2],
+      submesh_transform[1][2],
+      submesh_transform[2][2],
+      submesh_transform[3][2],
+    };
 
-  if (true /*mesh->casts_shadows()*/) {
-    auto& shadow_command = shadow_draw_commands[key];
-    shadow_command.vertex_buffer = &vertex_buffer;
-    shadow_command.index_buffer = &index_buffer;
-    shadow_command.submesh_index = 0;
-    shadow_command.instance_count++;
-    // shadow_command.material = shadow_material.get();
+    auto& command = draw_commands[key];
+    command.static_mesh = static_mesh;
+    command.submesh_index = submesh_index;
+    command.instance_count++;
+
+    if (true /*mesh->casts_shadows()*/) {
+      auto& shadow_command = shadow_draw_commands[key];
+      shadow_command.static_mesh = static_mesh;
+      shadow_command.submesh_index = submesh_index;
+      shadow_command.instance_count++;
+      // shadow_command.material = shadow_material.get();
+    }
+  }
+}
+
+auto
+Renderer::submit_static_light(Core::Ref<StaticMesh>& static_mesh,
+                              const glm::mat4& transform) -> void
+{
+
+  const auto& source = static_mesh->get_mesh_asset();
+  const auto& submesh_data = source->get_submeshes();
+  for (const auto submesh_index : static_mesh->get_submeshes()) {
+    glm::mat4 submesh_transform =
+      transform * submesh_data[submesh_index].transform;
+
+    const auto& vertex_buffer = source->get_vertex_buffer();
+    const auto& index_buffer = source->get_index_buffer();
+    auto& material =
+      source->get_materials().at(submesh_data[submesh_index].material_index);
+
+    CommandKey key{ &vertex_buffer, &index_buffer, material.get(), 0 };
+    auto& mesh_transform = mesh_transform_map[key].transforms.emplace_back();
+    mesh_transform.transform_rows[0] = {
+      submesh_transform[0][0],
+      submesh_transform[1][0],
+      submesh_transform[2][0],
+      submesh_transform[3][0],
+    };
+    mesh_transform.transform_rows[1] = {
+      submesh_transform[0][1],
+      submesh_transform[1][1],
+      submesh_transform[2][1],
+      submesh_transform[3][1],
+    };
+    mesh_transform.transform_rows[2] = {
+      submesh_transform[0][2],
+      submesh_transform[1][2],
+      submesh_transform[2][2],
+      submesh_transform[3][2],
+    };
+
+    auto& command = lights_draw_commands[key];
+    command.static_mesh = static_mesh;
+    command.submesh_index = submesh_index;
+    command.instance_count++;
   }
 }
 
@@ -248,7 +427,6 @@ auto
 Renderer::on_resize(const Core::Extent& new_size) -> void
 {
   size = new_size;
-  main_geometry_render_pass.framebuffer->on_resize(new_size);
 }
 
 auto
@@ -274,21 +452,34 @@ Renderer::flush_draw_lists() -> void
   vb->write(std::span{ output });
 
   command_buffer->begin();
+  compute_command_buffer->begin();
 
-  // Predepth pass
-  predepth_pass();
   // Shadow pass
-  shadow_pass();
-  // Geometry pass
-  main_geometry_pass();
-  // Deferred
-  deferred_pass();
+  render_passes.at("Shadow")->execute(*command_buffer);
+  // Prepdepth pass
+  render_passes.at("Predepth")->execute(*command_buffer);
+  // render_passes.at("LightCulling")->execute(*compute_command_buffer, true);
+  if (technique == RendererTechnique::Deferred) {
+    // Geometry pass
+    render_passes.at("MainGeometry")->execute(*command_buffer);
+    // Deferred
+    render_passes.at("Deferred")->execute(*command_buffer);
 
+    render_passes.at("Lights")->execute(*command_buffer);
+  } else if (technique == RendererTechnique::ForwardPlus) {
+    // TODO: Not yet implemented.
+    render_passes.at("ForwardPlusGeometry")->execute(*command_buffer);
+    render_passes.at("Composite")->execute(*command_buffer);
+  }
+
+  compute_command_buffer->end();
+  compute_command_buffer->submit();
   command_buffer->end();
   command_buffer->submit();
 
   draw_commands.clear();
   shadow_draw_commands.clear();
+  lights_draw_commands.clear();
   mesh_transform_map.clear();
 }
 

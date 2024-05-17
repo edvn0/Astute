@@ -1,45 +1,46 @@
 #include "pch/CorePCH.hpp"
 
-#include "graphics/Renderer.hpp"
-
-#include "core/Logger.hpp"
-#include "core/Scene.hpp"
+#include "graphics/render_passes/Predepth.hpp"
 
 #include "core/Application.hpp"
-#include "graphics/DescriptorResource.hpp"
+#include "graphics/Framebuffer.hpp"
 #include "graphics/GPUBuffer.hpp"
-#include "graphics/Swapchain.hpp"
-#include "graphics/Window.hpp"
+#include "graphics/GraphicsPipeline.hpp"
+#include "graphics/Material.hpp"
+#include "graphics/Renderer.hpp"
+#include "graphics/Shader.hpp"
 
 #include "graphics/RendererExtensions.hpp"
 
 namespace Engine::Graphics {
 
 auto
-Renderer::construct_predepth_pass(const Window* window) -> void
+PredepthRenderPass::construct() -> void
 {
-  auto& [predepth_framebuffer,
-         predepth_shader,
-         predepth_pipeline,
-         predepth_material] = predepth_render_pass;
-  predepth_framebuffer =
-    Core::make_scope<Framebuffer>(Framebuffer::Configuration{
-      .size = window->get_swapchain().get_size(),
-      .depth_attachment_format = VK_FORMAT_D32_SFLOAT,
-      .sample_count = VK_SAMPLE_COUNT_4_BIT,
-      .name = "Predepth",
-    });
+  const auto& ext = get_renderer().get_size();
+  auto&& [predepth_framebuffer,
+          predepth_shader,
+          predepth_pipeline,
+          predepth_material] = get_data();
+  predepth_framebuffer = Core::make_scope<Framebuffer>(FramebufferSpecification{
+    .width = ext.width,
+    .height = ext.height,
+    .clear_depth_on_load = false,
+    .attachments = { VK_FORMAT_D32_SFLOAT },
+    .debug_name = "Predepth",
+  });
+
   predepth_shader = Shader::compile_graphics_scoped(
-    "Assets/shaders/predepth.vert", "Assets/shaders/predepth.frag");
+    "Assets/shaders/predepth.vert", "Assets/shaders/empty.frag");
   predepth_pipeline =
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
       .framebuffer = predepth_framebuffer.get(),
       .shader = predepth_shader.get(),
-      .sample_count = VK_SAMPLE_COUNT_4_BIT,
-      .override_vertex_attributes =
-        {
-          { { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 } },
-        },
+      .sample_count = VK_SAMPLE_COUNT_1_BIT,
+      .depth_comparator = VK_COMPARE_OP_GREATER,
+      .override_vertex_attributes = { {
+        { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
+      } },
     });
 
   predepth_material = Core::make_scope<Material>(Material::Configuration{
@@ -48,33 +49,21 @@ Renderer::construct_predepth_pass(const Window* window) -> void
 }
 
 auto
-Renderer::predepth_pass() -> void
+PredepthRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 {
   const auto& [predepth_framebuffer,
                predepth_shader,
                predepth_pipeline,
-               predepth_material] = predepth_render_pass;
-  VkRenderPassBeginInfo render_pass_info{};
-  render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-  render_pass_info.renderPass = predepth_framebuffer->get_renderpass();
-  render_pass_info.framebuffer = predepth_framebuffer->get_framebuffer();
-  render_pass_info.renderArea.offset = { 0, 0 };
-  render_pass_info.renderArea.extent = predepth_framebuffer->get_extent();
-  const auto& clear_values = predepth_framebuffer->get_clear_values();
-  render_pass_info.clearValueCount =
-    static_cast<Core::u32>(clear_values.size());
-  render_pass_info.pClearValues = clear_values.data();
+               predepth_material] = get_data();
 
-  RendererExtensions::begin_renderpass(*command_buffer, *predepth_framebuffer);
+  RendererExtensions::explicitly_clear_framebuffer(command_buffer,
+                                                   *predepth_framebuffer);
 
-  vkCmdBindPipeline(command_buffer->get_command_buffer(),
-                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    predepth_pipeline->get_pipeline());
-  auto descriptor_set =
+  auto* descriptor_set =
     generate_and_update_descriptor_write_sets(*predepth_material);
 
-  vkCmdBindDescriptorSets(command_buffer->get_command_buffer(),
-                          VK_PIPELINE_BIND_POINT_GRAPHICS,
+  vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
+                          predepth_pipeline->get_bind_point(),
                           predepth_pipeline->get_layout(),
                           0,
                           1,
@@ -82,41 +71,65 @@ Renderer::predepth_pass() -> void
                           0,
                           nullptr);
 
-  for (const auto& [key, command] : draw_commands) {
-    const auto& [vertex_buffer,
-                 index_buffer,
-                 material,
-                 submesh_index,
-                 instance_count] = command;
+  static constexpr float depth_bias_constant = 1.25F;
+  static constexpr float depth_bias_slope = 1.75F;
 
-    auto vertex_buffers = std::array{ vertex_buffer->get_buffer() };
+  vkCmdSetDepthBias(command_buffer.get_command_buffer(),
+                    depth_bias_constant,
+                    0.0F,
+                    depth_bias_slope);
+
+  for (const auto& [key, command] : get_renderer().draw_commands) {
+    const auto& [mesh, submesh_index, instance_count] = command;
+
+    const auto& mesh_asset = mesh->get_mesh_asset();
+    auto vertex_buffers =
+      std::array{ mesh_asset->get_vertex_buffer().get_buffer() };
     auto offsets = std::array<VkDeviceSize, 1>{ 0 };
-    vkCmdBindVertexBuffers(command_buffer->get_command_buffer(),
+    vkCmdBindVertexBuffers(command_buffer.get_command_buffer(),
                            0,
                            1,
                            vertex_buffers.data(),
                            offsets.data());
 
     const auto& transform_vertex_buffer =
-      transform_buffers.at(Core::Application::the().current_frame_index())
+      get_renderer()
+        .transform_buffers.at(Core::Application::the().current_frame_index())
         .transform_buffer;
-    auto offset = mesh_transform_map.at(key).offset;
-    RendererExtensions::bind_vertex_buffer(
-      *command_buffer, *transform_vertex_buffer, 1, offset);
+    auto* vb = transform_vertex_buffer->get_buffer();
+    auto offset = get_renderer().mesh_transform_map.at(key).offset;
+    const auto& submesh = mesh_asset->get_submeshes().at(submesh_index);
 
-    vkCmdBindIndexBuffer(command_buffer->get_command_buffer(),
-                         index_buffer->get_buffer(),
+    offsets = std::array{ VkDeviceSize{ offset } };
+
+    vkCmdBindVertexBuffers(
+      command_buffer.get_command_buffer(), 1, 1, &vb, offsets.data());
+
+    vkCmdBindIndexBuffer(command_buffer.get_command_buffer(),
+                         mesh_asset->get_index_buffer().get_buffer(),
                          0,
                          VK_INDEX_TYPE_UINT32);
-    vkCmdDrawIndexed(command_buffer->get_command_buffer(),
-                     static_cast<Core::u32>(index_buffer->count()),
+    vkCmdDrawIndexed(command_buffer.get_command_buffer(),
+                     submesh.index_count,
                      instance_count,
-                     0,
-                     0,
+                     submesh.base_index,
+                     static_cast<Core::i32>(submesh.base_vertex),
                      0);
   }
+}
 
-  RendererExtensions::end_renderpass(*command_buffer);
+auto
+PredepthRenderPass::destruct_impl() -> void
+{
+}
+
+auto
+PredepthRenderPass::on_resize(const Core::Extent& ext) -> void
+{
+  auto&& [fb, _, pipe, __] = get_data();
+
+  fb->on_resize(ext);
+  pipe->on_resize(ext);
 }
 
 } // namespace Engine::Graphics

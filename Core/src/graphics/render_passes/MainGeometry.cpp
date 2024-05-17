@@ -2,39 +2,42 @@
 
 #include "graphics/Renderer.hpp"
 
-#include "core/Logger.hpp"
 #include "core/Scene.hpp"
+#include "logging/Logger.hpp"
 
 #include "core/Application.hpp"
-#include "graphics/DescriptorResource.hpp"
-#include "graphics/GPUBuffer.hpp"
-#include "graphics/Image.hpp"
-#include "graphics/Swapchain.hpp"
-#include "graphics/Window.hpp"
+#include "graphics/Framebuffer.hpp"
+#include "graphics/GraphicsPipeline.hpp"
 
 #include "graphics/RendererExtensions.hpp"
+
+#include "graphics/render_passes/MainGeometry.hpp"
 
 namespace Engine::Graphics {
 
 auto
-Renderer::construct_main_geometry_pass(const Window* window,
-                                       Core::Ref<Image> predepth_attachment)
-  -> void
+MainGeometryRenderPass::construct() -> void
 {
-  auto& [main_geometry_framebuffer,
-         main_geometry_shader,
-         main_geometry_pipeline,
-         main_geometry_material] = main_geometry_render_pass;
+  const auto& ext = get_renderer().get_size();
+  auto&& [main_geometry_framebuffer,
+          main_geometry_shader,
+          main_geometry_pipeline,
+          main_geometry_material] = get_data();
   main_geometry_framebuffer =
-    Core::make_scope<Framebuffer>(Framebuffer::Configuration{
-      .size = window->get_swapchain().get_size(),
-      .colour_attachment_formats = { VK_FORMAT_R32G32B32A32_SFLOAT, // position
-                                     VK_FORMAT_R32G32B32A32_SFLOAT, // normals
-                                     VK_FORMAT_R32G32B32A32_SFLOAT, // albedo + spec
-                                     },
-      .sample_count = VK_SAMPLE_COUNT_4_BIT,
-      .dependent_attachments = {predepth_attachment},
-      .name = "MainGeometry",
+    Core::make_scope<Framebuffer>(FramebufferSpecification{
+      .width = ext.width,
+      .height= ext.height,
+      .clear_depth_on_load = false,
+      .attachments = {
+          VK_FORMAT_R32G32B32A32_SFLOAT, // world pos
+          VK_FORMAT_R32G32B32A32_SFLOAT, // normals
+          VK_FORMAT_R32G32B32A32_SFLOAT, // albedo + specular strength
+          VK_FORMAT_R32G32B32A32_SFLOAT, // shadow position
+          VK_FORMAT_D32_SFLOAT, // depth
+      },
+      .samples = VK_SAMPLE_COUNT_1_BIT,
+      .existing_images = { {4, get_renderer().get_render_pass("Predepth").get_depth_attachment(), }, },
+      .debug_name = "MainGeometry",
     });
   main_geometry_shader = Shader::compile_graphics_scoped(
     "Assets/shaders/main_geometry.vert", "Assets/shaders/main_geometry.frag");
@@ -42,84 +45,90 @@ Renderer::construct_main_geometry_pass(const Window* window,
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
       .framebuffer = main_geometry_framebuffer.get(),
       .shader = main_geometry_shader.get(),
-      .sample_count = VK_SAMPLE_COUNT_4_BIT,
+      .sample_count = VK_SAMPLE_COUNT_1_BIT,
+      .depth_comparator = VK_COMPARE_OP_EQUAL,
     });
   main_geometry_material = Core::make_scope<Material>(Material::Configuration{
     .shader = main_geometry_shader.get(),
   });
-
-  main_geometry_material->set(
-    "shadow_map", TextureType::Shadow, predepth_attachment);
 }
 
 auto
-Renderer::main_geometry_pass() -> void
+MainGeometryRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 {
   const auto& [main_geometry_framebuffer,
                main_geometry_shader,
                main_geometry_pipeline,
-               main_geometry_material] = main_geometry_render_pass;
-  VkRenderPassBeginInfo render_pass_info{};
-  render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-  render_pass_info.renderPass = main_geometry_framebuffer->get_renderpass();
-  render_pass_info.framebuffer = main_geometry_framebuffer->get_framebuffer();
-  render_pass_info.renderArea.offset = { 0, 0 };
-  render_pass_info.renderArea.extent = main_geometry_framebuffer->get_extent();
-  const auto& clear_values = main_geometry_framebuffer->get_clear_values();
-  render_pass_info.clearValueCount =
-    static_cast<Core::u32>(clear_values.size());
-  render_pass_info.pClearValues = clear_values.data();
+               main_geometry_material] = get_data();
 
-  RendererExtensions::begin_renderpass(*command_buffer,
-                                       *main_geometry_framebuffer);
-
-  vkCmdBindPipeline(command_buffer->get_command_buffer(),
-                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    main_geometry_pipeline->get_pipeline());
-  auto descriptor_set =
+  auto* renderer_desc_set =
     generate_and_update_descriptor_write_sets(*main_geometry_material);
 
-  for (const auto& [key, command] : draw_commands) {
-    const auto& [vertex_buffer,
-                 index_buffer,
-                 material,
-                 submesh_index,
-                 instance_count] = command;
+  main_geometry_material->update_descriptor_write_sets(renderer_desc_set);
+
+  for (auto&& [key, command] : get_renderer().draw_commands) {
+    auto&& [mesh, submesh_index, instance_count] = command;
+
+    const auto& mesh_asset = mesh->get_mesh_asset();
     const auto& transform_vertex_buffer =
-      transform_buffers.at(Core::Application::the().current_frame_index())
+      get_renderer()
+        .transform_buffers.at(Core::Application::the().current_frame_index())
         .transform_buffer;
-    auto offset = mesh_transform_map.at(key).offset;
+    auto offset = get_renderer().mesh_transform_map.at(key).offset;
+    const auto& submesh = mesh_asset->get_submeshes().at(submesh_index);
 
-    if (material) {
-      material->set(
-        "normal_map",
-        Graphics::TextureType::Normal,
-        Graphics::Image::load_from_file("Assets/images/cube_normal.png"));
-      material->generate_and_update_descriptor_write_sets(descriptor_set);
-    }
+    const auto& material = mesh->get_materials().at(submesh.material_index);
+    auto* material_descriptor_set =
+      material->generate_and_update_descriptor_write_sets();
 
-    RendererExtensions::bind_vertex_buffer(*command_buffer, *vertex_buffer, 0);
     RendererExtensions::bind_vertex_buffer(
-      *command_buffer, *transform_vertex_buffer, 1, offset);
-    RendererExtensions::bind_index_buffer(*command_buffer, *index_buffer);
+      command_buffer, mesh_asset->get_vertex_buffer(), 0);
+    RendererExtensions::bind_vertex_buffer(
+      command_buffer, *transform_vertex_buffer, 1, offset);
+    RendererExtensions::bind_index_buffer(command_buffer,
+                                          mesh_asset->get_index_buffer());
 
-    vkCmdBindDescriptorSets(command_buffer->get_command_buffer(),
-                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+    std::array desc_sets{ renderer_desc_set, material_descriptor_set };
+    vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
+                            main_geometry_pipeline->get_bind_point(),
                             main_geometry_pipeline->get_layout(),
                             0,
-                            1,
-                            &descriptor_set,
+                            static_cast<Core::u32>(desc_sets.size()),
+                            desc_sets.data(),
                             0,
                             nullptr);
-    vkCmdDrawIndexed(command_buffer->get_command_buffer(),
-                     static_cast<Core::u32>(index_buffer->count()),
+
+    if (const auto& push_constant_buffer = material->get_constant_buffer();
+        push_constant_buffer) {
+      vkCmdPushConstants(command_buffer.get_command_buffer(),
+                         main_geometry_pipeline->get_layout(),
+                         VK_SHADER_STAGE_ALL,
+                         0,
+                         static_cast<Core::u32>(push_constant_buffer.size()),
+                         push_constant_buffer.raw());
+    }
+
+    vkCmdDrawIndexed(command_buffer.get_command_buffer(),
+                     submesh.index_count,
                      instance_count,
-                     0,
-                     0,
+                     submesh.base_index,
+                     submesh.base_vertex,
                      0);
   }
+}
 
-  RendererExtensions::end_renderpass(*command_buffer);
+auto
+MainGeometryRenderPass::destruct_impl() -> void
+{
+}
+
+auto
+MainGeometryRenderPass::on_resize(const Core::Extent& ext) -> void
+{
+  auto&& [fb, _, pipe, __] = get_data();
+
+  fb->on_resize(ext);
+  pipe->on_resize(ext);
 }
 
 } // namespace Engine::Graphics

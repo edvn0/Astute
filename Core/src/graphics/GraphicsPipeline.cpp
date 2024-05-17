@@ -4,6 +4,7 @@
 #include "graphics/Device.hpp"
 #include "graphics/Framebuffer.hpp"
 #include "graphics/GraphicsPipeline.hpp"
+#include "graphics/Image.hpp"
 #include "graphics/Shader.hpp"
 
 #include "graphics/Vertex.hpp"
@@ -14,21 +15,39 @@ namespace Engine::Graphics {
 
 GraphicsPipeline::GraphicsPipeline(const Configuration& config)
   : sample_count(config.sample_count)
+  , cull_mode(config.cull_mode)
+  , face_mode(config.face_mode)
+  , depth_comparator(config.depth_comparator)
+  , clear_depth_value(config.clear_depth_value)
   , override_vertex_attributes(config.override_vertex_attributes)
   , override_instance_attributes(config.override_instance_attributes)
   , framebuffer(config.framebuffer)
   , shader(config.shader)
 {
-  info("Creating graphics pipeline for framebuffer: {}",
-       framebuffer->get_name());
   create_layout();
   create_pipeline();
+  trace("Created graphics pipeline for framebuffer: {}",
+        framebuffer->get_name());
 }
 
 GraphicsPipeline::~GraphicsPipeline()
 {
+  destroy();
+}
+
+auto
+GraphicsPipeline::destroy() -> void
+{
   vkDestroyPipeline(Device::the().device(), pipeline, nullptr);
   vkDestroyPipelineLayout(Device::the().device(), layout, nullptr);
+}
+
+auto
+GraphicsPipeline::on_resize(const Core::Extent&) -> void
+{
+  destroy();
+  create_layout();
+  create_pipeline();
 }
 
 auto
@@ -37,25 +56,11 @@ GraphicsPipeline::create_pipeline() -> void
   VkGraphicsPipelineCreateInfo pipeline_info{};
   pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 
-  VkViewport viewport{};
-  viewport.x = 0.0f;
-  viewport.y = 0.0f;
-  viewport.width = static_cast<float>(framebuffer->get_extent().width);
-  viewport.height = static_cast<float>(framebuffer->get_extent().height);
-  viewport.minDepth = 0.0f;
-  viewport.maxDepth = 1.0f;
-
-  VkRect2D scissor{};
-  scissor.offset = { 0, 0 };
-  scissor.extent = framebuffer->get_extent();
-
   VkPipelineViewportStateCreateInfo viewport_state_info{};
   viewport_state_info.sType =
     VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
   viewport_state_info.viewportCount = 1;
-  viewport_state_info.pViewports = &viewport;
   viewport_state_info.scissorCount = 1;
-  viewport_state_info.pScissors = &scissor;
   pipeline_info.pViewportState = &viewport_state_info;
 
   const auto maybe_vertex_stage =
@@ -67,18 +72,41 @@ GraphicsPipeline::create_pipeline() -> void
     throw std::runtime_error("Failed to get shader modules");
   }
 
+  VkSpecializationMapEntry specialization_entry{};
+  specialization_entry.constantID = 0;
+  specialization_entry.offset = 0;
+  specialization_entry.size = sizeof(uint32_t);
+
+#ifndef ASTUTE_PERFORMANCE
+  Core::u32 specialisation_data = sample_count;
+#else
+  Core::u32 specialisation_data = 1;
+#endif
+
+  VkSpecializationInfo specialisation_info{};
+  specialisation_info.mapEntryCount = 1;
+  specialisation_info.pMapEntries = &specialization_entry;
+  specialisation_info.dataSize = sizeof(specialisation_data);
+  specialisation_info.pData = &specialisation_data;
+
   std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages = {
     VkPipelineShaderStageCreateInfo{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
       .stage = VK_SHADER_STAGE_VERTEX_BIT,
       .module = maybe_vertex_stage.value(),
       .pName = "main",
+      .pSpecializationInfo = &specialisation_info,
     },
     VkPipelineShaderStageCreateInfo{
       .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
       .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
       .module = maybe_fragment_stage.value(),
       .pName = "main",
+      .pSpecializationInfo = &specialisation_info,
     },
   };
   pipeline_info.stageCount = static_cast<Core::u32>(shader_stages.size());
@@ -124,6 +152,16 @@ GraphicsPipeline::create_pipeline() -> void
     static_cast<Core::u32>(binding_descriptions.size());
   vertex_input_info.pVertexBindingDescriptions = binding_descriptions.data();
 
+  if ((override_instance_attributes.has_value() &&
+       override_instance_attributes->empty()) &&
+      (override_vertex_attributes.has_value() &&
+       override_vertex_attributes->empty())) {
+    vertex_input_info.vertexAttributeDescriptionCount = 0;
+    vertex_input_info.pVertexAttributeDescriptions = nullptr;
+    vertex_input_info.vertexBindingDescriptionCount = 0;
+    vertex_input_info.pVertexBindingDescriptions = nullptr;
+  }
+
   VkPipelineInputAssemblyStateCreateInfo input_assembly_info{};
   input_assembly_info.sType =
     VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -140,7 +178,13 @@ GraphicsPipeline::create_pipeline() -> void
   rasterization_info.lineWidth = 1.0f;
   rasterization_info.cullMode = cull_mode;
   rasterization_info.frontFace = face_mode;
-  rasterization_info.depthBiasEnable = VK_FALSE;
+  if (framebuffer && framebuffer->has_depth_attachment()) {
+    rasterization_info.depthBiasEnable =
+      framebuffer->get_depth_attachment()->configuration.format ==
+          VK_FORMAT_D32_SFLOAT
+        ? VK_FALSE
+        : VK_TRUE;
+  }
   rasterization_info.depthBiasConstantFactor = 0.0f;
   rasterization_info.depthBiasClamp = 0.0f;
   rasterization_info.depthBiasSlopeFactor = 0.0f;
@@ -150,7 +194,7 @@ GraphicsPipeline::create_pipeline() -> void
   multisample_info.sType =
     VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
   multisample_info.sampleShadingEnable =
-    sample_count == VK_SAMPLE_COUNT_1_BIT ? VK_TRUE : VK_FALSE;
+    sample_count != VK_SAMPLE_COUNT_1_BIT ? VK_TRUE : VK_FALSE;
   multisample_info.rasterizationSamples = sample_count;
 
   pipeline_info.pMultisampleState = &multisample_info;
@@ -160,16 +204,20 @@ GraphicsPipeline::create_pipeline() -> void
     VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
   depth_stencil_info.depthTestEnable = VK_TRUE;
   depth_stencil_info.depthWriteEnable = VK_TRUE;
-  depth_stencil_info.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+  depth_stencil_info.depthCompareOp = depth_comparator;
   depth_stencil_info.depthBoundsTestEnable = VK_FALSE;
   depth_stencil_info.stencilTestEnable = VK_FALSE;
+  depth_stencil_info.back.failOp = VK_STENCIL_OP_KEEP;
+  depth_stencil_info.back.passOp = VK_STENCIL_OP_KEEP;
+  depth_stencil_info.back.compareOp = VK_COMPARE_OP_ALWAYS;
+  depth_stencil_info.front = depth_stencil_info.back;
   pipeline_info.pDepthStencilState = &depth_stencil_info;
 
   VkPipelineColorBlendStateCreateInfo color_blend_info{};
   color_blend_info.sType =
     VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-  color_blend_info.logicOpEnable = VK_FALSE;
-  color_blend_info.logicOp = VK_LOGIC_OP_COPY;
+  color_blend_info.logicOpEnable = VK_TRUE;
+  color_blend_info.logicOp = VK_LOGIC_OP_AND;
 
   auto color_blend_states = framebuffer->construct_blend_states();
   color_blend_info.attachmentCount =
@@ -180,9 +228,10 @@ GraphicsPipeline::create_pipeline() -> void
   VkPipelineDynamicStateCreateInfo dynamic_state_info{};
   dynamic_state_info.sType =
     VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-  std::array<VkDynamicState, 2> dynamic_states = {
+  std::array<VkDynamicState, 3> dynamic_states = {
     VK_DYNAMIC_STATE_VIEWPORT,
     VK_DYNAMIC_STATE_SCISSOR,
+    VK_DYNAMIC_STATE_DEPTH_BIAS
   };
   dynamic_state_info.dynamicStateCount =
     static_cast<Core::u32>(dynamic_states.size());
@@ -213,8 +262,21 @@ GraphicsPipeline::create_layout() -> void
   layout_info.setLayoutCount =
     static_cast<Core::u32>(descriptor_set_layouts.size());
   layout_info.pSetLayouts = descriptor_set_layouts.data();
-  layout_info.pushConstantRangeCount = 0;
-  layout_info.pPushConstantRanges = nullptr;
+
+  const auto& pcs_from_shader =
+    shader->get_reflection_data().push_constant_ranges;
+  std::vector<VkPushConstantRange> vk_pc_range(pcs_from_shader.size());
+  for (Core::u32 i = 0; i < pcs_from_shader.size(); i++) {
+    const auto& pc_range = pcs_from_shader[i];
+    auto& vulkan_pc_range = vk_pc_range[i];
+
+    vulkan_pc_range.stageFlags = pc_range.shader_stage;
+    vulkan_pc_range.offset = pc_range.offset;
+    vulkan_pc_range.size = pc_range.size;
+  }
+  layout_info.pushConstantRangeCount =
+    static_cast<Core::u32>(vk_pc_range.size());
+  layout_info.pPushConstantRanges = vk_pc_range.data();
 
   VK_CHECK(vkCreatePipelineLayout(
     Device::the().device(), &layout_info, nullptr, &layout));

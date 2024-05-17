@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -37,7 +38,7 @@ struct BasicExtent
 
   BasicExtent() = default;
 
-  BasicExtent(T val)
+  explicit BasicExtent(T val)
     : width(val)
     , height(val)
   {
@@ -50,7 +51,8 @@ struct BasicExtent
   }
 
   // Constructor for integral types separate from T
-  template<typename U = T, typename = std::enable_if_t<std::is_integral_v<U>>>
+  template<typename U = T>
+    requires(std::is_integral_v<U> && !std::is_same_v<T, U>)
   BasicExtent(U w, U h)
     : width(static_cast<T>(w))
     , height(static_cast<T>(h))
@@ -71,6 +73,28 @@ struct BasicExtent
   {
     return static_cast<f32>(width) / static_cast<f32>(height);
   }
+
+  auto operator==(const BasicExtent& other) const -> bool
+  {
+    return width == other.width && height == other.height;
+  }
+
+  template<Number U>
+  auto operator==(const BasicExtent<U>& other) const -> bool
+  {
+    const auto casted = other.template as<T>();
+    return width == casted.width && height == casted.height;
+  }
+
+  auto operator*(std::floating_point auto scale) const -> Core::BasicExtent<T>
+  {
+    return {
+      static_cast<T>(scale * width),
+      static_cast<T>(scale * height),
+    };
+  }
+
+  auto valid() const { return width != T{ 0 } || height != T{ 0 }; }
 };
 
 using Extent = BasicExtent<u32>;
@@ -79,9 +103,7 @@ using FloatExtent = BasicExtent<f32>;
 namespace Detail {
 template<class T>
 concept Deleter = requires(T t, void* data) {
-  {
-    t.operator()(data)
-  } -> std::same_as<void>;
+  { t.operator()(data) } -> std::same_as<void>;
 };
 
 struct DefaultDelete
@@ -89,7 +111,12 @@ struct DefaultDelete
   template<class T>
   auto operator()(T* ptr) const noexcept -> void
   {
-    delete ptr;
+    if constexpr (requires(T* p) { p->destroy(); }) {
+      ptr->destroy();
+      delete ptr;
+    } else {
+      delete ptr;
+    }
   }
 };
 }
@@ -120,5 +147,28 @@ template<class T, typename... Args>
 
 template<class T>
 using Maybe = std::optional<T>;
+
+template<class T, Core::usize PadBytes>
+struct Padded
+{
+  T value;
+  std::array<Core::u8, PadBytes> padding{};
+  explicit(false) Padded(T v = T{})
+    : value(v)
+  {
+  }
+
+  auto operator=(T new_value) -> void { value = new_value; }
+
+  explicit(false) operator T() const { return value; }
+};
+
+using PaddedBool = Padded<bool, 3>;
+static_assert(sizeof(PaddedBool) == 4);
+static_assert(alignof(PaddedBool) == 1);
+
+using PaddedU32 = Padded<Core::u32, 12>;
+static_assert(sizeof(PaddedU32) == 16);
+static_assert(alignof(PaddedU32) == 4);
 
 } // namespace Core

@@ -3,7 +3,6 @@
 #include "graphics/RendererExtensions.hpp"
 
 #include "graphics/CommandBuffer.hpp"
-#include "graphics/Framebuffer.hpp"
 #include "graphics/GPUBuffer.hpp"
 #include "graphics/Image.hpp"
 
@@ -15,7 +14,8 @@ namespace Engine::Graphics::RendererExtensions {
 
 auto
 begin_renderpass(const CommandBuffer& command_buffer,
-                 const Framebuffer& framebuffer) -> void
+                 const IFramebuffer& framebuffer,
+                 const bool flip) -> void
 {
   VkRenderPassBeginInfo render_pass_begin_info = {};
   render_pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -35,11 +35,16 @@ begin_renderpass(const CommandBuffer& command_buffer,
 
   VkViewport viewport = {};
   viewport.x = 0.0F;
-  viewport.y = 0.0F;
+  viewport.y = static_cast<float>(height);
   viewport.width = static_cast<float>(width);
-  viewport.height = static_cast<float>(height);
-  viewport.minDepth = 0.0F;
-  viewport.maxDepth = 1.0F;
+  viewport.height = -static_cast<float>(height);
+  viewport.minDepth = 1.0F;
+  viewport.maxDepth = 0.0F;
+
+  if (!flip) {
+    viewport.y = 0.0F;
+    viewport.height = static_cast<float>(height);
+  }
 
   vkCmdSetViewport(command_buffer.get_command_buffer(), 0, 1, &viewport);
 
@@ -56,14 +61,16 @@ end_renderpass(const CommandBuffer& command_buffer) -> void
 
 auto
 explicitly_clear_framebuffer(const CommandBuffer& command_buffer,
-                             const Framebuffer& framebuffer) -> void
+                             const IFramebuffer& framebuffer,
+                             const bool clear_depth) -> void
 {
   const std::vector<VkClearValue>& fb_clear_values =
     framebuffer.get_clear_values();
 
   const auto color_attachment_count = framebuffer.get_colour_attachment_count();
   const auto total_attachment_count =
-    color_attachment_count + (framebuffer.has_depth_attachment() ? 1 : 0);
+    color_attachment_count +
+    (framebuffer.has_depth_attachment() && clear_depth ? 1 : 0);
 
   const VkExtent2D extent_2_d = framebuffer.get_extent();
   std::vector<VkClearAttachment> attachments(total_attachment_count);
@@ -82,7 +89,7 @@ explicitly_clear_framebuffer(const CommandBuffer& command_buffer,
     clear_rects[i].layerCount = 1;
   }
 
-  if (framebuffer.has_depth_attachment()) {
+  if (framebuffer.has_depth_attachment() && clear_depth) {
     auto aspect_bits = framebuffer.get_depth_attachment()->get_aspect_flags();
     attachments[color_attachment_count].aspectMask = aspect_bits;
     attachments[color_attachment_count].clearValue =
@@ -106,22 +113,28 @@ bind_vertex_buffer(const CommandBuffer& command,
                    BufferBinding binding,
                    BufferOffset offset) -> void
 {
-  std::array<VkDeviceSize, 1> offsets{ offset };
+  std::array<VkDeviceSize, 1> offsets{
+    offset,
+  };
   auto cmd_buffer = command.get_command_buffer();
 
-  std::array vk_buffers{ buffer.get_buffer() };
+  std::array vk_buffers{
+    buffer.get_buffer(),
+  };
 
-  vkCmdBindVertexBuffers(
-    cmd_buffer, binding, 1, vk_buffers.data(), offsets.data());
+  vkCmdBindVertexBuffers(cmd_buffer,
+                         binding,
+                         static_cast<Core::u32>(vk_buffers.size()),
+                         vk_buffers.data(),
+                         offsets.data());
 }
 
 auto
 bind_index_buffer(const CommandBuffer& command,
                   const IndexBuffer& buffer,
-                  BufferBinding binding,
+                  BufferBinding,
                   BufferOffset offset) -> void
 {
-  auto cmd_buffer = command.get_command_buffer();
   vkCmdBindIndexBuffer(command.get_command_buffer(),
                        buffer.get_buffer(),
                        offset,
