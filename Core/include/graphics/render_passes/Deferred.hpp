@@ -15,10 +15,10 @@ class DeferredRenderPass final : public RenderPass
 public:
   explicit DeferredRenderPass(Renderer&);
   ~DeferredRenderPass() override;
-  auto construct() -> void override;
   auto on_resize(const Core::Extent&) -> void override;
 
 protected:
+  auto construct_impl() -> void override;
   auto destruct_impl() -> void override;
   auto execute_impl(CommandBuffer&) -> void override;
 

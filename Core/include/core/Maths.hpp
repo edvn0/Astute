@@ -54,4 +54,66 @@ using Vec4 = Vector<Core::f32, 4>;
 using Vec3 = Vector<Core::f32, 3>;
 using Vec2 = Vector<Core::f32, 2>;
 
+template<Core::usize N>
+auto
+monotone_sequence() -> std::array<Core::u32, N>
+{
+  auto sequence = std::array<Core::u32, N>{};
+  for (auto i = 0; i < N; i++) {
+    sequence.at(i) = i;
+  }
+  return sequence;
+}
+
+namespace Detail {
+Core::f64 constexpr sqrt_third_order_approx(Core::f64 x,
+                                            Core::f64 curr,
+                                            Core::f64 prev,
+                                            std::uint32_t n)
+{
+  if (n > 10)
+    return curr;
+  if (curr == prev)
+    return curr;
+
+  Core::f64 a = 0.0;
+  Core::f64 b = 1.0;
+  Core::f64 c = -0.5;
+  Core::f64 d = 0.25;
+
+  Core::f64 new_approx = a + b * x + c * x * x + d * x * x * x;
+  return sqrt_third_order_approx(x, new_approx, curr, n + 1);
+}
+
+Core::f64 constexpr sqrt_newton_raphson(Core::f64 x,
+                                        Core::f64 curr,
+                                        Core::f64 prev)
+{
+  return curr == prev ? curr
+                      : sqrt_newton_raphson(x, 0.5 * (curr + x / curr), curr);
+}
+}
+
+/*
+ * Constexpr version of the square root
+ * Return value:
+ *   - For a finite and non-negative value of "x", returns an approximation for
+ *     the square root of "x"
+ *   - Otherwise, returns NaN
+ */
+Core::f64 constexpr sqrt(Core::f64 x)
+{
+  if (x < 0 || x >= std::numeric_limits<Core::f64>::infinity()) {
+    return std::numeric_limits<Core::f64>::quiet_NaN();
+  }
+
+  if (x < 1) {
+    // Use third-degree polynomial approximation for small x
+    return Detail::sqrt_third_order_approx(x, x, 0, 0);
+  } else {
+    // Use Newton-Raphson method for larger x
+    return Detail::sqrt_newton_raphson(x, x, 0);
+  }
+}
+
 } // namespace Engine::Core

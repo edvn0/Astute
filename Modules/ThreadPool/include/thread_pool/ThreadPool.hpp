@@ -40,6 +40,14 @@ public:
     return thread_pool.submit_task(std::forward<F>(f));
   }
 
+  template<typename Container, typename F>
+  auto enqueue_loop_split(Container& container, F&& f)
+  {
+    using IndexType = decltype(container.size());
+    return thread_pool.submit_loop(
+      IndexType{ 0 }, container.size(), std::forward<F>(f));
+  }
+
   template<typename F>
   auto enqueue_command_buffer_task(F&& f)
     -> std::future<

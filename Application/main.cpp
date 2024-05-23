@@ -7,7 +7,7 @@
 #ifdef ASTUTE_BASE_PATH
 static constexpr std::string_view base_path = ASTUTE_BASE_PATH;
 #else  // ASTUTE_BASE_PATH
-static constexpr std::string_view base_path = "C:\\D\\Dev\\AstuteEngine";
+static constexpr std::string_view base_path = "C:\\Dev\\Personal\\Astute";
 #endif // ASTUTE_BASE_PATH
 
 auto
@@ -33,6 +33,8 @@ main(int argc, char** argv) -> int
     "b", "breadth", "Window [b]readth (width)", 1600, &size.width);
   auto fullscreen_opt =
     parser.add<popl::Switch>("f", "fullscreen", "Begin in [f]ullscreen mode");
+  auto shadow_pass_opt = parser.add<popl::Value<u32>>(
+    "s", "shadow-pass", "[S]ize of the shadow", 1024);
 
   // Parse the command-line arguments
   try {
@@ -53,6 +55,10 @@ main(int argc, char** argv) -> int
     .headless = headless_opt->value_or(false),
     .size = size,
     .fullscreen = fullscreen_opt->value_or(false),
+    .renderer =
+      Application::RendererConfiguration{
+        .shadow_pass_size = shadow_pass_opt->value_or(1024),
+      },
   };
 
   std::filesystem::current_path(base_path);

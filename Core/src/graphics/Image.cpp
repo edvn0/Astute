@@ -282,40 +282,12 @@ copy_buffer_to_image(VkCommandBuffer buf,
 }
 
 auto
-create_view(VkImage& image,
-            VkFormat format,
-            VkImageAspectFlags aspect_mask,
-            Core::u32 mip_levels,
-            Core::u32 layer) -> VkImageView
-{
-  VkImageViewCreateInfo view_create_info{};
-  view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-  view_create_info.image = image;
-  view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-  view_create_info.format = format;
-  view_create_info.subresourceRange.aspectMask = aspect_mask;
-  view_create_info.subresourceRange.baseMipLevel = 0;
-  view_create_info.subresourceRange.levelCount = mip_levels;
-  view_create_info.subresourceRange.baseArrayLayer = 0;
-  view_create_info.subresourceRange.layerCount = layer;
-  view_create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-  view_create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-  view_create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-  view_create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-  VkImageView view;
-  VK_CHECK(vkCreateImageView(
-    Device::the().device(), &view_create_info, nullptr, &view));
-  return view;
-}
-
-auto
 create_sampler(VkFilter min_filter,
                VkFilter mag_filter,
                VkSamplerAddressMode u_address_mode,
                VkSamplerAddressMode v_address_mode,
                VkSamplerAddressMode w_address_mode,
-               VkBorderColor border_color,
+               VkBorderColor border_colour,
                Core::u32 mips) -> VkSampler
 {
   VkSamplerCreateInfo sampler_info{};
@@ -326,11 +298,14 @@ create_sampler(VkFilter min_filter,
   sampler_info.addressModeV = v_address_mode;
   sampler_info.addressModeW = w_address_mode;
   sampler_info.anisotropyEnable = VK_TRUE;
+  if (mips == 0) {
+    sampler_info.anisotropyEnable = VK_FALSE;
+  }
   sampler_info.maxAnisotropy = 16;
-  sampler_info.borderColor = border_color;
+  sampler_info.borderColor = border_colour;
   sampler_info.unnormalizedCoordinates = VK_FALSE;
   sampler_info.compareEnable = VK_TRUE;
-  sampler_info.compareOp = VK_COMPARE_OP_LESS;
+  sampler_info.compareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
   sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
   sampler_info.mipLodBias = 0.0F;
   sampler_info.minLod = 0.0F;
@@ -371,6 +346,12 @@ Image::destroy() -> void
 
   vkDestroyImageView(Device::the().device(), view, nullptr);
   vkDestroySampler(Device::the().device(), sampler, nullptr);
+
+  for (const auto& [index, layer_view] : layer_image_views) {
+    vkDestroyImageView(Device::the().device(), layer_view, nullptr);
+  }
+  layer_image_views.clear();
+
   Allocator allocator{ "destroy_image" };
   allocator.deallocate_image(alloc_impl->allocation, image);
   alloc_impl.reset(new ImageImpl);
@@ -416,7 +397,9 @@ Image::load_from_file_into_staging(const std::string_view path,
   auto* pixel_data = stbi_load(
     whole_path.string().c_str(), &width, &height, &channels, STBI_rgb_alpha);
 
-  Core::DataBuffer data_buffer{ width * height * STBI_rgb_alpha };
+  Core::DataBuffer data_buffer{
+    width * height * STBI_rgb_alpha,
+  };
   data_buffer.write(std::span{
     pixel_data, static_cast<Core::usize>(width * height * STBI_rgb_alpha) });
   trace("Loaded image from file '{}', size: {}",
@@ -640,15 +623,15 @@ Image::resolve_msaa(const Image&, const CommandBuffer*) -> Core::Scope<Image>
 }
 
 auto
-Image::reference_resolve_msaa(const Image&, const CommandBuffer*)
-  -> Core::Ref<Image>
+Image::reference_resolve_msaa(const Image&,
+                              const CommandBuffer*) -> Core::Ref<Image>
 {
   return nullptr;
 }
 
 auto
-Image::copy_image(const Image& source, const CommandBuffer& command_buffer)
-  -> Core::Ref<Image>
+Image::copy_image(const Image& source,
+                  const CommandBuffer& command_buffer) -> Core::Ref<Image>
 {
   auto image = Image::construct(source.configuration);
 
@@ -746,11 +729,19 @@ Image::create_specific_layer_image_views(
   const std::span<const Core::u32> indices) -> void
 {
   for (unsigned int index : indices) {
-    layer_image_views[index] = create_view(image,
-                                           configuration.format,
-                                           aspect_mask,
-                                           configuration.mip_levels,
-                                           index);
+    auto& view_to_be_created = layer_image_views[index];
+    VkImageViewCreateInfo view_create_info{};
+    view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view_create_info.image = image;
+    view_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view_create_info.format = configuration.format;
+    view_create_info.subresourceRange.aspectMask = aspect_mask;
+    view_create_info.subresourceRange.levelCount = configuration.mip_levels;
+    view_create_info.subresourceRange.baseArrayLayer = index;
+    view_create_info.subresourceRange.layerCount = 1;
+
+    VK_CHECK(vkCreateImageView(
+      Device::the().device(), &view_create_info, nullptr, &view_to_be_created));
   }
 }
 
@@ -761,18 +752,28 @@ Image::invalidate() -> void
 
   create_image(
     configuration, image, alloc_impl->allocation, alloc_impl->allocation_info);
-  view = create_view(image,
-                     configuration.format,
-                     aspect_mask,
-                     configuration.mip_levels,
-                     configuration.layers);
-  sampler = create_sampler(configuration.min_filter,
-                           configuration.mag_filter,
-                           configuration.address_mode_u,
-                           configuration.address_mode_v,
-                           configuration.address_mode_w,
-                           configuration.border_colour,
-                           configuration.mip_levels);
+
+  VkImageViewCreateInfo view_create_info{};
+  view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+  view_create_info.image = image;
+  view_create_info.viewType = configuration.layers > 1
+                                ? VK_IMAGE_VIEW_TYPE_2D_ARRAY
+                                : VK_IMAGE_VIEW_TYPE_2D;
+  view_create_info.format = configuration.format;
+  view_create_info.subresourceRange.aspectMask = aspect_mask;
+  view_create_info.subresourceRange.levelCount = configuration.mip_levels;
+  view_create_info.subresourceRange.layerCount = configuration.layers;
+  VK_CHECK(vkCreateImageView(
+    Device::the().device(), &view_create_info, nullptr, &view));
+
+  sampler =
+    create_sampler(configuration.min_filter,
+                   configuration.mag_filter,
+                   configuration.address_mode_u,
+                   configuration.address_mode_v,
+                   configuration.address_mode_w,
+                   configuration.border_colour,
+                   configuration.mip_levels > 1 ? configuration.mip_levels : 0);
 
   descriptor_info.imageLayout = configuration.layout;
   descriptor_info.imageView = view;
@@ -937,7 +938,7 @@ Image::invalidate_hash() -> void
 }
 
 auto
-Image::write_to_file(const std::string_view path) -> bool
+Image::write_to_file(const std::string_view path) const -> bool
 {
   std::filesystem::path file_path{ path };
   // Check parent directory exists
@@ -1003,7 +1004,8 @@ Image::write_to_file(const std::string_view path) -> bool
     vkCmdCopyImageToBuffer(
       cmd_buffer, image, VK_IMAGE_LAYOUT_GENERAL, staging_buffer, 1, &region);
 
-    auto* mapped = static_cast<Core::u8*>(staging_allocation_info.pMappedData);
+    const auto* mapped =
+      static_cast<Core::u8*>(staging_allocation_info.pMappedData);
     data_buffer.write(mapped, width * height * 4);
 
     transition_image_layout(cmd_buffer,

@@ -87,4 +87,10 @@ layout(std140, set = 0, binding = 6) uniform ScreenDataUBO
 }
 screen_data;
 
+layout(std140, set = 0, binding = 7) uniform DirectionalShadowProjectionUBO
+{
+  mat4 view_projections[4];
+}
+directional_shadow_projections;
+
 #endif

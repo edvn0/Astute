@@ -13,15 +13,27 @@ public:
   {
   }
   ~ShadowRenderPass() override = default;
-  auto construct() -> void override;
   auto on_resize(const Core::Extent&) -> void override;
+  auto get_extraneous_framebuffer(Core::u32 index)
+    -> Core::Scope<IFramebuffer>& override
+  {
+    auto& found = other_framebuffers.at(index);
+    return found;
+  }
 
 protected:
+  auto construct_impl() -> void override;
   auto destruct_impl() -> void override {}
   auto execute_impl(CommandBuffer&) -> void override;
+  auto bind(CommandBuffer&) -> void override {}
+  auto unbind(CommandBuffer&) -> void override {}
 
 private:
   Core::u32 size{ 0 };
+
+  Core::Ref<Image> cascaded_shadow_map;
+  std::vector<Core::Scope<IFramebuffer>> other_framebuffers;
+  std::vector<Core::Scope<IPipeline>> other_pipelines;
 };
 
 } // namespace Engine::Graphics

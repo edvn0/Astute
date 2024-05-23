@@ -100,4 +100,10 @@ struct ScreenDataUBO
   static constexpr std::string_view name = "ScreenDataUBO";
 };
 
+struct DirectionalShadowProjectionUBO
+{
+  std::array<glm::mat4, 4> view_projections;
+  static constexpr std::string_view name = "DirectionalShadowProjectionUBO";
+};
+
 } // namespace Engine::Graphics

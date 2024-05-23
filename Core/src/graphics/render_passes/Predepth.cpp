@@ -15,8 +15,10 @@
 namespace Engine::Graphics {
 
 auto
-PredepthRenderPass::construct() -> void
+PredepthRenderPass::construct_impl() -> void
 {
+  ASTUTE_PROFILE_FUNCTION();
+
   const auto& ext = get_renderer().get_size();
   auto&& [predepth_framebuffer,
           predepth_shader,
@@ -51,6 +53,7 @@ PredepthRenderPass::construct() -> void
 auto
 PredepthRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 {
+  ASTUTE_PROFILE_FUNCTION();
   const auto& [predepth_framebuffer,
                predepth_shader,
                predepth_pipeline,
@@ -80,6 +83,7 @@ PredepthRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                     depth_bias_slope);
 
   for (const auto& [key, command] : get_renderer().draw_commands) {
+    ASTUTE_PROFILE_SCOPE("Predepth Draw Command");
     const auto& [mesh, submesh_index, instance_count] = command;
 
     const auto& mesh_asset = mesh->get_mesh_asset();

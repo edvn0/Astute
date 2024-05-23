@@ -36,10 +36,10 @@ namespace Engine::Graphics {
 static constexpr auto update_lights = []<class Light>(Light& light_ubo,
                                                       auto& env_lights) {
   auto i = 0ULL;
-  auto& [count, lights] = light_ubo.get_data();
-  count = static_cast<Core::i32>(env_lights.size());
+  auto& [ubo_count, ubo_lights] = light_ubo.get_data();
+  ubo_count = static_cast<Core::i32>(env_lights.size());
   for (const auto& light : env_lights) {
-    lights.at(i) = light;
+    ubo_lights.at(i) = light;
     i++;
   }
   light_ubo.update();
@@ -49,7 +49,7 @@ auto
 Renderer::generate_and_update_descriptor_write_sets(Material& material)
   -> VkDescriptorSet
 {
-  static std::array<IShaderBindable*, 7> structure_identifiers = {
+  static std::array<IShaderBindable*, 8> structure_identifiers = {
     &renderer_ubo,
     &shadow_ubo,
     &point_light_ubo,
@@ -57,6 +57,7 @@ Renderer::generate_and_update_descriptor_write_sets(Material& material)
     &visible_point_lights_ssbo,
     &visible_spot_lights_ssbo,
     &screen_data_ubo,
+    &directional_shadow_projections_ubo
   };
   const auto& shader = material.get_shader();
 
@@ -234,8 +235,8 @@ Renderer::destruct() -> void
 }
 
 auto
-Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
-  -> void
+Renderer::begin_scene(Core::Scene& scene,
+                      const SceneRendererCamera& camera) -> void
 {
   if (old_size != size) {
     Device::the().wait();
@@ -318,6 +319,150 @@ Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
   static auto begin = Core::Clock::now();
   screen_data.time = static_cast<Core::f32>(Core::Clock::now() - begin);
   screen_data_ubo.update();
+
+  compute_directional_shadow_projections(camera, glm::vec3(light_dir));
+}
+
+auto
+Renderer::compute_directional_shadow_projections(
+  const SceneRendererCamera& camera,
+  const glm::vec3& light_direction) -> void
+{
+  struct CascadeData
+  {
+    glm::mat4 view_projection;
+    glm::mat4 view;
+    Core::f32 split_depth;
+  };
+  std::array<CascadeData, 4> cascades{};
+
+  auto view_projection =
+    camera.camera.get_unreversed_projection_matrix() * camera.view_matrix;
+  view_projection[1][1] *= -1.0f;
+
+  static constexpr auto shadow_map_cascade_count = 4;
+  static constexpr auto cascade_split_lambda = 0.95f;
+  static constexpr auto CascadeFarPlaneOffset = 5.0f;
+  static constexpr auto CascadeNearPlaneOffset = -5.0f;
+
+  std::array<float, shadow_map_cascade_count> shadow_cascade_splits;
+
+  float near_clip = camera.near;
+  float far_clip = camera.far;
+  float clip_range = far_clip - near_clip;
+
+  float min_z = near_clip;
+  float max_z = near_clip + clip_range;
+
+  float range = max_z - min_z;
+  float ratio = max_z / min_z;
+
+  // Calculate split depths based on view camera frustum
+  // Based on method presented in
+  // https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch10.html
+  for (uint32_t i = 0; i < shadow_map_cascade_count; i++) {
+    float p = (static_cast<float>(i) + 1) /
+              static_cast<float>(shadow_map_cascade_count);
+    float log = min_z * std::pow(ratio, p);
+    float uniform = min_z + range * p;
+    float d = std::lerp(log, uniform, cascade_split_lambda);
+    shadow_cascade_splits[i] = (d - near_clip) / clip_range;
+  }
+
+  shadow_cascade_splits[3] = 0.3f;
+
+  // Manually set cascades here
+  // shadow_cascade_splits[0] = 0.05f;
+  // shadow_cascade_splits[1] = 0.15f;
+  // shadow_cascade_splits[2] = 0.3f;
+  // shadow_cascade_splits[3] = 1.0f;
+
+  // Calculate orthographic projection matrix for each cascade
+  float last_split_distance = 0.0;
+  for (uint32_t k = 0; k < shadow_map_cascade_count; k++) {
+    float splitDist = shadow_cascade_splits[k];
+
+    std::array frustum_corners = {
+      glm::vec3(-1.0f, 1.0f, -1.0f), glm::vec3(1.0f, 1.0f, -1.0f),
+      glm::vec3(1.0f, -1.0f, -1.0f), glm::vec3(-1.0f, -1.0f, -1.0f),
+      glm::vec3(-1.0f, 1.0f, 1.0f),  glm::vec3(1.0f, 1.0f, 1.0f),
+      glm::vec3(1.0f, -1.0f, 1.0f),  glm::vec3(-1.0f, -1.0f, 1.0f),
+    };
+
+    // Project frustum corners into world space
+    glm::mat4 inverse_camera = glm::inverse(view_projection);
+    for (auto& frustum_corner : frustum_corners) {
+      glm::vec4 invCorner = inverse_camera * glm::vec4(frustum_corner, 1.0f);
+      frustum_corner = invCorner / invCorner.w;
+    }
+
+    for (uint32_t i = 0; i < 4; i++) {
+      glm::vec3 dist = frustum_corners[i + 4] - frustum_corners[i];
+      frustum_corners[i + 4] = frustum_corners[i] + (dist * splitDist);
+      frustum_corners[i] = frustum_corners[i] + (dist * last_split_distance);
+    }
+
+    // Get frustum center
+    glm::vec3 frustum_center(0.0f);
+    for (const auto& corner : frustum_corners)
+      frustum_center += corner;
+
+    frustum_center /= 8.0f;
+
+    // frustum_center *= 0.01f;
+
+    float radius = 0.0f;
+    for (const auto& corner : frustum_corners) {
+      float distance = glm::length(corner - frustum_center);
+      radius = glm::max(radius, distance);
+    }
+    radius = std::ceil(radius * 16.0f) / 16.0f;
+
+    glm::vec3 max_extents(radius);
+    glm::vec3 min_extents = -max_extents;
+
+    glm::vec3 light_dir = light_direction;
+    glm::mat4 light_view_matrix =
+      glm::lookAt(frustum_center - light_dir * -min_extents.z,
+                  frustum_center,
+                  glm::vec3(0.0f, 0.0f, 1.0f));
+    glm::mat4 light_ortho_matrix =
+      glm::ortho(min_extents.x,
+                 max_extents.x,
+                 min_extents.y,
+                 max_extents.y,
+                 0.0f + CascadeNearPlaneOffset,
+                 max_extents.z - min_extents.z + CascadeFarPlaneOffset);
+
+    // Offset to texel space to avoid shimmering (from
+    // https://stackoverflow.com/questions/33499053/cascaded-shadow-map-shimmering)
+    glm::mat4 shadowMatrix = light_ortho_matrix * light_view_matrix;
+    float ShadowMapResolution = 4096.0F;
+    glm::vec4 shadowOrigin =
+      (shadowMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)) * ShadowMapResolution /
+      2.0f;
+    glm::vec4 rounded_origin = glm::round(shadowOrigin);
+    glm::vec4 round_offset = rounded_origin - shadowOrigin;
+    round_offset = round_offset * 2.0f / ShadowMapResolution;
+    round_offset.z = 0.0f;
+    round_offset.w = 0.0f;
+
+    light_ortho_matrix[3] += round_offset;
+
+    // Store split distance and matrix in cascade
+    cascades[k].split_depth = (near_clip + splitDist * clip_range) * -1.0f;
+    cascades[k].view_projection = light_ortho_matrix * light_view_matrix;
+    cascades[k].view = light_view_matrix;
+
+    last_split_distance = shadow_cascade_splits[k];
+  }
+
+  auto& [view_projections] = directional_shadow_projections_ubo.get_data();
+  for (int i = 0; i < 4; i++) {
+    cascade_splits[i] = cascades[i].split_depth;
+    view_projections[i] = cascades[i].view_projection;
+  }
+  directional_shadow_projections_ubo.update();
 }
 
 auto
@@ -452,13 +597,17 @@ Renderer::flush_draw_lists() -> void
   vb->write(std::span{ output });
 
   command_buffer->begin();
-  compute_command_buffer->begin();
 
   // Shadow pass
   render_passes.at("Shadow")->execute(*command_buffer);
   // Prepdepth pass
   render_passes.at("Predepth")->execute(*command_buffer);
-  // render_passes.at("LightCulling")->execute(*compute_command_buffer, true);
+  {
+    compute_command_buffer->begin();
+    render_passes.at("LightCulling")->execute(*compute_command_buffer);
+    compute_command_buffer->end();
+    compute_command_buffer->submit();
+  }
   if (technique == RendererTechnique::Deferred) {
     // Geometry pass
     render_passes.at("MainGeometry")->execute(*command_buffer);
@@ -472,8 +621,6 @@ Renderer::flush_draw_lists() -> void
     render_passes.at("Composite")->execute(*command_buffer);
   }
 
-  compute_command_buffer->end();
-  compute_command_buffer->submit();
   command_buffer->end();
   command_buffer->submit();
 
@@ -481,6 +628,19 @@ Renderer::flush_draw_lists() -> void
   shadow_draw_commands.clear();
   lights_draw_commands.clear();
   mesh_transform_map.clear();
+}
+
+auto
+Renderer::screenshot() -> void
+{
+  static auto index = 0ULL;
+  Device::the().wait();
+  auto image = get_final_output();
+  if (image->write_to_file(std::format("screenshot-{}.png", index))) {
+    info("Screenshot saved to screenshot.png");
+  } else {
+    error("Failed to save screenshot to screenshot.png");
+  }
 }
 
 } // namespace Engine::Graphics

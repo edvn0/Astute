@@ -20,6 +20,7 @@ add_library(Core STATIC
     include/core/Scene.hpp
     include/core/Types.hpp
     include/core/Verify.hpp
+    include/core/Profiler.hpp
     include/graphics/Allocator.hpp
     include/graphics/CommandBuffer.hpp
     include/graphics/DescriptorResource.hpp
@@ -59,6 +60,7 @@ add_library(Core STATIC
     src/core/Input.cpp
     src/core/Random.cpp
     src/core/Scene.cpp
+    src/core/Profiler.cpp
     src/graphics/Allocator.cpp
     src/graphics/CommandBuffer.cpp
     src/graphics/DescriptorResource.cpp
@@ -104,10 +106,6 @@ target_include_directories(Core SYSTEM PRIVATE
 target_link_libraries(Core PUBLIC ThreadPool glfw Vulkan::Vulkan PRIVATE VulkanMemoryAllocator imgui glm EnTT::EnTT stbimage::stbimage assimp FastNoise2 ShaderCompilation Logging Platform)
 target_precompile_headers(Core PRIVATE include/pch/CorePCH.hpp)
 target_compile_definitions(Core PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)
-
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    target_compile_definitions(Core PRIVATE ASTUTE_DEBUG)
-endif()
 
 if("Clang" IN_LIST CMAKE_CXX_COMPILER_ID)
     target_compile_options(Core PRIVATE -Wno-unused-local-typedef)

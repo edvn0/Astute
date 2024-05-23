@@ -229,6 +229,10 @@ public:
   }
 
   [[nodiscard]] auto size() const noexcept -> usize { return buffer_size; }
+  [[nodiscard]] auto size_u32() const noexcept -> Core::u32
+  {
+    return static_cast<Core::u32>(buffer_size);
+  }
   [[nodiscard]] auto hash() const noexcept -> usize
   {
     return std::hash<usize>{}(buffer_size) ^

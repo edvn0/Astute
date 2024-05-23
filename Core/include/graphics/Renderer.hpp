@@ -153,6 +153,7 @@ public:
   }
 
   auto set_technique(RendererTechnique tech) -> void { technique = tech; }
+  auto screenshot() -> void;
 
   static auto get_thread_pool() -> ED::ThreadPool& { return *thread_pool; }
 
@@ -183,7 +184,13 @@ private:
     visible_spot_lights_ssbo{};
   UniformBufferObject<ScreenDataUBO> screen_data_ubo{};
 
+  auto compute_directional_shadow_projections(const SceneRendererCamera&,
+                                              const glm::vec3&) -> void;
+  UniformBufferObject<DirectionalShadowProjectionUBO>
+    directional_shadow_projections_ubo{};
+
   glm::uvec3 light_culling_work_groups{};
+  glm::vec4 cascade_splits {};
 
   struct DrawCommand
   {

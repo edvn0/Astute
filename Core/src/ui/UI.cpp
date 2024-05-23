@@ -150,9 +150,17 @@ auto
 image(const Graphics::Image& image,
       const Core::FloatExtent& extent,
       const Core::Vec4& colour,
-      bool flipped) -> void
+      bool flipped,
+      Core::u32 array_index) -> void
 {
-  const auto& [sampler, view, layout] = image.get_descriptor_info();
+  VkImageView view{ nullptr };
+  const auto& [sampler, v, layout] = image.get_descriptor_info();
+  if (image.get_layer_count() > 1) {
+    view = image.get_layer_image_view(array_index);
+  } else {
+    view = v;
+  }
+
   auto set = add_image(sampler, view, layout);
   auto made = make_id(set, sampler, view, layout, image.hash());
   ImGui::PushID(made.c_str());

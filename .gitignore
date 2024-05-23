@@ -3,6 +3,9 @@
 
 test_output
 vs2022
+html
+latex
+doxygen-output
 
 vscode-build
 build

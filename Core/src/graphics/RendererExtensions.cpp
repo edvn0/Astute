@@ -3,7 +3,9 @@
 #include "graphics/RendererExtensions.hpp"
 
 #include "graphics/CommandBuffer.hpp"
+#include "graphics/ComputePipeline.hpp"
 #include "graphics/GPUBuffer.hpp"
+#include "graphics/GraphicsPipeline.hpp"
 #include "graphics/Image.hpp"
 
 #include <array>
@@ -57,6 +59,15 @@ auto
 end_renderpass(const CommandBuffer& command_buffer) -> void
 {
   vkCmdEndRenderPass(command_buffer.get_command_buffer());
+}
+
+auto
+bind_pipeline(const CommandBuffer& command_buffer,
+              const IPipeline& pipeline) -> void
+{
+  vkCmdBindPipeline(command_buffer.get_command_buffer(),
+                    pipeline.get_bind_point(),
+                    pipeline.get_pipeline());
 }
 
 auto

@@ -15,6 +15,7 @@ struct InterfaceImageProperties
   Core::BasicExtent<T> extent{ T{ 64 }, T{ 64 } };
   Core::Vec4 colour{ 1.0, 1.0, 1.0, 1.0 };
   bool flipped{ false };
+  std::optional<Core::u32> image_array_index{};
 };
 
 namespace Impl {
@@ -34,7 +35,8 @@ auto
 image(const Graphics::Image& image,
       const Core::FloatExtent& extent,
       const Core::Vec4& colour,
-      bool flipped) -> void;
+      bool flipped,
+      Core::u32 array_index) -> void;
 
 }
 
@@ -96,16 +98,21 @@ scope(const std::string_view name, auto&& func)
 
 template<class T>
 auto
-image(const Graphics::Image& image, InterfaceImageProperties<T> properties = {})
-  -> void
+image(const Graphics::Image& image,
+      InterfaceImageProperties<T> properties = {}) -> void
 {
+  const auto array_index_or_zero = properties.image_array_index.value_or(0);
   if constexpr (std::is_same_v<T, Core::f32>) {
-    return Impl::image(
-      image, properties.extent, properties.colour, properties.flipped);
+    return Impl::image(image,
+                       properties.extent,
+                       properties.colour,
+                       properties.flipped,
+                       array_index_or_zero);
   } else {
 
     auto ext = properties.extent.template as<Core::f32>();
-    return Impl::image(image, ext, properties.colour, properties.flipped);
+    return Impl::image(
+      image, ext, properties.colour, properties.flipped, array_index_or_zero);
   }
 }
 

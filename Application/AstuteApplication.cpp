@@ -78,6 +78,8 @@ AstuteApplication::render() -> void
   }
 }
 
+static u32 chosen_image{ 0 };
+
 auto
 AstuteApplication::interface() -> void
 {
@@ -96,7 +98,7 @@ AstuteApplication::interface() -> void
     UI::image<f32>(*renderer->get_shadow_output_image(),
                    {
                      .extent = { w, h },
-                     .flipped = true,
+                     .image_array_index = chosen_image,
                    });
   });
 
@@ -109,25 +111,19 @@ AstuteApplication::interface() -> void
     UI::coloured_text({ 0.1F, 0.9F, 0.6F, 1.0F }, "Current chosen: {}", label);
     ImGui::Checkbox(inverse_label.c_str(), &light_environment.is_perspective);
     if (!light_environment.is_perspective) {
-      static f32 left{ -10.0F };
-      static f32 right{ 10.0F };
-      static f32 bottom{ -10.0F };
-      static f32 top{ 10.0F };
-      static f32 near{ 3.0F };
-      static f32 far{ 90.0F };
-      ImGui::InputFloat("Left", &left);
-      ImGui::InputFloat("Right", &right);
-      ImGui::InputFloat("Bottom", &bottom);
-      ImGui::InputFloat("Top", &top);
+      static f32 scale{ 15.0F };
+      static f32 near{ 80.0F };
+      static f32 far{ 128.0F };
+      ImGui::InputFloat("Scale", &scale);
       ImGui::InputFloat("Near", &near);
       ImGui::InputFloat("Far", &far);
-      auto projection = glm::ortho(left, right, bottom, top, near, far);
+      auto projection = glm::ortho(-scale, scale, -scale, scale, near, far);
       light_environment.shadow_projection = projection;
     } else {
-      static f32 fov{ 45.0F };
-      static f32 aspect{ 1.0F };
+      static f32 fov{ 75.0F };
+      static f32 aspect{ 1.778F };
       static f32 near{ 0.1F };
-      static f32 far{ 100.0F };
+      static f32 far{ 90.0F };
       ImGui::InputFloat("FOV", &fov);
       ImGui::InputFloat("Aspect", &aspect);
       ImGui::InputFloat("Near", &near);
@@ -166,10 +162,24 @@ AstuteApplication::handle_events(Event& event) -> void
 {
   EventDispatcher dispatcher{ event };
   dispatcher.dispatch<KeyPressedEvent>([this](KeyPressedEvent& ev) {
-    if (ev.get_keycode() == KeyCode::KEY_ESCAPE) {
+    const auto keycode = ev.get_keycode();
+    if (keycode == KeyCode::KEY_ESCAPE) {
       get_window().close();
       return true;
     }
+
+    // screenshot
+    if (keycode == KeyCode::KEY_F12 || keycode == KeyCode::KEY_PRINT_SCREEN) {
+      renderer->screenshot();
+      return true;
+    }
+
+    if (keycode == KeyCode::KEY_9) {
+      chosen_image = chosen_image + 1;
+      chosen_image = chosen_image % 4;
+      return true;
+    }
+
     return false;
   });
 

@@ -8,21 +8,30 @@
 
 namespace Engine::Graphics {
 
+RenderPass::RenderPass(Renderer& input)
+  : renderer(input)
+{
+}
+
 auto
-RenderPass::execute(CommandBuffer& command_buffer, bool is_compute) -> void
+RenderPass::construct() -> void
+{
+  construct_impl();
+
+  is_compute = std::get<Core::Scope<IPipeline>>(pass)->get_bind_point() ==
+               VK_PIPELINE_BIND_POINT_COMPUTE;
+}
+
+auto
+RenderPass::execute(CommandBuffer& command_buffer) -> void
 {
 #ifdef ASTUTE_DEBUG
   if (!is_valid()) {
     return;
   }
 #endif
-
   bind(command_buffer);
-  if (is_compute) {
-    execute_compute_impl(command_buffer);
-  } else {
-    execute_impl(command_buffer);
-  }
+  execute_impl(command_buffer);
   unbind(command_buffer);
 }
 
@@ -43,7 +52,7 @@ auto
 RenderPass::bind(CommandBuffer& command_buffer) -> void
 {
   const auto& pipeline = std::get<Core::Scope<IPipeline>>(pass);
-  if (pipeline->get_bind_point() == VK_PIPELINE_BIND_POINT_GRAPHICS) {
+  if (!is_compute) {
     RendererExtensions::begin_renderpass(command_buffer, *get_framebuffer());
   }
 
@@ -55,8 +64,7 @@ RenderPass::bind(CommandBuffer& command_buffer) -> void
 auto
 RenderPass::unbind(CommandBuffer& command_buffer) -> void
 {
-  const auto& pipeline = std::get<Core::Scope<IPipeline>>(pass);
-  if (pipeline->get_bind_point() == VK_PIPELINE_BIND_POINT_GRAPHICS) {
+  if (!is_compute) {
     RendererExtensions::end_renderpass(command_buffer);
   }
 }
@@ -69,8 +77,9 @@ RenderPass::generate_and_update_descriptor_write_sets(Material& material)
 }
 
 auto
-RenderPass::blit_to(const CommandBuffer&, const Framebuffer&, BlitProperties)
-  -> void
+RenderPass::blit_to(const CommandBuffer&,
+                    const Framebuffer&,
+                    BlitProperties) -> void
 {
 }
 

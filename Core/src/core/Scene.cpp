@@ -1,5 +1,6 @@
 #include "pch/CorePCH.hpp"
 
+#include "core/Maths.hpp"
 #include "core/Random.hpp"
 #include "core/Scene.hpp"
 #include "graphics/Device.hpp"
@@ -9,9 +10,71 @@
 
 #include "graphics/Renderer.hpp"
 
+#include <limits>
 #include <ranges>
 
 namespace Engine::Core {
+
+static constexpr auto sun_radius = sqrt(30 * 30 + 70 * 70 + 30 * 30);
+
+template<typename Component, typename Light>
+void
+map(const glm::vec3& position,
+    const Component& component,
+    Light& light) = delete;
+
+template<>
+void
+map(const glm::vec3& position,
+    const PointLightComponent& component,
+    Graphics::PointLight& light)
+{
+  light.pos = position;
+  light.radiance = component.radiance;
+  light.intensity = component.intensity;
+  light.light_size = component.light_size;
+  light.min_radius = component.min_radius;
+  light.radius = component.radius;
+  light.falloff = component.falloff;
+}
+
+template<>
+void
+map(const glm::vec3& position,
+    const SpotLightComponent& component,
+    Graphics::SpotLight& light)
+{
+  light.pos = position;
+  light.radiance = component.radiance;
+  light.intensity = component.intensity;
+  light.range = component.range;
+  light.angle = component.angle;
+  light.angle_attenuation = component.angle_attenuation;
+  light.casts_shadows = component.casts_shadows;
+  light.soft_shadows = component.soft_shadows;
+  light.falloff = component.falloff;
+}
+
+template<typename Component, typename Light, typename Container>
+void
+update_lights(entt::registry& registry,
+              Container& lights,
+              std::size_t& prev_count)
+{
+  auto count = 0U;
+  lights.reserve(prev_count + 1);
+
+  for (auto&& [entity, transform, light_component] :
+       registry.view<TransformComponent, Component>().each()) {
+    auto& light = lights.emplace_back();
+    map(transform.translation, light_component, light);
+    count++;
+  }
+
+  if (count != prev_count) {
+    prev_count = count;
+  }
+}
 
 Scene::Scene(const std::string_view name_view)
   : name(name_view)
@@ -34,7 +97,7 @@ Scene::Scene(const std::string_view name_view)
 
   const auto& bounds = sponza_mesh->get_mesh_asset()->get_bounding_box();
   const auto scaled = bounds.scaled(0.01);
-  for (auto i = 0; i < 300; i++) {
+  for (auto i = 0; i < 127; i++) {
     auto light = registry.create();
     registry.emplace<MeshComponent>(light, cube_mesh);
     auto& t = registry.emplace<TransformComponent>(light);
@@ -47,10 +110,10 @@ Scene::Scene(const std::string_view name_view)
     light_data.light_size = Random::random<Core::f32>(0.1, 1.0);
     light_data.min_radius = Random::random<Core::f32>(1.0, 20.0);
     light_data.radius = Random::random<Core::f32>(0.1, 30.0);
-    light_data.falloff = Random::random<Core::f32>(0.1, 0.5);
+    light_data.falloff = Random::random<Core::f32>(0.1, 10.0);
   }
 
-  for (auto i = 0; i < 300; i++) {
+  for (auto i = 0; i < 127; i++) {
     auto light = registry.create();
     auto& t = registry.emplace<TransformComponent>(light);
     registry.emplace<MeshComponent>(light, cube_mesh);
@@ -63,15 +126,25 @@ Scene::Scene(const std::string_view name_view)
     light_data.angle = Random::random<Core::f32>(30.0, 90.0);
     light_data.range = Random::random<Core::f32>(0.1, 1.0);
     light_data.angle_attenuation = Random::random<Core::f32>(1.0, 5.0);
-    light_data.intensity = Random::random<Core::f32>(0.5, 1.0);
+    light_data.intensity = Random::random<Core::f32>(0.5, 10.0);
   }
-
   light_environment.sun_position = { -30.0, -70.0, 30.0, 1.0 };
 }
 
 auto
-Scene::on_update_editor(f64) -> void
+Scene::on_update_editor(f64 ts) -> void
 {
+  static f64 time = 0.0f;
+  time += ts;
+
+  // Update sun position to orbit around the origin
+  light_environment.sun_position = glm::vec4{
+    sun_radius * glm::cos(time * 0.1F),
+    -70.0F,
+    sun_radius * glm::sin(time * 0.1F),
+    1.0F,
+  };
+
   if (!scene_tasks.empty()) {
     auto& task = scene_tasks.front();
     if (task.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
@@ -83,60 +156,17 @@ Scene::on_update_editor(f64) -> void
   light_environment.spot_lights.clear();
   light_environment.point_lights.clear();
 
-  [&]() {
-    static auto prev_count = 15U;
-    auto count = 0U;
-
-    light_environment.point_lights.reserve(prev_count + 1);
-
-    for (auto&& [entity, transform, point_light] :
-         registry.view<TransformComponent, PointLightComponent>().each()) {
-      auto& light = light_environment.point_lights.emplace_back();
-      light.pos = transform.translation;
-      light.casts_shadows = point_light.casts_shadows;
-      light.falloff = point_light.falloff;
-      light.intensity = point_light.intensity;
-      light.light_size = point_light.light_size;
-      light.min_radius = point_light.min_radius;
-      light.radiance = point_light.radiance;
-      light.radius = point_light.radius;
-      count++;
-    }
-
-    if (count != prev_count) {
-      prev_count = count;
-    }
-  }();
-
-  [&]() {
-    static auto prev_count = 15U;
-    auto count = 0U;
-    light_environment.spot_lights.reserve(prev_count + 1);
-
-    for (auto&& [entity, transform, spot_light] :
-         registry.view<TransformComponent, SpotLightComponent>().each()) {
-      auto& light = light_environment.spot_lights.emplace_back();
-      light.pos = transform.translation;
-      light.radiance = spot_light.radiance;
-      light.intensity = spot_light.intensity;
-      light.range = spot_light.range;
-      light.angle = spot_light.angle;
-      light.angle_attenuation = spot_light.angle_attenuation;
-      light.casts_shadows = spot_light.casts_shadows;
-      light.soft_shadows = spot_light.soft_shadows;
-      light.falloff = spot_light.falloff;
-      count++;
-    }
-
-    if (count != prev_count) {
-      prev_count = count;
-    }
-  }();
+  static auto prev_point_light_count = 15ULL;
+  static auto prev_spot_light_count = 15ULL;
+  update_lights<PointLightComponent, Graphics::PointLight>(
+    registry, light_environment.point_lights, prev_point_light_count);
+  update_lights<SpotLightComponent, Graphics::SpotLight>(
+    registry, light_environment.spot_lights, prev_spot_light_count);
 }
 
 auto
-Scene::on_render_editor(Graphics::Renderer& renderer, const Camera& camera)
-  -> void
+Scene::on_render_editor(Graphics::Renderer& renderer,
+                        const Camera& camera) -> void
 {
   renderer.begin_scene(*this,
                        {

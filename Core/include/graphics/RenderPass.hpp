@@ -7,6 +7,7 @@
 #include "graphics/Pipeline.hpp"
 
 #include "core/FrameBasedCollection.hpp"
+#include "core/Profiler.hpp"
 #include "core/Types.hpp"
 
 #include <tuple>
@@ -19,9 +20,8 @@ class RenderPass
 public:
   virtual ~RenderPass() = default;
 
-  virtual auto construct() -> void = 0;
   virtual auto on_resize(const Core::Extent& new_size) -> void = 0;
-  auto execute(CommandBuffer& command_buffer, bool is_compute = false) -> void;
+  auto execute(CommandBuffer& command_buffer) -> void;
 
   auto destruct() -> void
   {
@@ -29,10 +29,20 @@ public:
 
     pass = {};
   }
+  auto construct() -> void;
 
   auto get_colour_attachment(Core::u32) const -> const Core::Ref<Image>&;
   auto get_depth_attachment() const -> const Core::Ref<Image>&;
   auto get_framebuffer() -> decltype(auto)
+  {
+    return std::get<Core::Scope<IFramebuffer>>(pass);
+  }
+
+  /// @brief Some renderpasses can have several framebuffers apart from the
+  /// primary one. Indexing starts at one - the default pass is receivable from get_framebuffer(/*no-params*/).
+  /// @param index The index of the framebuffer to get.
+  /// @return The framebuffer.
+  virtual auto get_extraneous_framebuffer(Core::u32) -> Core::Scope<IFramebuffer>&
   {
     return std::get<Core::Scope<IFramebuffer>>(pass);
   }
@@ -46,14 +56,12 @@ public:
     std::optional<Core::u32> colour_attachment_index{};
     bool depth_attachment{ false };
   };
-  auto blit_to(const CommandBuffer&, const Framebuffer&, BlitProperties)
-    -> void;
+  auto blit_to(const CommandBuffer&,
+               const Framebuffer&,
+               BlitProperties) -> void;
 
 protected:
-  explicit RenderPass(Renderer& input)
-    : renderer(input)
-  {
-  }
+  explicit RenderPass(Renderer&);
   virtual auto is_valid() const -> bool
   {
     return std::get<Core::Scope<IFramebuffer>>(pass) &&
@@ -61,9 +69,9 @@ protected:
            std::get<Core::Scope<IPipeline>>(pass) &&
            std::get<Core::Scope<Material>>(pass);
   }
+  virtual auto construct_impl() -> void = 0;
   virtual auto destruct_impl() -> void = 0;
-  virtual auto execute_impl(CommandBuffer&) -> void{};
-  virtual auto execute_compute_impl(CommandBuffer&) -> void{};
+  virtual auto execute_impl(CommandBuffer&) -> void {};
   virtual auto bind(CommandBuffer& command_buffer) -> void;
   virtual auto unbind(CommandBuffer& command_buffer) -> void;
   auto generate_and_update_descriptor_write_sets(Material&) -> VkDescriptorSet;
@@ -79,6 +87,7 @@ private:
                                  Core::Scope<IPipeline>,
                                  Core::Scope<Material>>;
   RenderTuple pass{};
+  bool is_compute{ false };
 
   static inline std::mutex render_pass_mutex;
   friend class Renderer;

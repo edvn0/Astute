@@ -57,8 +57,12 @@ main()
   shadow_space_fragment_position = bias * shadow.view_projection * computed;
 
   if (gl_InstanceIndex < 300) {
-    fragment_colour = vec4(point_lights.lights[gl_InstanceIndex].radiance, 1.0);
+    fragment_colour = vec4(point_lights.lights[gl_InstanceIndex].radiance *
+                             point_lights.lights[gl_InstanceIndex].intensity,
+                           1.0);
   } else {
-    fragment_colour = vec4(spot_lights.lights[gl_InstanceIndex].radiance, 1.0);
+    fragment_colour = vec4(spot_lights.lights[gl_InstanceIndex].radiance *
+                             spot_lights.lights[gl_InstanceIndex].intensity,
+                           1.0);
   }
 }

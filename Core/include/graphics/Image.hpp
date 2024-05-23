@@ -119,15 +119,10 @@ copy_buffer_to_image(VkBuffer buffer,
 auto
 copy_buffer_to_image(const Core::DataBuffer&, Image&) -> void;
 
-auto
-create_view(VkImage&,
-            VkFormat,
-            VkImageAspectFlags,
-            Core::u32 mips = 1,
-            Core::u32 layer = 1) -> VkImageView;
-
-auto create_sampler(VkFilter, VkSamplerAddressMode, VkBorderColor, Core::u32)
-  -> VkSampler;
+auto create_sampler(VkFilter,
+                    VkSamplerAddressMode,
+                    VkBorderColor,
+                    Core::u32) -> VkSampler;
 auto
 create_sampler(VkFilter,
                VkFilter,
@@ -172,7 +167,7 @@ public:
   [[nodiscard]] auto get_descriptor_info() const
     -> const VkDescriptorImageInfo&;
 
-  auto get_layer_image_view(Core::u32 index) -> VkImageView
+  auto get_layer_image_view(Core::u32 index) const -> VkImageView
   {
     if (layer_image_views.empty() || index > layer_image_views.size()) {
       return nullptr;
@@ -199,7 +194,7 @@ public:
   [[nodiscard]] auto get_layer_count() const { return configuration.layers; }
   [[nodiscard]] auto get_path() const { return configuration.path; }
 
-  auto write_to_file(std::string_view path) -> bool;
+  auto write_to_file(std::string_view path) const -> bool;
 
   auto hash() -> Core::usize;
 
@@ -231,8 +226,8 @@ public:
   static auto reference_resolve_msaa(const Image&,
                                      const CommandBuffer* = nullptr)
     -> Core::Ref<Image>;
-  static auto copy_image(const Image& source, const CommandBuffer&)
-    -> Core::Ref<Image>;
+  static auto copy_image(const Image& source,
+                         const CommandBuffer&) -> Core::Ref<Image>;
 
   static auto construct(const ImageConfiguration&) -> Core::Ref<Image>;
 

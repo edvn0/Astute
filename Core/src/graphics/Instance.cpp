@@ -96,6 +96,8 @@ Instance::create_instance() -> void
 
   if (enable_validation_layers) {
     extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+
+    info("Enabled validation layers!");
   }
 
   create_info.enabledExtensionCount = static_cast<uint32_t>(extensions.size());

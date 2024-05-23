@@ -12,8 +12,10 @@
 namespace Engine::Graphics {
 
 auto
-LightsRenderPass::construct() -> void
+LightsRenderPass::construct_impl() -> void
 {
+  ASTUTE_PROFILE_FUNCTION();
+
   auto&& [lights_framebuffer, lights_shader, lights_pipeline, lights_material] =
     get_data();
   lights_framebuffer = Core::make_scope<Framebuffer>(FramebufferSpecification{
@@ -60,6 +62,7 @@ LightsRenderPass::construct() -> void
 auto
 LightsRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 {
+  ASTUTE_PROFILE_FUNCTION();
   const auto& [lights_framebuffer,
                lights_shader,
                lights_pipeline,
@@ -71,6 +74,7 @@ LightsRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
   lights_material->update_descriptor_write_sets(renderer_desc_set);
 
   for (auto&& [key, command] : get_renderer().lights_draw_commands) {
+    ASTUTE_PROFILE_SCOPE("Lights Render pass draw command");
     auto&& [mesh, submesh_index, instance_count] = command;
 
     const auto& mesh_asset = mesh->get_mesh_asset();

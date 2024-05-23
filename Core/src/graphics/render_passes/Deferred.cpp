@@ -58,7 +58,7 @@ struct Impl
 };
 
 auto
-DeferredRenderPass::construct() -> void
+DeferredRenderPass::construct_impl() -> void
 {
   noise_map = TextureGenerator::simplex_noise(100, 100);
   const auto& ext = get_renderer().get_size();
@@ -112,6 +112,8 @@ DeferredRenderPass::~DeferredRenderPass()
 auto
 DeferredRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 {
+  ASTUTE_PROFILE_FUNCTION();
+
   auto&& [deferred_framebuffer,
           deferred_shader,
           deferred_pipeline,
@@ -126,9 +128,6 @@ DeferredRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                          input_render_pass.get_colour_attachment(2));
   deferred_material->set("shadow_position_map",
                          input_render_pass.get_colour_attachment(3));
-  deferred_material->set(
-    "shadow_map",
-    get_renderer().get_render_pass("Shadow").get_depth_attachment());
   deferred_material->set("noise_map", noise_map);
 
   auto* renderer_desc_set =
