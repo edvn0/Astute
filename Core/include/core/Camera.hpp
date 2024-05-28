@@ -269,4 +269,13 @@ private:
   constexpr static float max_speed{ 2.0F };
 };
 
+struct SceneRendererCamera
+{
+  const Core::Camera& camera;
+  glm::mat4 view_matrix{};
+  Core::f32 near{};
+  Core::f32 far{};
+  Core::f32 fov{};
+};
+
 } // namespace Engine::Core

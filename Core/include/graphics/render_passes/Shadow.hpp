@@ -20,6 +20,12 @@ public:
     auto& found = other_framebuffers.at(index);
     return found;
   }
+  auto get_extraneous_framebuffer(Core::u32 index) const
+    -> const Core::Scope<IFramebuffer>& override
+  {
+    auto& found = other_framebuffers.at(index);
+    return found;
+  }
 
 protected:
   auto construct_impl() -> void override;

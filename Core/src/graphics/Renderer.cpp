@@ -3,12 +3,13 @@
 #include "graphics/Renderer.hpp"
 
 #include "core/Application.hpp"
+#include "core/Clock.hpp"
+#include "core/Random.hpp"
 #include "core/Scene.hpp"
+#include "core/ShadowCascadeCalculator.hpp"
+
 #include "logging/Logger.hpp"
 
-#include "core/Clock.hpp"
-
-#include "core/Random.hpp"
 #include "graphics/DescriptorResource.hpp"
 #include "graphics/GPUBuffer.hpp"
 #include "graphics/Swapchain.hpp"
@@ -19,6 +20,7 @@
 #include "graphics/RendererExtensions.hpp"
 #include "graphics/TextureGenerator.hpp"
 
+#include "graphics/render_passes/ChromaticAberration.hpp"
 #include "graphics/render_passes/Deferred.hpp"
 #include "graphics/render_passes/LightCulling.hpp"
 #include "graphics/render_passes/Lights.hpp"
@@ -140,7 +142,8 @@ Renderer::Renderer(Configuration config, const Window* window)
   std::unordered_map<RendererTechnique, std::vector<std::string>>
     technique_construction_order;
   technique_construction_order[RendererTechnique::Deferred] = {
-    "Shadow", "Predepth", "MainGeometry", "Deferred", "Lights",
+    "Shadow",   "Predepth", "MainGeometry",
+    "Deferred", "Lights",   "ChromaticAberration"
   };
 
   render_passes["MainGeometry"] =
@@ -150,6 +153,8 @@ Renderer::Renderer(Configuration config, const Window* window)
   render_passes["Deferred"] = Core::make_scope<DeferredRenderPass>(*this);
   render_passes["Predepth"] = Core::make_scope<PredepthRenderPass>(*this);
   render_passes["Lights"] = Core::make_scope<LightsRenderPass>(*this);
+  render_passes["ChromaticAberration"] =
+    Core::make_scope<ChromaticAberrationRenderPass>(*this);
 
   for (const auto& k :
        technique_construction_order.at(RendererTechnique::Deferred)) {
@@ -157,7 +162,7 @@ Renderer::Renderer(Configuration config, const Window* window)
   }
 
   technique_construction_order[RendererTechnique::ForwardPlus] = {
-    "LightCulling",
+    "LightCulling"
   };
 
   render_passes["LightCulling"] =
@@ -166,6 +171,8 @@ Renderer::Renderer(Configuration config, const Window* window)
        technique_construction_order.at(RendererTechnique::ForwardPlus)) {
     render_passes.at(k)->construct();
   }
+
+  this->activate_post_processing_step("ChromaticAberration");
 
   transform_buffers.resize(3);
   static constexpr auto total_size = 100 * 1000 * sizeof(TransformVertexData);
@@ -225,7 +232,7 @@ Renderer::destruct() -> void
   white_texture->destroy();
   black_texture->destroy();
 
-  for (auto& [k, v] : render_passes) {
+  for (const auto& [k, v] : render_passes) {
     v->destruct();
   }
 
@@ -236,7 +243,7 @@ Renderer::destruct() -> void
 
 auto
 Renderer::begin_scene(Core::Scene& scene,
-                      const SceneRendererCamera& camera) -> void
+                      const Core::SceneRendererCamera& camera) -> void
 {
   if (old_size != size) {
     Device::the().wait();
@@ -273,6 +280,7 @@ Renderer::begin_scene(Core::Scene& scene,
          view_proj,
          light_colour_intensity,
          specular_colour_intensity,
+         ubo_cascade_splits,
          camera_pos] = renderer_ubo.get_data();
   view = camera.camera.get_view_matrix();
   proj = camera.camera.get_projection_matrix();
@@ -280,6 +288,7 @@ Renderer::begin_scene(Core::Scene& scene,
   camera_pos = camera.camera.get_position();
   light_colour_intensity = light_environment.colour_and_intensity;
   specular_colour_intensity = light_environment.specular_colour_and_intensity;
+  ubo_cascade_splits = cascade_splits;
   renderer_ubo.update();
 
   auto& [light_view, light_proj, light_view_proj, light_pos, light_dir] =
@@ -325,141 +334,17 @@ Renderer::begin_scene(Core::Scene& scene,
 
 auto
 Renderer::compute_directional_shadow_projections(
-  const SceneRendererCamera& camera,
+  const Core::SceneRendererCamera& camera,
   const glm::vec3& light_direction) -> void
 {
-  struct CascadeData
-  {
-    glm::mat4 view_projection;
-    glm::mat4 view;
-    Core::f32 split_depth;
+  static Core::ShadowCascadeCalculator cascade_calculator{
+    cascade_near_plane_offset,
+    cascade_far_plane_offset,
   };
-  std::array<CascadeData, 4> cascades{};
-
-  auto view_projection =
-    camera.camera.get_unreversed_projection_matrix() * camera.view_matrix;
-  view_projection[1][1] *= -1.0f;
-
-  static constexpr auto shadow_map_cascade_count = 4;
-  static constexpr auto cascade_split_lambda = 0.95f;
-  static constexpr auto CascadeFarPlaneOffset = 5.0f;
-  static constexpr auto CascadeNearPlaneOffset = -5.0f;
-
-  std::array<float, shadow_map_cascade_count> shadow_cascade_splits;
-
-  float near_clip = camera.near;
-  float far_clip = camera.far;
-  float clip_range = far_clip - near_clip;
-
-  float min_z = near_clip;
-  float max_z = near_clip + clip_range;
-
-  float range = max_z - min_z;
-  float ratio = max_z / min_z;
-
-  // Calculate split depths based on view camera frustum
-  // Based on method presented in
-  // https://developer.nvidia.com/gpugems/GPUGems3/gpugems3_ch10.html
-  for (uint32_t i = 0; i < shadow_map_cascade_count; i++) {
-    float p = (static_cast<float>(i) + 1) /
-              static_cast<float>(shadow_map_cascade_count);
-    float log = min_z * std::pow(ratio, p);
-    float uniform = min_z + range * p;
-    float d = std::lerp(log, uniform, cascade_split_lambda);
-    shadow_cascade_splits[i] = (d - near_clip) / clip_range;
-  }
-
-  shadow_cascade_splits[3] = 0.3f;
-
-  // Manually set cascades here
-  // shadow_cascade_splits[0] = 0.05f;
-  // shadow_cascade_splits[1] = 0.15f;
-  // shadow_cascade_splits[2] = 0.3f;
-  // shadow_cascade_splits[3] = 1.0f;
-
-  // Calculate orthographic projection matrix for each cascade
-  float last_split_distance = 0.0;
-  for (uint32_t k = 0; k < shadow_map_cascade_count; k++) {
-    float splitDist = shadow_cascade_splits[k];
-
-    std::array frustum_corners = {
-      glm::vec3(-1.0f, 1.0f, -1.0f), glm::vec3(1.0f, 1.0f, -1.0f),
-      glm::vec3(1.0f, -1.0f, -1.0f), glm::vec3(-1.0f, -1.0f, -1.0f),
-      glm::vec3(-1.0f, 1.0f, 1.0f),  glm::vec3(1.0f, 1.0f, 1.0f),
-      glm::vec3(1.0f, -1.0f, 1.0f),  glm::vec3(-1.0f, -1.0f, 1.0f),
-    };
-
-    // Project frustum corners into world space
-    glm::mat4 inverse_camera = glm::inverse(view_projection);
-    for (auto& frustum_corner : frustum_corners) {
-      glm::vec4 invCorner = inverse_camera * glm::vec4(frustum_corner, 1.0f);
-      frustum_corner = invCorner / invCorner.w;
-    }
-
-    for (uint32_t i = 0; i < 4; i++) {
-      glm::vec3 dist = frustum_corners[i + 4] - frustum_corners[i];
-      frustum_corners[i + 4] = frustum_corners[i] + (dist * splitDist);
-      frustum_corners[i] = frustum_corners[i] + (dist * last_split_distance);
-    }
-
-    // Get frustum center
-    glm::vec3 frustum_center(0.0f);
-    for (const auto& corner : frustum_corners)
-      frustum_center += corner;
-
-    frustum_center /= 8.0f;
-
-    // frustum_center *= 0.01f;
-
-    float radius = 0.0f;
-    for (const auto& corner : frustum_corners) {
-      float distance = glm::length(corner - frustum_center);
-      radius = glm::max(radius, distance);
-    }
-    radius = std::ceil(radius * 16.0f) / 16.0f;
-
-    glm::vec3 max_extents(radius);
-    glm::vec3 min_extents = -max_extents;
-
-    glm::vec3 light_dir = light_direction;
-    glm::mat4 light_view_matrix =
-      glm::lookAt(frustum_center - light_dir * -min_extents.z,
-                  frustum_center,
-                  glm::vec3(0.0f, 0.0f, 1.0f));
-    glm::mat4 light_ortho_matrix =
-      glm::ortho(min_extents.x,
-                 max_extents.x,
-                 min_extents.y,
-                 max_extents.y,
-                 0.0f + CascadeNearPlaneOffset,
-                 max_extents.z - min_extents.z + CascadeFarPlaneOffset);
-
-    // Offset to texel space to avoid shimmering (from
-    // https://stackoverflow.com/questions/33499053/cascaded-shadow-map-shimmering)
-    glm::mat4 shadowMatrix = light_ortho_matrix * light_view_matrix;
-    float ShadowMapResolution = 4096.0F;
-    glm::vec4 shadowOrigin =
-      (shadowMatrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)) * ShadowMapResolution /
-      2.0f;
-    glm::vec4 rounded_origin = glm::round(shadowOrigin);
-    glm::vec4 round_offset = rounded_origin - shadowOrigin;
-    round_offset = round_offset * 2.0f / ShadowMapResolution;
-    round_offset.z = 0.0f;
-    round_offset.w = 0.0f;
-
-    light_ortho_matrix[3] += round_offset;
-
-    // Store split distance and matrix in cascade
-    cascades[k].split_depth = (near_clip + splitDist * clip_range) * -1.0f;
-    cascades[k].view_projection = light_ortho_matrix * light_view_matrix;
-    cascades[k].view = light_view_matrix;
-
-    last_split_distance = shadow_cascade_splits[k];
-  }
-
+  auto cascades = cascade_calculator.compute_cascades(camera, light_direction);
   auto& [view_projections] = directional_shadow_projections_ubo.get_data();
-  for (int i = 0; i < 4; i++) {
-    cascade_splits[i] = cascades[i].split_depth;
+  for (auto i = 0ULL; i < 4; i++) {
+    cascade_splits[static_cast<Core::i32>(i)] = cascades[i].split_depth;
     view_projections[i] = cascades[i].view_projection;
   }
   directional_shadow_projections_ubo.update();
@@ -531,7 +416,7 @@ Renderer::submit_static_light(Core::Ref<StaticMesh>& static_mesh,
 
     const auto& vertex_buffer = source->get_vertex_buffer();
     const auto& index_buffer = source->get_index_buffer();
-    auto& material =
+    const auto& material =
       source->get_materials().at(submesh_data[submesh_index].material_index);
 
     CommandKey key{ &vertex_buffer, &index_buffer, material.get(), 0 };
@@ -619,6 +504,13 @@ Renderer::flush_draw_lists() -> void
     // TODO: Not yet implemented.
     render_passes.at("ForwardPlusGeometry")->execute(*command_buffer);
     render_passes.at("Composite")->execute(*command_buffer);
+  }
+
+  for (const auto& step : post_processing_steps) {
+    if (!render_passes.contains(step))
+      continue;
+    const auto& render_pass = render_passes.at(step);
+    render_pass->execute(*command_buffer);
   }
 
   command_buffer->end();

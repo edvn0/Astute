@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/Camera.hpp"
 #include "core/DataBuffer.hpp"
 #include "core/Forward.hpp"
 #include "core/Types.hpp"
@@ -64,15 +65,6 @@ struct SubmeshTransformBuffer
   Core::Scope<Core::DataBuffer> data_buffer{ nullptr };
 };
 
-struct SceneRendererCamera
-{
-  const Core::Camera& camera;
-  glm::mat4 view_matrix{};
-  Core::f32 near{};
-  Core::f32 far{};
-  Core::f32 fov{};
-};
-
 struct CommandKey
 {
   const VertexBuffer* vertex_buffer{ nullptr };
@@ -101,7 +93,7 @@ public:
 
   auto destruct() -> void;
 
-  auto begin_scene(Core::Scene&, const SceneRendererCamera&) -> void;
+  auto begin_scene(Core::Scene&, const Core::SceneRendererCamera&) -> void;
   auto end_scene() -> void;
 
   auto submit_static_mesh(Core::Ref<StaticMesh>&, const glm::mat4&) -> void;
@@ -118,12 +110,19 @@ public:
   [[nodiscard]] auto get_shadow_output_image() const -> const Image*
   {
     return render_passes.at("Shadow")
-      ->get_framebuffer()
+      ->get_extraneous_framebuffer(0)
       ->get_depth_attachment()
       .get();
   }
   [[nodiscard]] auto get_final_output() const -> const Image*
   {
+    if (!post_processing_steps.empty()) {
+      return render_passes.at("ChromaticAberration")
+        ->get_framebuffer()
+        ->get_colour_attachment(0)
+        .get();
+    }
+
     return render_passes.at("Lights")
       ->get_framebuffer()
       ->get_colour_attachment(0)
@@ -150,6 +149,36 @@ public:
     -> const RenderPass&
   {
     return *render_passes.at(name);
+  }
+  auto get_shadow_cascade_configuration()
+  {
+    struct ShadowCascadeConfiguration
+    {
+      Core::f32& cascade_near_plane_offset;
+      Core::f32& cascade_far_plane_offset;
+    };
+
+    return ShadowCascadeConfiguration{
+      cascade_near_plane_offset,
+      cascade_far_plane_offset,
+    };
+  }
+
+  auto expose_settings_to_ui() const -> void
+  {
+    for (const auto& [name, render_pass] : render_passes) {
+      render_pass->expose_settings_to_ui();
+    }
+  }
+
+  auto activate_post_processing_step(const std::string& name) -> void
+  {
+    post_processing_steps.insert(name);
+  }
+
+  auto deactivate_post_processing_step(const std::string& name) -> void
+  {
+    post_processing_steps.erase(name);
   }
 
   auto set_technique(RendererTechnique tech) -> void { technique = tech; }
@@ -184,13 +213,17 @@ private:
     visible_spot_lights_ssbo{};
   UniformBufferObject<ScreenDataUBO> screen_data_ubo{};
 
-  auto compute_directional_shadow_projections(const SceneRendererCamera&,
+  auto compute_directional_shadow_projections(const Core::SceneRendererCamera&,
                                               const glm::vec3&) -> void;
   UniformBufferObject<DirectionalShadowProjectionUBO>
     directional_shadow_projections_ubo{};
 
+  std::unordered_set<std::string> post_processing_steps{};
+
   glm::uvec3 light_culling_work_groups{};
-  glm::vec4 cascade_splits {};
+  glm::vec4 cascade_splits{};
+  Core::f32 cascade_near_plane_offset{ -50.0F };
+  Core::f32 cascade_far_plane_offset{ 50.0F };
 
   struct DrawCommand
   {
@@ -220,6 +253,7 @@ private:
   friend class PredepthRenderPass;
   friend class LightCullingRenderPass;
   friend class LightsRenderPass;
+  friend class ChromaticAberrationRenderPass;
 };
 
 }

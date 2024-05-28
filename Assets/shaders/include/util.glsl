@@ -4,6 +4,23 @@
 #define TILE_SIZE 16
 #define MAX_LIGHTS_PER_TILE 1024
 
+const mat4 bias = mat4(0.5,
+                       0.0,
+                       0.0,
+                       0.0,
+                       0.0,
+                       0.5,
+                       0.0,
+                       0.0,
+                       0.0,
+                       0.0,
+                       1.0,
+                       0.0,
+                       0.5,
+                       0.5,
+                       0.0,
+                       1.0);
+
 mat4
 from_instance_to_model_matrix(vec4 row_zero, vec4 row_one, vec4 row_two)
 {

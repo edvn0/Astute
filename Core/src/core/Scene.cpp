@@ -85,15 +85,30 @@ Scene::Scene(const std::string_view name_view)
   info("Creating scene: {}", name);
   auto sponza_mesh =
     Graphics::StaticMesh::construct("Assets/meshes/sponza_new/sponza.gltf");
+  auto cerberus_mesh =
+    Graphics::StaticMesh::construct("Assets/meshes/cerb/cerberus.gltf");
 
-  auto sponza = registry.create();
-  registry.emplace<MeshComponent>(sponza, sponza_mesh);
-  auto& transform2 = registry.emplace<TransformComponent>(sponza);
-  transform2.translation = { 0, 5, 0 };
-  transform2.rotation =
-    glm::rotate(glm::mat4{ 1.0F }, glm::radians(180.0F), glm::vec3{ 1, 0, 0 });
-  // Floor is big!
-  transform2.scale = { 0.01, 0.01, 0.01 };
+  {
+    auto sponza = registry.create();
+    registry.emplace<MeshComponent>(sponza, sponza_mesh);
+    auto& transform2 = registry.emplace<TransformComponent>(sponza);
+    transform2.translation = { 0, 5, 0 };
+    transform2.rotation = glm::rotate(
+      glm::mat4{ 1.0F }, glm::radians(180.0F), glm::vec3{ 1, 0, 0 });
+    // Floor is big!
+    transform2.scale = { 0.01, 0.01, 0.01 };
+  }
+
+  {
+    auto cerberos = registry.create();
+    registry.emplace<MeshComponent>(cerberos, cerberus_mesh);
+    auto& transform2 = registry.emplace<TransformComponent>(cerberos);
+    transform2.translation = { 0, 5, 0 };
+    transform2.rotation = glm::rotate(
+      glm::mat4{ 1.0F }, glm::radians(180.0F), glm::vec3{ 1, 0, 0 });
+    // Floor is big!
+    transform2.scale = { 0.01, 0.01, 0.01 };
+  }
 
   const auto& bounds = sponza_mesh->get_mesh_asset()->get_bounding_box();
   const auto scaled = bounds.scaled(0.01);

@@ -328,7 +328,8 @@ ShaderCompiler::compile_graphics_scoped(
         compiled_fragment_shader,
       },
     };
-  auto name = vertex_shader_path.filename().replace_extension().string();
+  auto name = vertex_shader_path.filename().replace_extension().string() + "_" +
+              fragment_shader_path.filename().replace_extension().string();
 
   return Core::make_scope<Graphics::Shader>(std::move(compiled_spirv_per_stage),
                                             name);

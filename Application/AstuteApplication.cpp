@@ -102,7 +102,7 @@ AstuteApplication::interface() -> void
                    });
   });
 
-  UI::scope("Light Environment", [s = scene]() {
+  UI::scope("Light Environment", [s = scene, &r = renderer]() {
     auto& light_environment = s->get_light_environment();
     const std::string label =
       light_environment.is_perspective ? "Perspective" : "Ortho";
@@ -132,6 +132,15 @@ AstuteApplication::interface() -> void
       light_environment.shadow_projection = projection;
     }
 
+    auto config = r->get_shadow_cascade_configuration();
+    if (ImGui::DragFloat("Near Plane Offset",
+                         &config.cascade_near_plane_offset)) {
+    }
+
+    if (ImGui::DragFloat("Far Plane Offset",
+                         &config.cascade_far_plane_offset)) {
+    }
+
     auto& light_colour = light_environment.colour_and_intensity;
     if (ImGui::DragFloat3(
           "Light colour", glm::value_ptr(light_colour), 0.05F, 0.0F, 1.0F)) {
@@ -151,6 +160,10 @@ AstuteApplication::interface() -> void
           "Specular Strength", &specular_light_colour.w, 0.1F, 0.0F, 100.0F)) {
     }
   });
+
+  UI::begin("Render pass settings");
+  renderer->expose_settings_to_ui();
+  UI::end();
 
   ImGui::PopStyleVar();
 

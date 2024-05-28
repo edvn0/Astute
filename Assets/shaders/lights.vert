@@ -21,23 +21,6 @@ layout(location = 4) out vec4 world_space_fragment_position;
 layout(location = 5) out vec4 shadow_space_fragment_position;
 layout(location = 6) out vec4 fragment_colour;
 
-const mat4 bias = mat4(0.5,
-                       0.0,
-                       0.0,
-                       0.0,
-                       0.0,
-                       0.5,
-                       0.0,
-                       0.0,
-                       0.0,
-                       0.0,
-                       1.0,
-                       0.0,
-                       0.5,
-                       0.5,
-                       0.0,
-                       1.0);
-
 invariant precise gl_Position;
 void
 main()
@@ -56,7 +39,7 @@ main()
   world_space_fragment_position = computed;
   shadow_space_fragment_position = bias * shadow.view_projection * computed;
 
-  if (gl_InstanceIndex < 300) {
+  if (gl_InstanceIndex < 127) {
     fragment_colour = vec4(point_lights.lights[gl_InstanceIndex].radiance *
                              point_lights.lights[gl_InstanceIndex].intensity,
                            1.0);

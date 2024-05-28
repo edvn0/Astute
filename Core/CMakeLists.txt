@@ -51,6 +51,7 @@ add_library(Core STATIC
     include/graphics/render_passes/LightCulling.hpp
     include/graphics/render_passes/Predepth.hpp
     include/graphics/render_passes/Lights.hpp
+    include/graphics/render_passes/ChromaticAberration.hpp
     include/pch/CorePCH.hpp
     include/ui/UI.hpp
     src/core/Application.cpp
@@ -89,6 +90,7 @@ add_library(Core STATIC
     src/graphics/render_passes/LightCulling.cpp
     src/graphics/render_passes/Predepth.cpp
     src/graphics/render_passes/Lights.cpp
+    src/graphics/render_passes/ChromaticAberration.cpp
     src/ui/UI.cpp
 )
 target_include_directories(Core PUBLIC include

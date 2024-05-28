@@ -86,6 +86,9 @@ Device::is_device_suitable(VkPhysicalDevice device,
   if (!supported_features.samplerAnisotropy) {
     is_suitable = false;
   }
+  if (!supported_features.depthClamp) {
+    is_suitable = false;
+  }
   if (!supported_features.logicOp) {
     is_suitable = false;
   }
@@ -227,6 +230,7 @@ Device::create_device(VkSurfaceKHR surface) -> void
 
   VkPhysicalDeviceFeatures device_features{};
   device_features.samplerAnisotropy = VK_TRUE;
+  device_features.depthClamp = VK_TRUE;
   device_features.logicOp = VK_TRUE;
   device_features.wideLines = VK_TRUE;
   device_features.sampleRateShading = VK_TRUE;

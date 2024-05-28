@@ -18,8 +18,12 @@ RenderPass::construct() -> void
 {
   construct_impl();
 
-  is_compute = std::get<Core::Scope<IPipeline>>(pass)->get_bind_point() ==
-               VK_PIPELINE_BIND_POINT_COMPUTE;
+  is_compute = false;
+  if (const auto& pipe = std::get<Core::Scope<IPipeline>>(pass);
+      pipe != nullptr) {
+    is_compute = std::get<Core::Scope<IPipeline>>(pass)->get_bind_point() ==
+                 VK_PIPELINE_BIND_POINT_COMPUTE;
+  }
 }
 
 auto
@@ -45,7 +49,13 @@ RenderPass::get_colour_attachment(Core::u32 index) const
 auto
 RenderPass::get_depth_attachment() const -> const Core::Ref<Image>&
 {
-  return get_framebuffer()->get_depth_attachment();
+  if (const auto& framebuffer = get_framebuffer();
+      framebuffer != nullptr && framebuffer->has_depth_attachment()) {
+    return framebuffer->get_depth_attachment();
+  }
+
+  const auto& extraneous_framebuffer = get_extraneous_framebuffer(0);
+  return extraneous_framebuffer->get_depth_attachment();
 }
 
 auto

@@ -1,6 +1,7 @@
 #include "pch/CorePCH.hpp"
 
 #include "graphics/Renderer.hpp"
+#include "logging/Logger.hpp"
 
 #include "core/Application.hpp"
 #include "core/Maths.hpp"
@@ -25,13 +26,13 @@ static constexpr auto create_layer_views = [](auto& image) {
 auto
 ShadowRenderPass::construct_impl() -> void
 {
-  auto&& [shadow_framebuffer, shadow_shader, shadow_pipeline, shadow_material] =
-    get_data();
+  auto&& [_, shadow_shader, __, shadow_material] = get_data();
+  static constexpr auto shadow_map_count = 4ULL;
   cascaded_shadow_map = Core::make_ref<Image>(ImageConfiguration{
     .width = size,
     .height = size,
     .mip_levels = 1,
-    .layers = 4,
+    .layers = shadow_map_count,
     .format = VK_FORMAT_D32_SFLOAT,
     .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
     .usage =
@@ -50,79 +51,31 @@ ShadowRenderPass::construct_impl() -> void
     .existing_image_layers = { 0 },
     .debug_name = "Shadow",
   };
-  shadow_framebuffer = Core::make_scope<Framebuffer>(spec);
-
   shadow_shader = Shader::compile_graphics_scoped("Assets/shaders/shadow.vert",
                                                   "Assets/shaders/empty.frag");
-  shadow_pipeline =
-    Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
-      .framebuffer = shadow_framebuffer.get(),
-      .shader = shadow_shader.get(),
-      .sample_count = VK_SAMPLE_COUNT_1_BIT,
-      .depth_comparator = VK_COMPARE_OP_GREATER,
-      .override_vertex_attributes = { {
-        { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
-      } },
-    });
-
-  {
-    spec.existing_image_layers.clear();
-    spec.existing_image_layers.push_back(1);
-    auto& other = other_framebuffers.emplace_back();
-    other = Core::make_scope<Framebuffer>(spec);
-    auto& other_pipeline = other_pipelines.emplace_back();
-    other_pipeline =
-      Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
-        .framebuffer = other.get(),
-        .shader = shadow_shader.get(),
-        .sample_count = VK_SAMPLE_COUNT_1_BIT,
-        .depth_comparator = VK_COMPARE_OP_GREATER,
-        .override_vertex_attributes = { {
-          { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
-        } },
-      });
-  }
-
-  {
-    spec.existing_image_layers.clear();
-    spec.existing_image_layers.push_back(2);
-    auto& other = other_framebuffers.emplace_back();
-    other = Core::make_scope<Framebuffer>(spec);
-
-    auto& other_pipeline = other_pipelines.emplace_back();
-    other_pipeline =
-      Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
-        .framebuffer = other.get(),
-        .shader = shadow_shader.get(),
-        .sample_count = VK_SAMPLE_COUNT_1_BIT,
-        .depth_comparator = VK_COMPARE_OP_GREATER,
-        .override_vertex_attributes = { {
-          { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
-        } },
-      });
-  }
-
-  {
-    spec.existing_image_layers.clear();
-    spec.existing_image_layers.push_back(3);
-    auto& other = other_framebuffers.emplace_back();
-    other = Core::make_scope<Framebuffer>(spec);
-    auto& other_pipeline = other_pipelines.emplace_back();
-    other_pipeline =
-      Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
-        .framebuffer = other.get(),
-        .shader = shadow_shader.get(),
-        .sample_count = VK_SAMPLE_COUNT_1_BIT,
-        .depth_comparator = VK_COMPARE_OP_GREATER,
-        .override_vertex_attributes = { {
-          { 0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0 },
-        } },
-      });
-  }
-
   shadow_material = Core::make_scope<Material>(Material::Configuration{
     .shader = shadow_shader.get(),
   });
+
+  for (const auto i : std::views::iota(0ULL, shadow_map_count)) {
+    spec.existing_image_layers.clear();
+    spec.existing_image_layers.push_back(static_cast<Core::i32>(i));
+    other_framebuffers.push_back(Core::make_scope<Framebuffer>(spec));
+    other_pipelines.push_back(
+      Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
+        .framebuffer = other_framebuffers.back().get(),
+        .shader = shadow_shader.get(),
+        .depth_comparator = VK_COMPARE_OP_LESS_OR_EQUAL,
+        .override_vertex_attributes = { {
+          {
+            0,
+            0,
+            VK_FORMAT_R32G32B32_SFLOAT,
+            0,
+          },
+        }, },
+      }));
+  }
 }
 
 auto
@@ -130,25 +83,14 @@ ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 {
   ASTUTE_PROFILE_FUNCTION();
 
-  const auto& [shadow_framebuffer,
-               shadow_shader,
-               shadow_pipeline,
-               shadow_material] = get_data();
+  const auto& [_, shadow_shader, __, shadow_material] = get_data();
 
   auto descriptor_set =
     generate_and_update_descriptor_write_sets(*shadow_material);
 
-  vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
-                          shadow_pipeline->get_bind_point(),
-                          shadow_pipeline->get_layout(),
-                          0,
-                          1,
-                          &descriptor_set,
-                          0,
-                          nullptr);
-  static auto perform_pass = [&](const Core::DataBuffer& buffer) {
+  static auto perform_pass = [&](const Core::DataBuffer& cascade_buffer,
+                                 const IPipeline& pipeline) {
     for (const auto& [key, command] : get_renderer().shadow_draw_commands) {
-      ASTUTE_PROFILE_SCOPE("Shadow Draw Command");
       const auto& [mesh, submesh_index, instance_count] = command;
 
       const auto& mesh_asset = mesh->get_mesh_asset();
@@ -170,6 +112,20 @@ ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
       const auto& submesh = mesh_asset->get_submeshes().at(submesh_index);
 
       offsets = std::array{ VkDeviceSize{ offset } };
+      vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
+                              pipeline.get_bind_point(),
+                              pipeline.get_layout(),
+                              0,
+                              1,
+                              &descriptor_set,
+                              0,
+                              nullptr);
+      vkCmdPushConstants(command_buffer.get_command_buffer(),
+                         pipeline.get_layout(),
+                         VK_SHADER_STAGE_ALL,
+                         0,
+                         cascade_buffer.size_u32(),
+                         cascade_buffer.raw());
 
       vkCmdBindVertexBuffers(
         command_buffer.get_command_buffer(), 1, 1, &vb, offsets.data());
@@ -178,13 +134,6 @@ ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                            mesh_asset->get_index_buffer().get_buffer(),
                            0,
                            VK_INDEX_TYPE_UINT32);
-
-      vkCmdPushConstants(command_buffer.get_command_buffer(),
-                         shadow_pipeline->get_layout(),
-                         VK_SHADER_STAGE_ALL,
-                         0,
-                         buffer.size_u32(),
-                         buffer.raw());
 
       vkCmdDrawIndexed(command_buffer.get_command_buffer(),
                        submesh.index_count,
@@ -195,19 +144,16 @@ ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
     }
   };
 
-  RendererExtensions::begin_renderpass(command_buffer, *shadow_framebuffer);
-  RendererExtensions::bind_pipeline(command_buffer, *shadow_pipeline);
   Core::DataBuffer current_cascade_buffer{ sizeof(Core::u32) };
   current_cascade_buffer.fill_zero();
-  perform_pass(current_cascade_buffer);
-  RendererExtensions::end_renderpass(command_buffer);
-
   for (const auto i : std::views::iota(0ULL, other_framebuffers.size())) {
+    ASTUTE_PROFILE_SCOPE("Shadow Render Pass Cascade Number: " +
+                         std::to_string(i));
+    current_cascade_buffer.write(&i, sizeof(Core::u32));
     RendererExtensions::begin_renderpass(command_buffer,
                                          *other_framebuffers.at(i));
     RendererExtensions::bind_pipeline(command_buffer, *other_pipelines.at(i));
-    current_cascade_buffer.write(&i, sizeof(Core::u32));
-    perform_pass(current_cascade_buffer);
+    perform_pass(current_cascade_buffer, *other_pipelines.at(i));
     RendererExtensions::end_renderpass(command_buffer);
   }
 }
@@ -215,11 +161,6 @@ ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 auto
 ShadowRenderPass::on_resize(const Core::Extent& ext) -> void
 {
-  auto&& [fb, _, pipe, __] = get_data();
-
-  fb->on_resize(ext);
-  pipe->on_resize(ext);
-
   for (const auto& other : other_framebuffers) {
     other->on_resize(ext);
   }

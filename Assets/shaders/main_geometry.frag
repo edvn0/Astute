@@ -3,13 +3,14 @@
 #extension GL_EXT_debug_printf : enable
 
 #include "buffers.glsl"
+#include "util.glsl"
 
 layout(location = 0) in vec3 fragment_normal;
 layout(location = 1) in vec3 fragment_tangents;
 layout(location = 2) in vec3 fragment_bitangents;
 layout(location = 3) in vec2 fragment_uvs;
 layout(location = 4) in vec3 world_space_fragment_position;
-layout(location = 5) in vec4 shadow_space_fragment_position;
+layout(location = 5) in vec3 view_position;
 
 layout(location = 0) out vec4 fragment_position;
 layout(location = 1) out vec4 fragment_normals;
@@ -62,6 +63,17 @@ main()
 
   fragment_position = vec4(world_space_fragment_position, 1.0);
 
+  uint chosen_cascade_index = 0;
+  for (uint i = 0; i < 3; ++i) {
+    if (view_position.z < renderer.cascade_splits[i]) {
+      chosen_cascade_index = i + 1;
+    }
+  }
+
+  vec4 shadow_space_fragment_position =
+    bias *
+    directional_shadow_projections.view_projections[chosen_cascade_index] *
+    fragment_position;
   vec3 shadow_uvs =
     shadow_space_fragment_position.xyz / shadow_space_fragment_position.w;
   if (shadow_uvs.z > 1.0) {
@@ -71,7 +83,7 @@ main()
       0.005 * (1.0 - dot(N, normalize(-shadow.sun_direction.xyz))), 0.0005F);
 
     float shadow_value_here =
-      1.0F - texture(shadow_map, vec3(shadow_uvs.xy, 0)).r;
+      1.0F - texture(shadow_map, vec3(shadow_uvs.xy, chosen_cascade_index)).r;
     fragment_shadow_value = shadow_value_here > shadow_uvs.z - bias ? 1.0 : 0.2;
   }
 }
