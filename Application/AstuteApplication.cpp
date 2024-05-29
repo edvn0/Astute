@@ -11,7 +11,7 @@ static constexpr auto for_each_in_tuple = [](auto&& tuple, auto&& func) {
   std::apply([&func](auto&&... args) { (func(args), ...); }, tuple);
 };
 
-auto
+static constexpr auto
 map_to_renderer_config(Application::Configuration config)
   -> Renderer::Configuration
 {
@@ -34,6 +34,7 @@ AstuteApplication::AstuteApplication(Application::Configuration config)
 {
   auto& scene_widget = std::get<0>(widgets);
   scene_widget = Engine::Core::make_scope<Widgets::SceneWidget>();
+  scene_widget->set_current_scene(scene);
 };
 
 auto

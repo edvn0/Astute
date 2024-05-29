@@ -3,6 +3,7 @@
 #include "graphics/Forward.hpp"
 
 #include "core/Camera.hpp"
+#include "core/Random.hpp"
 #include "core/Types.hpp"
 #include "graphics/Material.hpp"
 #include "graphics/Mesh.hpp"
@@ -38,10 +39,35 @@ struct TransformComponent
   glm::quat rotation{ 1, 0, 0, 0 };
   glm::vec3 scale{ 1 };
 
-  auto compute() -> glm::mat4
+  auto compute() const -> glm::mat4
   {
-    return glm::translate(glm::mat4(1), translation) *
-           glm::mat4_cast(rotation) * glm::scale(glm::mat4(1), scale);
+    static constexpr auto identity = glm::mat4(1);
+    return glm::translate(identity, translation) * glm::mat4_cast(rotation) *
+           glm::scale(identity, scale);
+  }
+};
+
+struct IdentityComponent
+{
+  std::string name;
+  Core::u64 unique_identifier;
+
+  IdentityComponent(const std::string& name, Core::u64 unique_identifier)
+    : name(name)
+    , unique_identifier(unique_identifier)
+  {
+  }
+
+  IdentityComponent(const std::string& n)
+    : name(n)
+    , unique_identifier(Core::Random::random_uint(0))
+  {
+  }
+
+  IdentityComponent(const std::string_view n)
+    : name(n)
+    , unique_identifier(Core::Random::random_uint(0))
+  {
   }
 };
 
@@ -100,13 +126,22 @@ public:
     registry.clear<Ts...>();
   }
 
+  auto create_entity(std::string_view name) -> entt::entity;
+
   auto get_light_environment() const -> const LightEnvironment&
   {
     return light_environment;
   }
+
   auto get_light_environment() -> LightEnvironment&
   {
     return light_environment;
+  }
+
+  template<class... Components>
+  auto view()
+  {
+    return registry.view<Components...>();
   }
 
 private:

@@ -1,7 +1,5 @@
 #version 460
 
-#extension GL_EXT_debug_printf : enable
-
 #include "buffers.glsl"
 
 layout(set = 1, binding = 15) uniform sampler2D predepth_map;
@@ -33,7 +31,7 @@ TestFrustumSides(vec3 c,
 
 // From XeGTAO
 float
-ScreenSpaceToViewSpaceDepth(const float screenDepth)
+screen_space_to_view_space_depth(const float screenDepth)
 {
   float depthLinearizeMul = screen_data.depth_constants.x;
   float depthLinearizeAdd = screen_data.depth_constants.y;
@@ -62,13 +60,6 @@ main()
   ivec2 tileNumber = ivec2(gl_NumWorkGroups.xy);
   uint index = tileID.y * tileNumber.x + tileID.x;
 
-  debugPrintfEXT("Location: %d %d. Index: %d. TileNumber: %d %d",
-                 location.x,
-                 location.y,
-                 index,
-                 tileNumber.x,
-                 tileNumber.y);
-
   // Initialize shared global values for depth and light count
   if (gl_LocalInvocationIndex == 0) {
     shared_min_depth_int = 0xFFFFFFFF;
@@ -83,7 +74,7 @@ main()
   // buffer) for this group's tile
   vec2 tc = vec2(location) / screen_data.full_resolution;
   vec4 lod = textureLod(predepth_map, tc, 0);
-  float linearDepth = ScreenSpaceToViewSpaceDepth(lod.r);
+  float linearDepth = screen_space_to_view_space_depth(lod.r);
 
   // Convert depth to uint so we can do atomic min and max comparisons between
   // the threads

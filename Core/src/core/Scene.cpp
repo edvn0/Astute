@@ -89,7 +89,7 @@ Scene::Scene(const std::string_view name_view)
     Graphics::StaticMesh::construct("Assets/meshes/cerb/cerberus.gltf");
 
   {
-    auto sponza = registry.create();
+    auto sponza = create_entity("Sponza");
     registry.emplace<MeshComponent>(sponza, sponza_mesh);
     auto& transform2 = registry.emplace<TransformComponent>(sponza);
     transform2.translation = { 0, 5, 0 };
@@ -100,7 +100,7 @@ Scene::Scene(const std::string_view name_view)
   }
 
   {
-    auto cerberos = registry.create();
+    auto cerberos = create_entity("Cerberos");
     registry.emplace<MeshComponent>(cerberos, cerberus_mesh);
     auto& transform2 = registry.emplace<TransformComponent>(cerberos);
     transform2.translation = { 0, 5, 0 };
@@ -113,7 +113,7 @@ Scene::Scene(const std::string_view name_view)
   const auto& bounds = sponza_mesh->get_mesh_asset()->get_bounding_box();
   const auto scaled = bounds.scaled(0.01);
   for (auto i = 0; i < 127; i++) {
-    auto light = registry.create();
+    auto light = create_entity(std::format("PointLight{}, i", i));
     registry.emplace<MeshComponent>(light, cube_mesh);
     auto& t = registry.emplace<TransformComponent>(light);
     auto& light_data = registry.emplace<PointLightComponent>(light);
@@ -129,7 +129,7 @@ Scene::Scene(const std::string_view name_view)
   }
 
   for (auto i = 0; i < 127; i++) {
-    auto light = registry.create();
+    auto light = create_entity(std::format("SpotLight{}", i));
     auto& t = registry.emplace<TransformComponent>(light);
     registry.emplace<MeshComponent>(light, cube_mesh);
     t.scale *= 0.1;
@@ -180,8 +180,8 @@ Scene::on_update_editor(f64 ts) -> void
 }
 
 auto
-Scene::on_render_editor(Graphics::Renderer& renderer,
-                        const Camera& camera) -> void
+Scene::on_render_editor(Graphics::Renderer& renderer, const Camera& camera)
+  -> void
 {
   renderer.begin_scene(*this,
                        {
@@ -212,6 +212,14 @@ Scene::on_render_editor(Graphics::Renderer& renderer,
   }
 
   renderer.end_scene();
+}
+
+auto
+Scene::create_entity(const std::string_view entity_name) -> entt::entity
+{
+  auto created_entity = registry.create();
+  registry.emplace<IdentityComponent>(created_entity, entity_name);
+  return created_entity;
 }
 
 } // namespace Engine::Core

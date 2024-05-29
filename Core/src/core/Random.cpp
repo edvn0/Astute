@@ -77,5 +77,11 @@ random(Core::f32 min, Core::f64 max) -> Core::f64
                                                max };
   return distribution(engine);
 }
+auto
+random_uint(Core::u64 min, Core::u64 max) -> Core::u64
+{
+  std::uniform_int_distribution distribution{ min, max };
+  return distribution(engine);
+}
 
 } // namespace Engine::Core

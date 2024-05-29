@@ -24,7 +24,7 @@ private:
   public:
     Core::f32 chromatic_aberration = 0.001f;
 
-    auto expose_to_ui() -> void override;
+    auto expose_to_ui(Material&) -> void override;
     auto apply_to_material(Material&) -> void override;
   };
 };

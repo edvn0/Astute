@@ -118,7 +118,7 @@ private:
       corner = glm::vec3(inv_corner) / inv_corner.w;
     }
 
-    for (uint32_t j = 0; j < 4; j++) {
+    for (Core::u32 j = 0; j < 4; j++) {
       glm::vec3 dist = frustum_corners_world[j + 4] - frustum_corners_world[j];
       frustum_corners_world[j + 4] =
         frustum_corners_world[j] + (dist * split_dist);

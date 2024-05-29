@@ -19,7 +19,7 @@ class RenderPassSettings
 {
 public:
   virtual ~RenderPassSettings() = default;
-  virtual auto expose_to_ui() -> void = 0;
+  virtual auto expose_to_ui(Material&) -> void = 0;
   virtual auto apply_to_material(Material&) -> void {}
 };
 
@@ -69,7 +69,8 @@ public:
   auto expose_settings_to_ui() -> void
   {
     if (settings) {
-      settings->expose_to_ui();
+      const auto& material = std::get<Core::Scope<Material>>(pass);
+      settings->expose_to_ui(*material);
     }
   }
 

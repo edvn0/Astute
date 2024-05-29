@@ -25,7 +25,11 @@ main()
   mat4 model = from_instance_to_model_matrix(
     transform_row_zero, transform_row_one, transform_row_two);
   vec4 computed = model * vec4(position, 1.0);
+#ifdef OLD
   gl_Position =
     directional_shadow_projections.view_projections[pc.cascade_index] *
     computed;
+#else
+  gl_Position = shadow.view_projection * computed;
+#endif
 }

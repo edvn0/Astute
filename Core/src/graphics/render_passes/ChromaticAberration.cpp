@@ -22,8 +22,6 @@
 
 #include "ui/UI.hpp"
 
-#include <FileWatch.hpp>
-
 namespace Engine::Graphics {
 
 auto
@@ -42,8 +40,9 @@ ChromaticAberrationRenderPass::construct_impl() -> void
       .debug_name = "ChromaticAberration",
     });
 
-  chromatic_aberration_shader = Shader::compile_graphics_scoped(
-    "Assets/shaders/deferred.vert", "Assets/shaders/chromatic_aberration.frag");
+  chromatic_aberration_shader =
+    Shader::compile_graphics_scoped("Assets/shaders/chromatic_aberration.vert",
+                                    "Assets/shaders/chromatic_aberration.frag");
   chromatic_aberration_pipeline =
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
       .framebuffer = chromatic_aberration_framebuffer.get(),
@@ -63,6 +62,16 @@ ChromaticAberrationRenderPass::construct_impl() -> void
     Core::make_scope<Material>(Material::Configuration{
       .shader = chromatic_aberration_shader.get(),
     });
+  const auto& input_render_pass = get_renderer().get_render_pass("Deferred");
+  chromatic_aberration_material->set(
+    "fullscreen_texture", input_render_pass.get_colour_attachment(0));
+
+  const auto& geometry_pass = get_renderer().get_render_pass("MainGeometry");
+  chromatic_aberration_material->set("position_map",
+                                     geometry_pass.get_colour_attachment(0));
+  chromatic_aberration_material->set("normal_map",
+                                     geometry_pass.get_colour_attachment(1));
+  get_settings()->apply_to_material(*chromatic_aberration_material);
 }
 
 auto
@@ -75,11 +84,6 @@ ChromaticAberrationRenderPass::execute_impl(CommandBuffer& command_buffer)
           chromatic_aberration_shader,
           chromatic_aberration_pipeline,
           chromatic_aberration_material] = get_data();
-
-  const auto& input_render_pass = get_renderer().get_render_pass("Deferred");
-  chromatic_aberration_material->set(
-    "fullscreen_texture", input_render_pass.get_colour_attachment(0));
-  get_settings()->apply_to_material(*chromatic_aberration_material);
 
   auto* renderer_desc_set =
     get_renderer().generate_and_update_descriptor_write_sets(
@@ -120,12 +124,14 @@ ChromaticAberrationRenderPass::on_resize(const Core::Extent& ext) -> void
 }
 
 auto
-ChromaticAberrationRenderPass::ChromaticAberrationSettings::expose_to_ui()
-  -> void
+ChromaticAberrationRenderPass::ChromaticAberrationSettings::expose_to_ui(
+  Material& material) -> void
 {
   ImGui::Text("Chromatic Aberration Settings");
-  ImGui::SliderFloat(
-    "Intensity", &chromatic_aberration, 0.0001f, 0.05f, "%.4f");
+  if (ImGui::SliderFloat(
+        "Intensity", &chromatic_aberration, 0.0001f, 0.05f, "%.4f")) {
+    material.set("uniforms.aberration_offset", chromatic_aberration);
+  }
 }
 
 auto
