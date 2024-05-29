@@ -28,7 +28,7 @@ PredepthRenderPass::construct_impl() -> void
     .width = ext.width,
     .height = ext.height,
     .clear_depth_on_load = false,
-    .attachments = { VK_FORMAT_D32_SFLOAT },
+    .attachments = { { .format = VK_FORMAT_D32_SFLOAT } },
     .debug_name = "Predepth",
   });
 

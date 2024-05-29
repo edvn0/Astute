@@ -11,15 +11,15 @@ class AstuteApplication : public Application
 {
 public:
   ~AstuteApplication() override;
-  explicit AstuteApplication(Application::Configuration);
+  explicit AstuteApplication(const Application::Configuration&);
 
   auto construct() -> void override;
   auto destruct() -> void override;
-  auto update(f64 time_step) -> void override;
-  auto interpolate(f64 superfluous_time_step) -> void override;
+  auto update(f64) -> void override;
+  auto interpolate(f64) -> void override;
   auto interface() -> void override;
-  auto handle_events(Event& event) -> void override;
-  auto on_resize(const Extent& new_extent) -> void override;
+  auto handle_events(Event&) -> void override;
+  auto on_resize(const Extent&) -> void override;
   auto render() -> void override;
 
 private:
@@ -35,6 +35,9 @@ private:
 
   SceneState scene_state{ SceneState::Edit };
   Ref<Engine::Core::Scene> scene{ nullptr };
+  glm::vec2 viewport_size{ 0, 0 };
+  Ref<entt::entity> selected_entity{ nullptr };
+  auto perform_raycast(const glm::vec2&) -> entt::entity;
 
   using WidgetTuple = std::tuple<Scope<Widgets::SceneWidget>>;
   WidgetTuple widgets;

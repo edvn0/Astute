@@ -486,7 +486,7 @@ Framebuffer::construct_blend_states() const
         blend_attachment_states[i].srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
         blend_attachment_states[i].dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
         break;
-      case FramebufferBlendMode::Zero_SrcColor:
+      case FramebufferBlendMode::ZeroSrcColor:
         blend_attachment_states[i].srcColorBlendFactor = VK_BLEND_FACTOR_ZERO;
         blend_attachment_states[i].dstColorBlendFactor =
           VK_BLEND_FACTOR_SRC_COLOR;

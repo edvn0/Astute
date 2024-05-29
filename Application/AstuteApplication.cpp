@@ -7,12 +7,42 @@
 #include "core/Scene.hpp"
 #include "graphics/Window.hpp"
 
-static constexpr auto for_each_in_tuple = [](auto&& tuple, auto&& func) {
+namespace Utilities {
+
+auto
+calculate_ray(const glm::vec2& mouse_pos,
+              const glm::mat4& view_matrix,
+              const glm::mat4& projection_matrix,
+              const glm::vec2& viewport_size) -> glm::vec3
+{
+  // Normalize the mouse coordinates to range [-1, 1]
+  glm::vec2 normalized_coords =
+    glm::vec2((2.0F * mouse_pos.x) / viewport_size.x - 1.0F,
+              1.0F - (2.0F * mouse_pos.y) / viewport_size.y);
+
+  // Clip coordinates
+  glm::vec4 clip_coords = glm::vec4(normalized_coords, -1.0F, 1.0F);
+
+  // Convert to eye coordinates
+  glm::vec4 eye_coords = glm::inverse(projection_matrix) * clip_coords;
+  eye_coords = glm::vec4(eye_coords.x, eye_coords.y, -1.0F, 0.0F);
+
+  // Convert to world coordinates
+  glm::vec3 ray_world =
+    glm::normalize(glm::vec3(glm::inverse(view_matrix) * eye_coords));
+
+  return ray_world;
+}
+
+} // namespace utilities
+namespace {
+
+constexpr auto for_each_in_tuple = [](auto&& tuple, auto&& func) {
   std::apply([&func](auto&&... args) { (func(args), ...); }, tuple);
 };
 
-static constexpr auto
-map_to_renderer_config(Application::Configuration config)
+constexpr auto
+map_to_renderer_config(const Application::Configuration& config)
   -> Renderer::Configuration
 {
   Renderer::Configuration renderer_config;
@@ -20,9 +50,13 @@ map_to_renderer_config(Application::Configuration config)
   return renderer_config;
 }
 
+u32 chosen_image{ 0 };
+
+}
+
 AstuteApplication::~AstuteApplication() = default;
 
-AstuteApplication::AstuteApplication(Application::Configuration config)
+AstuteApplication::AstuteApplication(const Application::Configuration& config)
   : Application(config)
   , renderer(new Renderer{ map_to_renderer_config(config), &get_window() })
   , camera(new EditorCamera{ 79.0F,
@@ -48,13 +82,13 @@ AstuteApplication::update(f64 ts) -> void
       scene->on_update_editor(ts);
       break;
     case Play:
-      // TODO: Implement play mode
+      // TODO(edvin): Implement play mode
       break;
     case Pause:
-      // TODO: Implement pause mode
+      // TODO(edvin): Implement pause mode
       break;
     case Simulate:
-      // TODO: Implement simulate mode
+      // TODO(edvin): Implement simulate mode
       break;
   }
 
@@ -79,8 +113,6 @@ AstuteApplication::render() -> void
   }
 }
 
-static u32 chosen_image{ 0 };
-
 auto
 AstuteApplication::interface() -> void
 {
@@ -93,6 +125,7 @@ AstuteApplication::interface() -> void
                    {
                      .extent = { w, h },
                    });
+    viewport_size = { w, h };
   });
 
   UI::scope("Output Depth", [&](f32 w, f32 h) {
@@ -197,6 +230,31 @@ AstuteApplication::handle_events(Event& event) -> void
     return false;
   });
 
+  dispatcher.dispatch<MouseButtonPressedEvent>(
+    [this](MouseButtonPressedEvent& ev) {
+      if (ev.get_button() == MouseCode::MOUSE_BUTTON_LEFT) {
+        auto&& [mouse_x, mouse_y] = Engine::Core::Input::mouse_position();
+
+        auto* io = ImGui::GetMainViewport();
+        float imgui_mouse_x =
+          static_cast<float>(mouse_x) - io->DrawData->DisplayPos.x;
+        float imgui_mouse_y =
+          static_cast<float>(mouse_y) - io->DrawData->DisplayPos.y;
+
+        glm::vec2 mouse_pos(imgui_mouse_x, imgui_mouse_y);
+        if (selected_entity) {
+          *selected_entity = perform_raycast(mouse_pos);
+        } else {
+          selected_entity = make_ref<entt::entity>(perform_raycast(mouse_pos));
+        }
+
+        auto& scene_widget = std::get<0>(widgets);
+        scene_widget->set_selected_entity(selected_entity);
+        return true;
+      }
+      return false;
+    });
+
   for_each_in_tuple(widgets,
                     [&event](auto& widget) { widget->handle_events(event); });
 
@@ -230,4 +288,14 @@ AstuteApplication::destruct() -> void
 
   scene.reset();
   renderer.reset();
+}
+
+auto
+AstuteApplication::perform_raycast(const glm::vec2& mouse_pos) -> entt::entity
+{
+  auto ray = Utilities::calculate_ray(mouse_pos,
+                                      camera->get_view_matrix(),
+                                      camera->get_projection_matrix(),
+                                      viewport_size);
+  return scene->find_intersected_entity(ray, camera->get_position());
 }

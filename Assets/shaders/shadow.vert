@@ -30,6 +30,7 @@ main()
     directional_shadow_projections.view_projections[pc.cascade_index] *
     computed;
 #else
-  gl_Position = shadow.view_projection * computed;
+  uint c = pc.cascade_index;
+  gl_Position = shadow.view_projection * computed * c / c;
 #endif
 }

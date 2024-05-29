@@ -34,11 +34,11 @@ MainGeometryRenderPass::construct_impl() -> void
       .height= ext.height,
       .clear_depth_on_load = false,
       .attachments = {
-          VK_FORMAT_R32G32B32A32_SFLOAT, // world pos
-          VK_FORMAT_R32G32B32A32_SFLOAT, // normals
-          VK_FORMAT_R32G32B32A32_SFLOAT, // albedo + specular strength
-          VK_FORMAT_R32_SFLOAT, // shadow position
-          VK_FORMAT_D32_SFLOAT, // depth
+          { .format = VK_FORMAT_R32G32B32A32_SFLOAT, }, // world pos
+          { .format = VK_FORMAT_R32G32B32A32_SFLOAT, }, // normals
+          { .format = VK_FORMAT_R32G32B32A32_SFLOAT, }, // albedo + specular strength
+          { .format = VK_FORMAT_R32_SFLOAT, }, // shadow position
+          { .format=VK_FORMAT_D32_SFLOAT, }, // depth
       },
       .samples = VK_SAMPLE_COUNT_1_BIT,
       .existing_images = { {4, get_renderer().get_render_pass("Predepth").get_depth_attachment(), }, },

@@ -63,7 +63,7 @@ auto
 begin(std::format_string<Args...> format, Args&&... args)
 {
   std::string formatted = std::format(format, std::forward<Args>(args)...);
-  return Impl::begin(formatted.c_str());
+  return Impl::begin(formatted);
 }
 
 inline auto
@@ -98,8 +98,8 @@ scope(const std::string_view name, auto&& func)
 
 template<class T>
 auto
-image(const Graphics::Image& image,
-      InterfaceImageProperties<T> properties = {}) -> void
+image(const Graphics::Image& image, InterfaceImageProperties<T> properties = {})
+  -> void
 {
   const auto array_index_or_zero = properties.image_array_index.value_or(0);
   if constexpr (std::is_same_v<T, Core::f32>) {

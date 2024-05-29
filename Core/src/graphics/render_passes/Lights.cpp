@@ -23,7 +23,10 @@ LightsRenderPass::construct_impl() -> void
     .height = get_renderer().get_size().height,
     .clear_colour_on_load = false,
     .clear_depth_on_load = false,
-    .attachments = { { VK_FORMAT_R32G32B32A32_SFLOAT, VK_FORMAT_D32_SFLOAT } },
+    .attachments = { {
+      { .format = VK_FORMAT_R32G32B32A32_SFLOAT },
+      { .format = VK_FORMAT_D32_SFLOAT },
+    } },
     .samples = VK_SAMPLE_COUNT_1_BIT,
     .existing_images = { {
                            0,

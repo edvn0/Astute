@@ -70,7 +70,7 @@ DeferredRenderPass::construct_impl() -> void
     Core::make_scope<Framebuffer>(FramebufferSpecification{
       .width = ext.width,
       .height = ext.height,
-      .attachments = { VK_FORMAT_R32G32B32A32_SFLOAT, },
+      .attachments = { { .format = VK_FORMAT_R32G32B32A32_SFLOAT, }, },
       .debug_name = "Deferred",
     });
 

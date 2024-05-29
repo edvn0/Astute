@@ -15,6 +15,60 @@
 
 namespace Engine::Core {
 
+namespace Utilities {
+
+auto
+intersects(const Engine::Core::AABB& aabb,
+           const glm::vec3& ray,
+           const glm::vec3& origin) -> bool
+{
+  glm::vec3 inv_dir = 1.0F / ray;
+  glm::vec3 t0s = (aabb.min - origin) * inv_dir;
+  glm::vec3 t1s = (aabb.max - origin) * inv_dir;
+
+  glm::vec3 tmins = glm::min(t0s, t1s);
+  glm::vec3 tmaxs = glm::max(t0s, t1s);
+
+  float tmin = std::max(std::max(tmins.x, tmins.y), tmins.z);
+  float tmax = std::min(std::min(tmaxs.x, tmaxs.y), tmaxs.z);
+
+  return tmax >= tmin;
+}
+
+auto
+calculate_aabb(const TransformComponent& transform) -> Engine::Core::AABB
+{
+  glm::vec3 aabb_min = glm::vec3(-0.5F) * transform.scale;
+  glm::vec3 aabb_max = glm::vec3(0.5F) * transform.scale;
+
+  std::array vertices = {
+    aabb_min,
+    glm::vec3(aabb_min.x, aabb_min.y, aabb_max.z),
+    glm::vec3(aabb_min.x, aabb_max.y, aabb_min.z),
+    glm::vec3(aabb_min.x, aabb_max.y, aabb_max.z),
+    glm::vec3(aabb_max.x, aabb_min.y, aabb_min.z),
+    glm::vec3(aabb_max.x, aabb_min.y, aabb_max.z),
+    glm::vec3(aabb_max.x, aabb_max.y, aabb_min.z),
+    aabb_max,
+  };
+
+  glm::mat4 model_matrix =
+    glm::translate(glm::mat4(1.0F), transform.translation) *
+    glm::mat4_cast(transform.rotation) *
+    glm::scale(glm::mat4(1.0F), transform.scale);
+
+  Engine::Core::AABB aabb;
+  for (const auto& vertex : vertices) {
+    glm::vec3 transformed_vertex =
+      glm::vec3(model_matrix * glm::vec4(vertex, 1.0F));
+    aabb.update_min_max(transformed_vertex);
+  }
+
+  return aabb;
+}
+
+}
+
 static constexpr auto sun_radius = sqrt(30 * 30 + 70 * 70 + 30 * 30);
 
 template<typename Component, typename Light>
@@ -149,7 +203,7 @@ Scene::Scene(const std::string_view name_view)
 auto
 Scene::on_update_editor(f64 ts) -> void
 {
-  static f64 time = 0.0f;
+  static f64 time = 0.0F;
   time += ts;
 
   // Update sun position to orbit around the origin
@@ -220,6 +274,30 @@ Scene::create_entity(const std::string_view entity_name) -> entt::entity
   auto created_entity = registry.create();
   registry.emplace<IdentityComponent>(created_entity, entity_name);
   return created_entity;
+}
+
+auto
+Scene::find_intersected_entity(const glm::vec3& ray,
+                               const glm::vec3& camera_position) -> entt::entity
+{
+  auto closest_distance = std::numeric_limits<float>::max();
+  entt::entity closest_entity = entt::null;
+
+  auto view = registry.view<const TransformComponent>();
+  for (auto entity : view) {
+    const auto& transform = view.get<TransformComponent>(entity);
+    Engine::Core::AABB aabb = Utilities::calculate_aabb(transform);
+
+    if (Utilities::intersects(aabb, ray, camera_position)) {
+      float distance = glm::distance(camera_position, transform.translation);
+      if (distance < closest_distance) {
+        closest_distance = distance;
+        closest_entity = entity;
+      }
+    }
+  }
+
+  return closest_entity;
 }
 
 } // namespace Engine::Core
