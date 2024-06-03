@@ -41,8 +41,7 @@ LightCullingRenderPass::construct_impl() -> void
 }
 
 auto
-LightCullingRenderPass::execute_impl(CommandBuffer& command_buffer)
-  -> void
+LightCullingRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 {
   ASTUTE_PROFILE_FUNCTION();
 

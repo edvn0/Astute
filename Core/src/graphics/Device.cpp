@@ -9,8 +9,8 @@
 namespace Engine::Graphics {
 
 auto
-Device::is_device_suitable(VkPhysicalDevice device,
-                           VkSurfaceKHR surface) -> bool
+Device::is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface)
+  -> bool
 {
   Core::i32 graphics_family_index = -1;
   Core::i32 present_family_index = -1;
@@ -99,6 +99,9 @@ Device::is_device_suitable(VkPhysicalDevice device,
     is_suitable = false;
   }
   if (!supported_features.pipelineStatisticsQuery) {
+    is_suitable = false;
+  }
+  if (!supported_features.independentBlend) {
     is_suitable = false;
   }
 
@@ -235,6 +238,7 @@ Device::create_device(VkSurfaceKHR surface) -> void
   device_features.wideLines = VK_TRUE;
   device_features.sampleRateShading = VK_TRUE;
   device_features.pipelineStatisticsQuery = VK_TRUE;
+  device_features.independentBlend = VK_TRUE;
 
   VkPhysicalDeviceFeatures2 device_features_2{};
   VkPhysicalDeviceMemoryPriorityFeaturesEXT memory_priority_features{};
@@ -357,7 +361,7 @@ Device::execute_immediate(QueueType type,
   }
 
   // Submit to queue
-  auto queue = get_queue(type);
+  auto* queue = get_queue(type);
   vkQueueSubmit(queue, 1, &submit_info, to_use);
   static constexpr auto default_fence_timeout = 100000000000;
   vkWaitForFences(device(), 1, &to_use, VK_TRUE, default_fence_timeout);

@@ -62,14 +62,12 @@ main()
   fragment_albedo_spec.a = specular_strength * roughness_value;
 
   fragment_position = vec4(world_space_fragment_position, 1.0);
-
   uint chosen_cascade_index = 0;
   for (uint i = 0; i < 3; ++i) {
     if (view_position.z < renderer.cascade_splits[i]) {
       chosen_cascade_index = i + 1;
     }
   }
-
   vec4 shadow_space_fragment_position =
     bias *
     directional_shadow_projections.view_projections[chosen_cascade_index] *
@@ -83,7 +81,7 @@ main()
       0.005 * (1.0 - dot(N, normalize(-shadow.sun_direction.xyz))), 0.0005F);
 
     float shadow_value_here =
-      1.0F - texture(shadow_map, vec3(shadow_uvs.xy, chosen_cascade_index)).r;
+      texture(shadow_map, vec3(shadow_uvs.xy, chosen_cascade_index)).r;
     fragment_shadow_value = shadow_value_here > shadow_uvs.z - bias ? 1.0 : 0.2;
   }
 }

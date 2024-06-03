@@ -25,6 +25,7 @@ public:
   ~Material();
 
   auto set(std::string_view, const Core::Ref<Image>&) -> bool;
+  auto set(std::string_view, const StorageBuffer&) -> bool;
   auto override_property(std::string_view, const Core::Ref<Image>&) -> bool;
 
   template<glm::length_t L, typename T, glm::qualifier Q>
@@ -68,6 +69,7 @@ public:
 private:
   const Shader* shader{ nullptr };
   std::unordered_map<std::string, Core::Ref<Image>> images{};
+  std::unordered_map<std::string, const StorageBuffer*> storage_buffers;
 
   Core::FrameBasedCollection<
     std::unordered_map<Core::u32, VkWriteDescriptorSet>>

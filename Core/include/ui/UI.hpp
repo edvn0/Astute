@@ -12,10 +12,15 @@ namespace Engine::Core::UI {
 template<Number T>
 struct InterfaceImageProperties
 {
-  Core::BasicExtent<T> extent{ T{ 64 }, T{ 64 } };
-  Core::Vec4 colour{ 1.0, 1.0, 1.0, 1.0 };
-  bool flipped{ false };
-  std::optional<Core::u32> image_array_index{};
+  const Core::BasicExtent<T> extent{ T{ 64 }, T{ 64 } };
+  const Core::Vec4 colour{ 1.0, 1.0, 1.0, 1.0 };
+  const bool flipped{ false };
+  const std::optional<Core::u32> image_array_index{};
+};
+
+struct WindowConfiguration
+{
+  const bool expandable{ true };
 };
 
 namespace Impl {
@@ -23,7 +28,7 @@ auto
 coloured_text(const Core::Vec4&, std::string&&) -> void;
 
 auto
-begin(const std::string_view) -> bool;
+begin(std::string_view, const WindowConfiguration& = {}) -> bool;
 
 auto
 end() -> void;
@@ -37,7 +42,6 @@ image(const Graphics::Image& image,
       const Core::Vec4& colour,
       bool flipped,
       Core::u32 array_index) -> void;
-
 }
 
 template<typename... Args>
@@ -79,9 +83,11 @@ get_window_size() -> Core::Vec2
 }
 
 inline auto
-scope(const std::string_view name, auto&& func)
+scope(const std::string_view name,
+      auto&& func,
+      const WindowConfiguration& window_config = {})
 {
-  Impl::begin(name);
+  Impl::begin(name, window_config);
   const auto size = ImGui::GetWindowSize();
   if constexpr (std::is_invocable_v<decltype(func), Core::Vec2>) {
     func({ size.x, size.y });

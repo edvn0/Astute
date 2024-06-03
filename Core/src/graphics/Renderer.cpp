@@ -20,7 +20,9 @@
 #include "graphics/RendererExtensions.hpp"
 #include "graphics/TextureGenerator.hpp"
 
+#include "graphics/render_passes/Bloom.hpp"
 #include "graphics/render_passes/ChromaticAberration.hpp"
+#include "graphics/render_passes/Composition.hpp"
 #include "graphics/render_passes/Deferred.hpp"
 #include "graphics/render_passes/LightCulling.hpp"
 #include "graphics/render_passes/Lights.hpp"
@@ -71,15 +73,15 @@ Renderer::generate_and_update_descriptor_write_sets(Material& material)
   if (write_descriptor_sets.empty()) {
     write_descriptor_sets.reserve(structure_identifiers.size());
     for (const auto& identifier : structure_identifiers) {
-      auto write = shader->get_descriptor_set(identifier->get_name(), 0);
-      if (!write) {
+      const auto* write = shader->get_descriptor_set(identifier->get_name(), 0);
+      if (write == nullptr) {
         error("Failed to find descriptor set for identifier: {}",
               identifier->get_name());
         continue;
       }
 
-      auto* buffer_info = &identifier->get_descriptor_info();
-      if (!buffer_info) {
+      const auto* buffer_info = &identifier->get_descriptor_info();
+      if (buffer_info == nullptr) {
         error("Failed to find buffer info for identifier: {}",
               identifier->get_name());
         continue;
@@ -101,7 +103,7 @@ Renderer::generate_and_update_descriptor_write_sets(Material& material)
   const auto& layouts = shader->get_descriptor_set_layouts();
   alloc_info.descriptorSetCount = 1;
   alloc_info.pSetLayouts = &layouts.at(0);
-  auto allocated =
+  auto* allocated =
     DescriptorResource::the().allocate_descriptor_set(alloc_info);
 
   for (auto& wds : write_descriptor_sets) {
@@ -142,8 +144,9 @@ Renderer::Renderer(Configuration config, const Window* window)
   std::unordered_map<RendererTechnique, std::vector<std::string>>
     technique_construction_order;
   technique_construction_order[RendererTechnique::Deferred] = {
-    "Shadow",   "Predepth", "MainGeometry",
-    "Deferred", "Lights",   "ChromaticAberration"
+    "Shadow",   "Predepth",    "MainGeometry",
+    "Deferred", "Lights",      "ChromaticAberration",
+    "Bloom",    "Composition",
   };
 
   render_passes["MainGeometry"] =
@@ -153,8 +156,12 @@ Renderer::Renderer(Configuration config, const Window* window)
   render_passes["Deferred"] = Core::make_scope<DeferredRenderPass>(*this);
   render_passes["Predepth"] = Core::make_scope<PredepthRenderPass>(*this);
   render_passes["Lights"] = Core::make_scope<LightsRenderPass>(*this);
+  render_passes["LightCulling"] =
+    Core::make_scope<LightCullingRenderPass>(*this, light_culling_work_groups);
   render_passes["ChromaticAberration"] =
     Core::make_scope<ChromaticAberrationRenderPass>(*this);
+  render_passes["Composition"] = Core::make_scope<CompositionRenderPass>(*this);
+  render_passes["Bloom"] = Core::make_scope<BloomRenderPass>(*this);
 
   for (const auto& k :
        technique_construction_order.at(RendererTechnique::Deferred)) {
@@ -164,15 +171,14 @@ Renderer::Renderer(Configuration config, const Window* window)
   technique_construction_order[RendererTechnique::ForwardPlus] = {
     "LightCulling"
   };
-
-  render_passes["LightCulling"] =
-    Core::make_scope<LightCullingRenderPass>(*this, light_culling_work_groups);
   for (const auto& k :
        technique_construction_order.at(RendererTechnique::ForwardPlus)) {
     render_passes.at(k)->construct();
   }
 
-  this->activate_post_processing_step("ChromaticAberration");
+  activate_post_processing_step("Bloom");
+  activate_post_processing_step("ChromaticAberration");
+  activate_post_processing_step("Composition");
 
   transform_buffers.resize(3);
   static constexpr auto total_size = 100 * 1000 * sizeof(TransformVertexData);
@@ -218,10 +224,18 @@ Renderer::Renderer(Configuration config, const Window* window)
 
   struct
   {
-    auto get_device() const -> VkDevice { return Device::the().device(); }
-    auto get_queue_type() const -> QueueType { return QueueType::Graphics; }
+    [[nodiscard]] static auto get_device() -> VkDevice
+    {
+      return Device::the().device();
+    }
+    [[nodiscard]] static auto get_queue_type() -> QueueType
+    {
+      return QueueType::Graphics;
+    }
   } a{};
   thread_pool = Core::make_scope<ED::ThreadPool>(a, 4U);
+
+  renderer_2d = Core::make_scope<Renderer2D>(*this, 1000U);
 }
 
 Renderer::~Renderer() = default;
@@ -255,11 +269,13 @@ Renderer::begin_scene(Core::Scene& scene,
     auto& deferred = get_render_pass("Deferred");
     auto& predepth = get_render_pass("Predepth");
     auto& lights = get_render_pass("Lights");
+    auto& chromatic_aberration = get_render_pass("ChromaticAberration");
     predepth.on_resize(size);
     shadow_render_pass.on_resize(size);
     main_geom.on_resize(size);
     deferred.on_resize(size);
     lights.on_resize(size);
+    chromatic_aberration.on_resize(size);
 
     const glm::uvec2 viewport_size{ size.width, size.height };
 
@@ -288,6 +304,8 @@ Renderer::begin_scene(Core::Scene& scene,
   camera_pos = camera.camera.get_position();
   light_colour_intensity = light_environment.colour_and_intensity;
   specular_colour_intensity = light_environment.specular_colour_and_intensity;
+  compute_directional_shadow_projections(
+    camera, glm::normalize(-light_environment.sun_position));
   ubo_cascade_splits = cascade_splits;
   renderer_ubo.update();
 
@@ -328,8 +346,6 @@ Renderer::begin_scene(Core::Scene& scene,
   static auto begin = Core::Clock::now();
   screen_data.time = static_cast<Core::f32>(Core::Clock::now() - begin);
   screen_data_ubo.update();
-
-  compute_directional_shadow_projections(camera, glm::vec3(light_dir));
 }
 
 auto
@@ -405,9 +421,9 @@ Renderer::submit_static_mesh(Core::Ref<StaticMesh>& static_mesh,
 
 auto
 Renderer::submit_static_light(Core::Ref<StaticMesh>& static_mesh,
-                              const glm::mat4& transform) -> void
+                              const glm::mat4& transform,
+                              const glm::vec4& colour_times_intensity) -> void
 {
-
   const auto& source = static_mesh->get_mesh_asset();
   const auto& submesh_data = source->get_submeshes();
   for (const auto submesh_index : static_mesh->get_submeshes()) {
@@ -444,6 +460,7 @@ Renderer::submit_static_light(Core::Ref<StaticMesh>& static_mesh,
     command.static_mesh = static_mesh;
     command.submesh_index = submesh_index;
     command.instance_count++;
+    lights_instance_data.emplace_back(colour_times_intensity);
   }
 }
 
@@ -501,15 +518,15 @@ Renderer::flush_draw_lists() -> void
 
     render_passes.at("Lights")->execute(*command_buffer);
   } else if (technique == RendererTechnique::ForwardPlus) {
-    // TODO: Not yet implemented.
     render_passes.at("ForwardPlusGeometry")->execute(*command_buffer);
     render_passes.at("Composite")->execute(*command_buffer);
   }
 
   for (const auto& step : post_processing_steps) {
-    if (!render_passes.contains(step))
+    if (!render_passes.contains(step.name)) {
       continue;
-    const auto& render_pass = render_passes.at(step);
+    }
+    const auto& render_pass = render_passes.at(step.name);
     render_pass->execute(*command_buffer);
   }
 
@@ -520,19 +537,47 @@ Renderer::flush_draw_lists() -> void
   shadow_draw_commands.clear();
   lights_draw_commands.clear();
   mesh_transform_map.clear();
+  lights_instance_data.clear();
 }
 
 auto
-Renderer::screenshot() -> void
+Renderer::screenshot() const -> void
 {
   static auto index = 0ULL;
   Device::the().wait();
-  auto image = get_final_output();
-  if (image->write_to_file(std::format("screenshot-{}.png", index))) {
+  const auto* image = get_final_output();
+  if (image->write_to_file(
+        std::format("Assets/images/screenshot-{}.png", index))) {
     info("Screenshot saved to screenshot.png");
+    index++;
   } else {
     error("Failed to save screenshot to screenshot.png");
   }
+}
+
+auto
+Renderer::get_shadow_output_image() const -> const Image*
+{
+  return render_passes.at("Shadow")
+    ->get_extraneous_framebuffer(0)
+    ->get_depth_attachment()
+    .get();
+}
+
+[[nodiscard]] auto
+Renderer::get_final_output() const -> const Image*
+{
+  if (!post_processing_steps.empty()) {
+    return render_passes.at("Composition")
+      ->get_framebuffer()
+      ->get_colour_attachment(0)
+      .get();
+  }
+
+  return render_passes.at("Lights")
+    ->get_framebuffer()
+    ->get_colour_attachment(0)
+    .get();
 }
 
 } // namespace Engine::Graphics

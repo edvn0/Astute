@@ -6,21 +6,25 @@
 
 namespace ED {
 
-CommandBufferDispatcher::CommandBufferDispatcher()
+CommandBufferDispatcher::CommandBufferDispatcher(
+  Engine::Graphics::CommandBuffer& buf,
+  VkRenderPass rp,
+  VkFramebuffer fb)
+  : command_buffer(&buf)
 {
-  command_buffer = Engine::Core::make_scope<Engine::Graphics::CommandBuffer>(
-    Engine::Graphics::CommandBuffer::Properties{
-      .queue_type = Engine::Graphics::QueueType::Graphics,
-      .primary = true,
-      .image_count = 1,
-    });
-
-  inheritance_info = {};
+  inheritance_info = {
+    .renderPass = rp,
+    .framebuffer = fb,
+  };
   inheritance_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
 
   inherited_begin_info = {};
   inherited_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   inherited_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  if (rp != nullptr && fb != nullptr) {
+    inherited_begin_info.flags |=
+      VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+  }
   inherited_begin_info.pInheritanceInfo = &inheritance_info;
 }
 
@@ -37,9 +41,11 @@ CommandBufferDispatcher::construct_secondary()
 }
 
 auto
-CommandBufferDispatcher::execute() -> void
+CommandBufferDispatcher::execute(bool begin_end) -> void
 {
-  command_buffer->begin();
+  if (begin_end) {
+    command_buffer->begin();
+  }
   std::vector<Engine::Core::Scope<Engine::Graphics::CommandBuffer>>
     secondary_command_buffers;
 
@@ -63,8 +69,9 @@ CommandBufferDispatcher::execute() -> void
   vkCmdExecuteCommands(command_buffer->get_command_buffer(),
                        static_cast<Engine::Core::u32>(secondary_buffers.size()),
                        secondary_buffers.data());
-
-  vkEndCommandBuffer(command_buffer->get_command_buffer());
+  if (begin_end) {
+    vkEndCommandBuffer(command_buffer->get_command_buffer());
+  }
 
   command_buffer->submit();
 }

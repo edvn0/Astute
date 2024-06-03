@@ -42,6 +42,12 @@ GPUBuffer::GPUBuffer(GPUBufferType type, Core::usize input_size)
 {
   alloc_impl = Core::make_scope<GPUBufferImpl>();
   construct_buffer();
+
+  descriptor_info = {
+    .buffer = buffer,
+    .offset = 0,
+    .range = get_size(),
+  };
 }
 
 GPUBuffer::~GPUBuffer()
@@ -129,7 +135,8 @@ GPUBuffer::write(const void* write_data, const Core::usize write_size) -> void
     std::memcpy(
       alloc_impl->allocation_info.pMappedData, write_data, write_size);
   } else {
-    auto* mapped = allocator.map_memory(alloc_impl->allocation);
+    auto* mapped =
+      std::bit_cast<void*>(allocator.map_memory(alloc_impl->allocation));
     std::memcpy(mapped, write_data, write_size);
     allocator.unmap_memory(alloc_impl->allocation);
   }

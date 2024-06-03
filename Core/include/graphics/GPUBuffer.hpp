@@ -4,7 +4,6 @@
 #include "core/Types.hpp"
 
 #include <span>
-#include <type_traits>
 #include <vector>
 #include <vulkan/vulkan.h>
 
@@ -53,12 +52,19 @@ public:
   [[nodiscard]] auto get_buffer() const -> VkBuffer { return buffer; }
   auto copy_to(GPUBuffer&) -> void;
 
+  [[nodiscard]] auto get_descriptor_info() const -> const auto&
+  {
+    return descriptor_info;
+  }
+
 private:
   Core::usize size;
 
   GPUBufferType buffer_type{ GPUBufferType::Invalid };
   VkBuffer buffer;
   Core::Scope<GPUBufferImpl> alloc_impl;
+
+  VkDescriptorBufferInfo descriptor_info{};
 
   auto write(const void*, Core::usize) -> void;
   auto construct_buffer() -> void;
@@ -69,6 +75,7 @@ private:
   friend class VertexBuffer;
   friend class IndexBuffer;
   friend class StagingBuffer;
+  friend class StorageBuffer;
 };
 
 class StagingBuffer
@@ -93,6 +100,11 @@ public:
   [[nodiscard]] auto get_buffer() const -> VkBuffer
   {
     return buffer.get_buffer();
+  }
+
+  [[nodiscard]] auto get_descriptor_info() const -> const auto&
+  {
+    return buffer.get_descriptor_info();
   }
 
 private:
@@ -144,13 +156,27 @@ public:
     buffer.write(temp_buffer.raw(), new_size);
   }
 
-  auto size() const -> Core::usize { return buffer.get_size(); }
-  auto get_buffer() const -> VkBuffer { return buffer.get_buffer(); }
+  [[nodiscard]] auto size() const -> Core::usize { return buffer.get_size(); }
+  [[nodiscard]] auto get_buffer() const -> VkBuffer
+  {
+    return buffer.get_buffer();
+  }
 
   template<typename U>
   void write(std::span<U> data)
   {
     buffer.write(data.data(), data.size_bytes());
+  }
+
+  template<typename U>
+  void write(const U* data, const Core::u32 size)
+  {
+    buffer.write(data, size);
+  }
+
+  [[nodiscard]] auto get_descriptor_info() const -> const auto&
+  {
+    return buffer.get_descriptor_info();
   }
 
 private:
@@ -178,12 +204,20 @@ public:
     buffer.write(indices, size);
   }
 
-  auto size() const -> Core::usize { return buffer.get_size(); }
-  auto count() const -> Core::usize
+  [[nodiscard]] auto size() const -> Core::usize { return buffer.get_size(); }
+  [[nodiscard]] auto count() const -> Core::usize
   {
     return buffer.get_size() / sizeof(Core::u32);
   }
-  auto get_buffer() const -> VkBuffer { return buffer.get_buffer(); }
+  [[nodiscard]] auto get_buffer() const -> VkBuffer
+  {
+    return buffer.get_buffer();
+  }
+
+  [[nodiscard]] auto get_descriptor_info() const -> const auto&
+  {
+    return buffer.get_descriptor_info();
+  }
 
 private:
   GPUBuffer buffer;
@@ -193,31 +227,33 @@ class StorageBuffer
 {
 public:
   template<class T>
-  StorageBuffer(const std::span<T> data)
+  explicit StorageBuffer(const std::span<T> data)
     : buffer(GPUBufferType::Storage, data.size_bytes())
   {
     buffer.write(data);
   }
 
-  auto size() const -> Core::usize { return buffer.get_size(); }
-  auto get_buffer() const -> VkBuffer { return buffer.get_buffer(); }
-
-private:
-  GPUBuffer buffer;
-};
-
-class UniformBuffer
-{
-public:
-  template<class T>
-  explicit UniformBuffer(const std::span<T> data)
-    : buffer(GPUBufferType::Uniform, data.size_bytes())
+  explicit StorageBuffer(const Core::usize size)
+    : buffer(GPUBufferType::Storage, size)
   {
-    buffer.write(data);
   }
 
-  auto size() const -> Core::usize { return buffer.get_size(); }
-  auto get_buffer() const -> VkBuffer { return buffer.get_buffer(); }
+  [[nodiscard]] auto size() const -> Core::usize { return buffer.get_size(); }
+  [[nodiscard]] auto get_buffer() const -> VkBuffer
+  {
+    return buffer.get_buffer();
+  }
+
+  [[nodiscard]] auto get_descriptor_info() const -> const auto&
+  {
+    return buffer.get_descriptor_info();
+  }
+
+  template<typename U>
+  void write(std::span<U> data)
+  {
+    buffer.write(data.data(), data.size_bytes());
+  }
 
 private:
   GPUBuffer buffer;
@@ -227,10 +263,11 @@ class IShaderBindable
 {
 public:
   virtual ~IShaderBindable() = default;
-  virtual auto get_buffer() const -> VkBuffer = 0;
-  virtual auto get_descriptor_info() const -> const VkDescriptorBufferInfo& = 0;
-  virtual auto get_name() const -> const std::string& = 0;
-  virtual auto size() const -> Core::usize = 0;
+  [[nodiscard]] virtual auto get_buffer() const -> VkBuffer = 0;
+  [[nodiscard]] virtual auto get_descriptor_info() const
+    -> const VkDescriptorBufferInfo& = 0;
+  [[nodiscard]] virtual auto get_name() const -> const std::string& = 0;
+  [[nodiscard]] virtual auto size() const -> Core::usize = 0;
 };
 
 template<class T, GPUBufferType BufferType = GPUBufferType::Uniform>
@@ -244,11 +281,6 @@ public:
   {
     buffer = Core::make_scope<GPUBuffer>(BufferType, sizeof(T));
     buffer->write(&pod_data, sizeof(T));
-    descriptor_info = VkDescriptorBufferInfo{
-      .buffer = buffer->get_buffer(),
-      .offset = 0,
-      .range = sizeof(T),
-    };
   }
 
   UniformBufferObject()
@@ -256,11 +288,6 @@ public:
   {
     buffer = Core::make_scope<GPUBuffer>(BufferType, sizeof(T));
     buffer->write(&pod_data, sizeof(T));
-    descriptor_info = VkDescriptorBufferInfo{
-      .buffer = buffer->get_buffer(),
-      .offset = 0,
-      .range = sizeof(T),
-    };
   }
 
   explicit UniformBufferObject(Core::usize size,
@@ -271,11 +298,6 @@ public:
     Core::DataBuffer zero{ size };
     zero.fill_zero();
     buffer->write(zero.raw(), size);
-    descriptor_info = VkDescriptorBufferInfo{
-      .buffer = buffer->get_buffer(),
-      .offset = 0,
-      .range = size,
-    };
   }
 
   ~UniformBufferObject() override = default;
@@ -286,15 +308,16 @@ public:
     Core::DataBuffer zero{ new_size };
     zero.fill_zero();
     buffer->write(zero.raw(), new_size);
-    descriptor_info = VkDescriptorBufferInfo{
-      .buffer = buffer->get_buffer(),
-      .offset = 0,
-      .range = new_size,
-    };
   }
 
-  auto size() const -> Core::usize override { return buffer->get_size(); }
-  auto get_buffer() const -> VkBuffer override { return buffer->get_buffer(); }
+  [[nodiscard]] auto size() const -> Core::usize override
+  {
+    return buffer->get_size();
+  }
+  [[nodiscard]] auto get_buffer() const -> VkBuffer override
+  {
+    return buffer->get_buffer();
+  }
 
   auto update(const T& data) -> void { buffer->write(&data, sizeof(T)); }
   auto update() -> void { buffer->write(&pod_data, sizeof(T)); }
@@ -307,17 +330,20 @@ public:
   auto get_data() const -> const T& { return pod_data; }
   auto get_data() -> T& { return pod_data; }
 
-  auto get_descriptor_info() const -> const VkDescriptorBufferInfo& override
+  [[nodiscard]] auto get_descriptor_info() const
+    -> const VkDescriptorBufferInfo& override
   {
-    return descriptor_info;
+    return buffer->get_descriptor_info();
   }
 
-  auto get_name() const -> const std::string& override { return identifier; }
+  [[nodiscard]] auto get_name() const -> const std::string& override
+  {
+    return identifier;
+  }
 
 private:
   T pod_data{};
   Core::Scope<GPUBuffer> buffer;
-  VkDescriptorBufferInfo descriptor_info{};
   std::string identifier;
 };
 

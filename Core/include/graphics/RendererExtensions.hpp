@@ -13,7 +13,8 @@ namespace Engine::Graphics::RendererExtensions {
 auto
 begin_renderpass(const CommandBuffer&,
                  const IFramebuffer&,
-                 bool flip = false) -> void;
+                 bool flip = false,
+                 bool primary_pass = true) -> void;
 auto
 end_renderpass(const CommandBuffer&) -> void;
 auto

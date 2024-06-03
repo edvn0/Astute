@@ -66,13 +66,20 @@ DeferredRenderPass::construct_impl() -> void
           deferred_shader,
           deferred_pipeline,
           deferred_material] = get_data();
-  deferred_framebuffer =
-    Core::make_scope<Framebuffer>(FramebufferSpecification{
-      .width = ext.width,
-      .height = ext.height,
-      .attachments = { { .format = VK_FORMAT_R32G32B32A32_SFLOAT, }, },
-      .debug_name = "Deferred",
-    });
+  deferred_framebuffer = Core::make_scope<Framebuffer>(FramebufferSpecification{
+    .width = ext.width,
+    .height = ext.height,
+    .attachments = {
+      {
+                       .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+                     },
+
+                     {
+                       .format = VK_FORMAT_R32_UINT,
+                       .blend = false,
+                     }, },
+    .debug_name = "Deferred",
+  });
 
   deferred_shader = Shader::compile_graphics_scoped(
     "Assets/shaders/deferred.vert", "Assets/shaders/deferred.frag");

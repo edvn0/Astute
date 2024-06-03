@@ -5,11 +5,14 @@
 #include "core/Forward.hpp"
 #include "core/Types.hpp"
 
+#include "logging/Logger.hpp"
+
 #include "graphics/CommandBuffer.hpp"
 #include "graphics/GPUBuffer.hpp"
 #include "graphics/Material.hpp"
 #include "graphics/Mesh.hpp"
 #include "graphics/RenderPass.hpp"
+#include "graphics/Renderer2D.hpp"
 
 #include "graphics/ShaderBuffers.hpp"
 
@@ -31,7 +34,7 @@ namespace Engine::Graphics {
 
 namespace Detail {
 template<typename... Bases>
-struct overload : Bases...
+struct Overload : Bases...
 {
   using is_transparent = void;
   using Bases::operator()...;
@@ -45,7 +48,7 @@ struct CharPointerHash
   }
 };
 
-using transparent_string_hash = overload<std::hash<std::string>,
+using transparent_string_hash = Overload<std::hash<std::string>,
                                          std::hash<std::string_view>,
                                          CharPointerHash>;
 }
@@ -97,7 +100,11 @@ public:
   auto end_scene() -> void;
 
   auto submit_static_mesh(Core::Ref<StaticMesh>&, const glm::mat4&) -> void;
-  auto submit_static_light(Core::Ref<StaticMesh>&, const glm::mat4&) -> void;
+  auto submit_static_light(Core::Ref<StaticMesh>&,
+                           const glm::mat4&,
+                           const glm::vec4&) -> void;
+
+  auto get_2d_renderer() -> Graphics::Renderer2D& { return *renderer_2d; }
 
   [[nodiscard]] auto get_output_image(Core::u32 attachment = 0) const
     -> const Image*
@@ -107,27 +114,12 @@ public:
       ->get_colour_attachment(attachment)
       .get();
   }
-  [[nodiscard]] auto get_shadow_output_image() const -> const Image*
+  [[nodiscard]] auto get_lights_data() const -> const auto&
   {
-    return render_passes.at("Shadow")
-      ->get_extraneous_framebuffer(0)
-      ->get_depth_attachment()
-      .get();
+    return lights_instance_data;
   }
-  [[nodiscard]] auto get_final_output() const -> const Image*
-  {
-    if (!post_processing_steps.empty()) {
-      return render_passes.at("ChromaticAberration")
-        ->get_framebuffer()
-        ->get_colour_attachment(0)
-        .get();
-    }
-
-    return render_passes.at("Lights")
-      ->get_framebuffer()
-      ->get_colour_attachment(0)
-      .get();
-  }
+  [[nodiscard]] auto get_shadow_output_image() const -> const Image*;
+  [[nodiscard]] auto get_final_output() const -> const Image*;
 
   auto on_resize(const Core::Extent&) -> void;
 
@@ -171,18 +163,25 @@ public:
     }
   }
 
-  auto activate_post_processing_step(const std::string& name) -> void
+  auto activate_post_processing_step(const std::string& name,
+                                     const bool is_compute = false) -> void
   {
-    post_processing_steps.insert(name);
+    post_processing_steps.emplace(name, is_compute);
   }
 
-  auto deactivate_post_processing_step(const std::string& name) -> void
+  auto deactivate_post_processing_step(const std::string& name,
+                                       const bool is_compute = false) -> void
   {
-    post_processing_steps.erase(name);
+    if (name == "Composition") {
+      error("Cannot remove the composition pass.");
+      return;
+    }
+    PostProcessingStep step{ name, is_compute };
+    post_processing_steps.erase(step);
   }
 
   auto set_technique(RendererTechnique tech) -> void { technique = tech; }
-  auto screenshot() -> void;
+  auto screenshot() const -> void;
 
   static auto get_thread_pool() -> ED::ThreadPool& { return *thread_pool; }
 
@@ -191,6 +190,8 @@ private:
   Core::Extent old_size{ 0, 0 };
   Core::Scope<CommandBuffer> command_buffer{ nullptr };
   Core::Scope<CommandBuffer> compute_command_buffer{ nullptr };
+  Core::Scope<Renderer2D> renderer_2d{ nullptr };
+  RendererTechnique technique{ RendererTechnique::Deferred };
 
   std::unordered_map<std::string,
                      Core::Scope<RenderPass>,
@@ -218,7 +219,23 @@ private:
   UniformBufferObject<DirectionalShadowProjectionUBO>
     directional_shadow_projections_ubo{};
 
-  std::unordered_set<std::string> post_processing_steps{};
+  struct PostProcessingStep
+  {
+    std::string name;
+    const bool is_compute{ false };
+
+    constexpr auto operator<=>(const PostProcessingStep&) const = default;
+  };
+  struct HasherPPStep
+  {
+    auto operator()(const PostProcessingStep& step) const noexcept
+    {
+      static constexpr auto hasher_str = std::hash<std::string>();
+      static constexpr auto hasher_bool = std::hash<bool>();
+      return hasher_str(step.name) ^ hasher_bool(step.is_compute);
+    }
+  };
+  std::unordered_set<PostProcessingStep, HasherPPStep> post_processing_steps{};
 
   glm::uvec3 light_culling_work_groups{};
   glm::vec4 cascade_splits{};
@@ -232,28 +249,39 @@ private:
     Core::u32 instance_count{ 0 };
   };
 
+  struct LightDrawCommand : public DrawCommand
+  {
+    glm::vec4 colour_times_intensity;
+  };
+
   std::unordered_map<CommandKey, DrawCommand> draw_commands;
   std::unordered_map<CommandKey, DrawCommand> shadow_draw_commands;
+
   std::unordered_map<CommandKey, DrawCommand> lights_draw_commands;
+  struct LightInstanceData
+  {
+    glm::vec4 colour;
+  };
+  std::vector<glm::vec4> lights_instance_data;
 
   std::vector<SubmeshTransformBuffer> transform_buffers;
   std::unordered_map<CommandKey, TransformMapData> mesh_transform_map;
 
   static inline Core::Ref<Image> white_texture;
   static inline Core::Ref<Image> black_texture;
-
-  RendererTechnique technique{ RendererTechnique::Deferred };
-
   static inline Core::Scope<ED::ThreadPool> thread_pool{ nullptr };
 
   friend class RenderPass;
+  friend class BloomRenderPass;
+  friend class ChromaticAberrationRenderPass;
+  friend class CompositionRenderPass;
   friend class DeferredRenderPass;
-  friend class MainGeometryRenderPass;
-  friend class ShadowRenderPass;
-  friend class PredepthRenderPass;
   friend class LightCullingRenderPass;
   friend class LightsRenderPass;
-  friend class ChromaticAberrationRenderPass;
+  friend class MainGeometryRenderPass;
+  friend class PredepthRenderPass;
+  friend class ShadowRenderPass;
+  friend class Renderer2D;
 };
 
 }

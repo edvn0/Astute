@@ -14,6 +14,7 @@ layout(set = 1, binding = 14) uniform sampler2D noise_map;
 layout(constant_id = 0) const int NUM_SAMPLES = 4;
 
 layout(location = 0) out vec4 final_fragment_colour;
+layout(location = 1) out uint light_count;
 
 const vec3 ambient = vec3(0.15F);
 
@@ -97,10 +98,8 @@ main()
     frag_colour += factor_if_in_shadow * (diffuse + specular);
   }
 
-  // Tone mapping and gamma correction
-  vec3 mapped = tonemap_aces(vec4(frag_colour, 1.0));
-  vec3 gamma_corrected = pow(mapped, vec3(1.0 / 2.2));
-  final_fragment_colour = vec4(gamma_corrected, 1.0);
+  final_fragment_colour = vec4(frag_colour, 1.0);
+  light_count = visible_point_light_count + visible_spot_light_count;
 }
 
 const mat3 aces_m1 = mat3(0.59719,

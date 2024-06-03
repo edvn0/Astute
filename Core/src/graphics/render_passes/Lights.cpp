@@ -11,6 +11,12 @@
 
 namespace Engine::Graphics {
 
+LightsRenderPass::LightsRenderPass(Renderer& ren)
+  : RenderPass(ren)
+  , storage_buffer(sizeof(glm::vec4) * 5000)
+{
+}
+
 auto
 LightsRenderPass::construct_impl() -> void
 {
@@ -57,9 +63,7 @@ LightsRenderPass::construct_impl() -> void
     .shader = lights_shader.get(),
   });
 
-  lights_material->set(
-    "predepth_map",
-    get_renderer().get_render_pass("Predepth").get_depth_attachment());
+  lights_material->set("InstanceColours", storage_buffer);
 }
 
 auto
@@ -71,6 +75,8 @@ LightsRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                lights_pipeline,
                lights_material] = get_data();
 
+  storage_buffer.write(std::span(get_renderer().get_lights_data()));
+
   auto* renderer_desc_set =
     generate_and_update_descriptor_write_sets(*lights_material);
 
@@ -78,7 +84,9 @@ LightsRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 
   for (auto&& [key, command] : get_renderer().lights_draw_commands) {
     ASTUTE_PROFILE_SCOPE("Lights Render pass draw command");
-    auto&& [mesh, submesh_index, instance_count] = command;
+    const auto& mesh = command.static_mesh;
+    const auto& submesh_index = command.submesh_index;
+    const auto& instance_count = command.instance_count;
 
     const auto& mesh_asset = mesh->get_mesh_asset();
     const auto& transform_vertex_buffer =
@@ -123,7 +131,7 @@ LightsRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                      submesh.index_count,
                      instance_count,
                      submesh.base_index,
-                     submesh.base_vertex,
+                     static_cast<Core::i32>(submesh.base_vertex),
                      0);
   }
 }

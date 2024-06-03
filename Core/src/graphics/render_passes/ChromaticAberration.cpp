@@ -2,23 +2,12 @@
 
 #include "graphics/render_passes/ChromaticAberration.hpp"
 
-#include "core/Scene.hpp"
-#include "logging/Logger.hpp"
-
-#include "core/Application.hpp"
-#include "graphics/DescriptorResource.hpp"
 #include "graphics/Framebuffer.hpp"
-#include "graphics/GPUBuffer.hpp"
 #include "graphics/GraphicsPipeline.hpp"
 #include "graphics/Image.hpp"
 #include "graphics/Material.hpp"
 #include "graphics/Renderer.hpp"
 #include "graphics/Shader.hpp"
-#include "graphics/Swapchain.hpp"
-#include "graphics/TextureGenerator.hpp"
-#include "graphics/Window.hpp"
-
-#include "graphics/RendererExtensions.hpp"
 
 #include "ui/UI.hpp"
 
@@ -36,7 +25,7 @@ ChromaticAberrationRenderPass::construct_impl() -> void
     Core::make_scope<Framebuffer>(FramebufferSpecification{
       .width = ext.width,
       .height = ext.height,
-      .attachments = { {.format = VK_FORMAT_R32G32B32A32_SFLOAT}, },
+      .attachments = { { .format = VK_FORMAT_R32G32B32A32_SFLOAT, }, },
       .debug_name = "ChromaticAberration",
     });
 
@@ -65,12 +54,6 @@ ChromaticAberrationRenderPass::construct_impl() -> void
   const auto& input_render_pass = get_renderer().get_render_pass("Deferred");
   chromatic_aberration_material->set(
     "fullscreen_texture", input_render_pass.get_colour_attachment(0));
-
-  const auto& geometry_pass = get_renderer().get_render_pass("MainGeometry");
-  chromatic_aberration_material->set("position_map",
-                                     geometry_pass.get_colour_attachment(0));
-  chromatic_aberration_material->set("normal_map",
-                                     geometry_pass.get_colour_attachment(1));
   get_settings()->apply_to_material(*chromatic_aberration_material);
 }
 
@@ -129,7 +112,7 @@ ChromaticAberrationRenderPass::ChromaticAberrationSettings::expose_to_ui(
 {
   ImGui::Text("Chromatic Aberration Settings");
   if (ImGui::SliderFloat(
-        "Intensity", &chromatic_aberration, 0.0001f, 0.05f, "%.4f")) {
+        "Intensity", &chromatic_aberration, 0.0001F, 0.05F, "%.4f")) {
     material.set("uniforms.aberration_offset", chromatic_aberration);
   }
 }

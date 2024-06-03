@@ -4,25 +4,30 @@
 
 namespace Engine::Graphics {
 
-class ChromaticAberrationRenderPass final : public RenderPass
+class CompositionRenderPass final : public RenderPass
 {
 public:
-  explicit ChromaticAberrationRenderPass(Renderer& ren)
+  explicit CompositionRenderPass(Renderer& ren)
     : RenderPass(ren)
   {
-    create_settings<ChromaticAberrationSettings>();
+    create_settings<CompositionSettings>();
   }
-  ~ChromaticAberrationRenderPass() override = default;
+  ~CompositionRenderPass() override = default;
   auto on_resize(const Core::Extent&) -> void override;
 
 private:
   auto construct_impl() -> void override;
   auto execute_impl(CommandBuffer&) -> void override;
 
-  class ChromaticAberrationSettings : public RenderPassSettings
+  class CompositionSettings : public RenderPassSettings
   {
   public:
-    Core::f32 chromatic_aberration = 0.001F;
+    bool Enabled = true;
+    Core::f32 Threshold = 1.0f;
+    Core::f32 Knee = 0.1f;
+    Core::f32 UpsampleScale = 1.0f;
+    Core::f32 Intensity = 1.0f;
+    Core::f32 DirtIntensity = 1.0f;
 
     auto expose_to_ui(Material&) -> void override;
     auto apply_to_material(Material&) -> void override;

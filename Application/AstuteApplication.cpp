@@ -6,8 +6,39 @@
 
 #include "core/Scene.hpp"
 #include "graphics/Window.hpp"
+#include <ImGuizmo/ImGuizmo.h>
 
 namespace Utilities {
+
+constexpr auto
+convert_to_imguizmo(GizmoState state) -> ImGuizmo::OPERATION
+{
+  switch (state) {
+    case GizmoState::Rotate:
+      return ImGuizmo::OPERATION::ROTATE;
+    case GizmoState::Scale:
+      return ImGuizmo::OPERATION::SCALE;
+    case GizmoState::Translate:
+      return ImGuizmo::OPERATION::TRANSLATE;
+    default:
+      throw;
+  }
+}
+
+constexpr auto
+convert_to_bits(GizmoState state) -> u8
+{
+  switch (state) {
+    case GizmoState::Translate:
+      return 0x0;
+    case GizmoState::Rotate:
+      return 0x1;
+    case GizmoState::Scale:
+      return 0x2;
+    default:
+      throw;
+  }
+}
 
 auto
 calculate_ray(const glm::vec2& mouse_pos,
@@ -18,7 +49,9 @@ calculate_ray(const glm::vec2& mouse_pos,
   // Normalize the mouse coordinates to range [-1, 1]
   glm::vec2 normalized_coords =
     glm::vec2((2.0F * mouse_pos.x) / viewport_size.x - 1.0F,
-              1.0F - (2.0F * mouse_pos.y) / viewport_size.y);
+              (2.0F * mouse_pos.y) / viewport_size.y - 1.0F);
+
+  info("Mouse position: {} {}", normalized_coords.x, normalized_coords.y);
 
   // Clip coordinates
   glm::vec4 clip_coords = glm::vec4(normalized_coords, -1.0F, 1.0F);
@@ -65,10 +98,14 @@ AstuteApplication::AstuteApplication(const Application::Configuration& config)
                              0.01F,
                              1000.0F })
   , scene(std::make_shared<Engine::Core::Scene>(config.scene_name))
+  , selected_entity(new entt::entity{ entt::null })
 {
   auto& scene_widget = std::get<0>(widgets);
   scene_widget = Engine::Core::make_scope<Widgets::SceneWidget>();
   scene_widget->set_current_scene(scene);
+
+  auto& performance_widget = std::get<1>(widgets);
+  performance_widget = Engine::Core::make_scope<Widgets::PerformanceWidget>();
 };
 
 auto
@@ -77,7 +114,7 @@ AstuteApplication::update(f64 ts) -> void
   camera->on_update(static_cast<f32>(ts));
 
   switch (scene_state) {
-    using enum AstuteApplication::SceneState;
+    using enum SceneState;
     case Edit:
       scene->on_update_editor(ts);
       break;
@@ -104,7 +141,7 @@ auto
 AstuteApplication::render() -> void
 {
   switch (scene_state) {
-    using enum AstuteApplication::SceneState;
+    using enum SceneState;
     case Edit:
       scene->on_render_editor(*renderer, *camera);
       break;
@@ -120,13 +157,63 @@ AstuteApplication::interface() -> void
 
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0F, 0.0F));
 
-  UI::scope("Final Output", [&](f32 w, f32 h) {
-    UI::image<f32>(*renderer->get_final_output(),
-                   {
-                     .extent = { w, h },
-                   });
-    viewport_size = { w, h };
-  });
+  UI::scope(
+    "Final Output",
+    [&](f32 w, f32 h) {
+      UI::image<f32>(*renderer->get_final_output(),
+                     {
+                       .extent = { w, h, },
+                     });
+      viewport_size = {
+        w,
+        h,
+      };
+      const auto pos = ImGui::GetWindowPos();
+      viewport_position = { pos.x, pos.y };
+
+      if (*selected_entity == entt::null) {
+        return;
+      }
+
+      const auto& view_matrix = camera->get_view_matrix();
+      auto projection_matrix = camera->get_projection_matrix();
+      projection_matrix[1][1] *= -1.0F;
+
+      auto& transform =
+        scene->get_registry().get<TransformComponent>(*selected_entity);
+      ImGuizmo::SetOrthographic(false);
+      ImGuizmo::SetDrawlist();
+      ImGuizmo::SetRect(pos.x, pos.y, w, h);
+      auto computed = transform.compute();
+      const auto did_manipulate =
+        ImGuizmo::Manipulate(glm::value_ptr(view_matrix),
+                             glm::value_ptr(projection_matrix),
+                             Utilities::convert_to_imguizmo(current_mode),
+                             ImGuizmo::MODE::LOCAL,
+                             glm::value_ptr(computed));
+      if (!did_manipulate) {
+        return;
+      }
+
+      glm::vec3 scale{};
+      glm::quat rotation{};
+      glm::vec3 translation{};
+      glm::vec3 skew{};
+      glm::vec4 perspective{};
+      glm::decompose(computed, scale, rotation, translation, skew, perspective);
+
+      switch (current_mode) {
+        case GizmoState::Translate:
+          transform.translation = translation;
+        case GizmoState::Rotate:
+          transform.rotation = rotation;
+        case GizmoState::Scale:
+          transform.scale = scale;
+      }
+    },
+    {
+      .expandable = false,
+    });
 
   UI::scope("Output Depth", [&](f32 w, f32 h) {
     UI::image<f32>(*renderer->get_shadow_output_image(),
@@ -230,30 +317,27 @@ AstuteApplication::handle_events(Event& event) -> void
     return false;
   });
 
-  dispatcher.dispatch<MouseButtonPressedEvent>(
-    [this](MouseButtonPressedEvent& ev) {
-      if (ev.get_button() == MouseCode::MOUSE_BUTTON_LEFT) {
-        auto&& [mouse_x, mouse_y] = Engine::Core::Input::mouse_position();
+  if (!ImGuizmo::IsUsingAny()) {
+    dispatcher.dispatch<MouseButtonPressedEvent>(
+      [this](MouseButtonPressedEvent& ev) {
+        if (ev.get_button() == MouseCode::MOUSE_BUTTON_LEFT) {
+          ImGuiIO& io = ImGui::GetIO();
+          glm::vec2 imgui_mouse_pos((io.MousePos.x - viewport_position.x),
+                                    (io.MousePos.y - viewport_position.y));
 
-        auto* io = ImGui::GetMainViewport();
-        float imgui_mouse_x =
-          static_cast<float>(mouse_x) - io->DrawData->DisplayPos.x;
-        float imgui_mouse_y =
-          static_cast<float>(mouse_y) - io->DrawData->DisplayPos.y;
+          auto found = perform_raycast(imgui_mouse_pos);
 
-        glm::vec2 mouse_pos(imgui_mouse_x, imgui_mouse_y);
-        if (selected_entity) {
-          *selected_entity = perform_raycast(mouse_pos);
-        } else {
-          selected_entity = make_ref<entt::entity>(perform_raycast(mouse_pos));
+          if (found != entt::null) {
+            *selected_entity = found;
+          }
+
+          auto& scene_widget = std::get<0>(widgets);
+          scene_widget->set_selected_entity(selected_entity);
+          return true;
         }
-
-        auto& scene_widget = std::get<0>(widgets);
-        scene_widget->set_selected_entity(selected_entity);
-        return true;
-      }
-      return false;
-    });
+        return false;
+      });
+  }
 
   for_each_in_tuple(widgets,
                     [&event](auto& widget) { widget->handle_events(event); });

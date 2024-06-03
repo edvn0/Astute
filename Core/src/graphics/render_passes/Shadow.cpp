@@ -43,6 +43,7 @@ ShadowRenderPass::construct_impl() -> void
   FramebufferSpecification spec{
     .width = size,
     .height = size,
+    .depth_clear_value = 1.0F,
     .clear_depth_on_load = true,
     .attachments = { { VK_FORMAT_D32_SFLOAT } },
     .samples = VK_SAMPLE_COUNT_1_BIT,
@@ -65,7 +66,7 @@ ShadowRenderPass::construct_impl() -> void
       Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
         .framebuffer = other_framebuffers.back().get(),
         .shader = shadow_shader.get(),
-        .depth_comparator = VK_COMPARE_OP_LESS_OR_EQUAL,
+        .depth_comparator = VK_COMPARE_OP_LESS,
         .override_vertex_attributes = { {
           {
             0,
@@ -85,7 +86,7 @@ ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 
   const auto& [_, shadow_shader, __, shadow_material] = get_data();
 
-  auto descriptor_set =
+  auto* descriptor_set =
     generate_and_update_descriptor_write_sets(*shadow_material);
 
   static auto perform_pass = [&](const Core::DataBuffer& cascade_buffer,
@@ -107,7 +108,7 @@ ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
         get_renderer()
           .transform_buffers.at(Core::Application::the().current_frame_index())
           .transform_buffer;
-      auto vb = transform_vertex_buffer->get_buffer();
+      auto* vb = transform_vertex_buffer->get_buffer();
       auto offset = get_renderer().mesh_transform_map.at(key).offset;
       const auto& submesh = mesh_asset->get_submeshes().at(submesh_index);
 
@@ -139,12 +140,12 @@ ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                        submesh.index_count,
                        instance_count,
                        submesh.base_index,
-                       submesh.base_vertex,
+                       static_cast<Core::i32>(submesh.base_vertex),
                        0);
     }
   };
 
-  Core::DataBuffer current_cascade_buffer{ sizeof(Core::u32) };
+  static Core::DataBuffer current_cascade_buffer{ sizeof(Core::u32) };
   current_cascade_buffer.fill_zero();
   for (const auto i : std::views::iota(0ULL, other_framebuffers.size())) {
     ASTUTE_PROFILE_SCOPE("Shadow Render Pass Cascade Number: " +

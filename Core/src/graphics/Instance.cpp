@@ -51,15 +51,16 @@ debug_callback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
 {
   using namespace ED::Logging;
   LogLevel log_level = LogLevel::None;
-  if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+  if ((message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) != 0) {
     log_level = LogLevel::Error;
-  } else if (message_severity &
-             VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+  } else if ((message_severity &
+              VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) != 0) {
     log_level = LogLevel::Warn;
-  } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
+  } else if ((message_severity &
+              VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) != 0) {
     log_level = LogLevel::Info;
-  } else if (message_severity &
-             VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
+  } else if ((message_severity &
+              VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) != 0) {
     log_level = LogLevel::Debug;
   }
 

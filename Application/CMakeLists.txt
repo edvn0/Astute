@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.23)
 
 project(Application)
 
-add_executable(App main.cpp AstuteApplication.cpp AstuteApplication.hpp Widgets/Widget.hpp Widgets/SceneWidget.hpp Widgets/SceneWidget.cpp)
+add_executable(App main.cpp AstuteApplication.cpp AstuteApplication.hpp Widgets/Widget.hpp Widgets/SceneWidget.hpp Widgets/SceneWidget.cpp Widgets/PerformanceWidget.hpp Widgets/PerformanceWidget.cpp)
 target_link_libraries(App PRIVATE Core EnTT::EnTT Logging ShaderCompilation)
 target_include_directories(App PRIVATE ${CMAKE_SOURCE_DIR}/Core ${CMAKE_CURRENT_SOURCE_DIR})
 

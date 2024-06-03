@@ -99,9 +99,8 @@ make_id(Args&&... data)
 }
 
 auto
-add_image(VkSampler sampler,
-          VkImageView image_view,
-          VkImageLayout layout) -> VkDescriptorSet
+add_image(VkSampler sampler, VkImageView image_view, VkImageLayout layout)
+  -> VkDescriptorSet
 {
   auto pool = Graphics::InterfaceSystem::get_image_pool();
   auto set = ImGui_ImplVulkan_AddTexture(sampler, image_view, layout, pool);
@@ -129,9 +128,13 @@ coloured_text(const Core::Vec4& colour, std::string&& formatted) -> void
 }
 
 auto
-begin(const std::string_view data) -> bool
+begin(const std::string_view data, const WindowConfiguration& config) -> bool
 {
-  return ImGui::Begin(data.data());
+  const auto flag = ImGuiWindowFlags_NoTitleBar;
+  const auto added_stack_symbols = std::format("##{}", data);
+  return config.expandable
+           ? ImGui::Begin(data.data())
+           : ImGui::Begin(added_stack_symbols.data(), nullptr, flag);
 }
 
 auto
@@ -154,14 +157,14 @@ image(const Graphics::Image& image,
       Core::u32 array_index) -> void
 {
   VkImageView view{ nullptr };
-  const auto& [sampler, v, layout] = image.get_descriptor_info();
+  auto&& [sampler, v, layout] = image.get_descriptor_info();
   if (image.get_layer_count() > 1) {
     view = image.get_layer_image_view(array_index);
   } else {
     view = v;
   }
 
-  auto set = add_image(sampler, view, layout);
+  auto* set = add_image(sampler, view, layout);
   auto made = make_id(set, sampler, view, layout, image.hash());
   ImGui::PushID(made.c_str());
   static constexpr auto uv0 = ImVec2(0, 0);

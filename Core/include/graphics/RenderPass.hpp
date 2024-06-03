@@ -39,8 +39,9 @@ public:
   }
   auto construct() -> void;
 
-  auto get_colour_attachment(Core::u32) const -> const Core::Ref<Image>&;
-  auto get_depth_attachment() const -> const Core::Ref<Image>&;
+  [[nodiscard]] auto get_colour_attachment(Core::u32) const
+    -> const Core::Ref<Image>&;
+  [[nodiscard]] auto get_depth_attachment() const -> const Core::Ref<Image>&;
   auto get_framebuffer() -> decltype(auto)
   {
     return std::get<Core::Scope<IFramebuffer>>(pass);
@@ -56,12 +57,12 @@ public:
   {
     return std::get<Core::Scope<IFramebuffer>>(pass);
   }
-  virtual auto get_extraneous_framebuffer(Core::u32) const
+  [[nodiscard]] virtual auto get_extraneous_framebuffer(Core::u32) const
     -> const Core::Scope<IFramebuffer>&
   {
     return std::get<Core::Scope<IFramebuffer>>(pass);
   }
-  auto get_framebuffer() const -> const auto&
+  [[nodiscard]] auto get_framebuffer() const -> const auto&
   {
     return std::get<Core::Scope<IFramebuffer>>(pass);
   }
@@ -79,13 +80,12 @@ public:
     std::optional<Core::u32> colour_attachment_index{};
     bool depth_attachment{ false };
   };
-  auto blit_to(const CommandBuffer&,
-               const Framebuffer&,
-               BlitProperties) -> void;
+  auto blit_to(const CommandBuffer&, const Framebuffer&, BlitProperties)
+    -> void;
 
 protected:
   explicit RenderPass(Renderer&);
-  virtual auto is_valid() const -> bool
+  [[nodiscard]] virtual auto is_valid() const -> bool
   {
     return std::get<Core::Scope<IFramebuffer>>(pass) &&
            std::get<Core::Scope<Shader>>(pass) &&
@@ -93,15 +93,15 @@ protected:
            std::get<Core::Scope<Material>>(pass);
   }
   virtual auto construct_impl() -> void = 0;
-  virtual auto destruct_impl() -> void {};
-  virtual auto execute_impl(CommandBuffer&) -> void {};
+  virtual auto destruct_impl() -> void{};
+  virtual auto execute_impl(CommandBuffer&) -> void{};
   virtual auto bind(CommandBuffer& command_buffer) -> void;
   virtual auto unbind(CommandBuffer& command_buffer) -> void;
   auto generate_and_update_descriptor_write_sets(Material&) -> VkDescriptorSet;
   auto get_data() -> auto& { return pass; }
-  auto get_data() const -> const auto& { return pass; }
+  [[nodiscard]] auto get_data() const -> const auto& { return pass; }
   auto get_renderer() -> Renderer& { return renderer; }
-  auto get_mutex() -> auto& { return render_pass_mutex; }
+  static auto get_mutex() -> auto& { return render_pass_mutex; }
   template<class T>
     requires(std::is_base_of_v<RenderPassSettings, T> &&
              std::is_default_constructible_v<T>)
@@ -109,8 +109,23 @@ protected:
   {
     settings = Core::make_scope<T>();
   }
-  auto get_settings() const -> const auto* { return settings.get(); }
+  [[nodiscard]] auto get_settings() const -> const auto*
+  {
+    return settings.get();
+  }
   auto get_settings() -> auto* { return settings.get(); }
+  template<class T>
+    requires std::is_base_of_v<RenderPassSettings, T>
+  auto get_current_settings() -> auto*
+  {
+    return static_cast<T*>(get_settings());
+  }
+  template<class T>
+    requires std::is_base_of_v<RenderPassSettings, T>
+  auto get_current_settings() const -> const auto*
+  {
+    return static_cast<T*>(get_settings());
+  }
 
 private:
   Renderer& renderer;

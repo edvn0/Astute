@@ -12,30 +12,13 @@ struct Sphere
   float r; // Radius.
 };
 
-bool
-TestFrustumSides(vec3 c,
-                 float r,
-                 vec3 plane0,
-                 vec3 plane1,
-                 vec3 plane2,
-                 vec3 plane3)
-{
-  bool intersectingOrInside0 = dot(c, plane0) < r;
-  bool intersectingOrInside1 = dot(c, plane1) < r;
-  bool intersectingOrInside2 = dot(c, plane2) < r;
-  bool intersectingOrInside3 = dot(c, plane3) < r;
-
-  return (intersectingOrInside0 && intersectingOrInside1 &&
-          intersectingOrInside2 && intersectingOrInside3);
-}
-
 // From XeGTAO
 float
-screen_space_to_view_space_depth(const float screenDepth)
+screen_space_to_view_space_depth(const float screen_depth)
 {
-  float depthLinearizeMul = screen_data.depth_constants.x;
-  float depthLinearizeAdd = screen_data.depth_constants.y;
-  return depthLinearizeMul / (depthLinearizeAdd - screenDepth);
+  float depth_linearize_mul = screen_data.depth_constants.x;
+  float depth_linearize_add = screen_data.depth_constants.y;
+  return depth_linearize_mul / (depth_linearize_add - screen_depth);
 }
 // Shared values between all the threads in the group
 shared uint shared_min_depth_int;
@@ -53,7 +36,6 @@ layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE, local_size_z = 1) in;
 void
 main()
 {
-
   ivec2 location = ivec2(gl_GlobalInvocationID.xy);
   ivec2 itemID = ivec2(gl_LocalInvocationID.xy);
   ivec2 tileID = ivec2(gl_WorkGroupID.xy);
@@ -67,7 +49,6 @@ main()
     shared_visible_point_light_count = 0;
     shared_visible_spot_light_count = 0;
   }
-
   barrier();
 
   // Step 1: Calculate the minimum and maximum depth values (from the depth
@@ -118,15 +99,9 @@ main()
 
   barrier();
 
-  // Step 3: Cull lights.
-  // Parallelize the threads against the lights now.
-  // Can handle 256 simultaniously. Anymore lights than that and additional
-  // passes are performed
   const uint threadCount = TILE_SIZE * TILE_SIZE;
   uint passCount = (point_lights.count + threadCount - 1) / threadCount;
   for (uint i = 0; i < passCount; i++) {
-    // Get the lightIndex to test for this thread / pass. If the index is >=
-    // light count, then this thread can stop testing lights
     uint lightIndex = i * threadCount + gl_LocalInvocationIndex;
     if (lightIndex >= point_lights.count)
       break;
@@ -135,7 +110,6 @@ main()
     float radius = point_lights.lights[lightIndex].radius;
     radius += radius * 0.3f;
 
-    // Check if light radius is in frustum
     float dist = 0.0;
     for (uint j = 0; j < 6; j++) {
       dist = dot(position, frustum_planes[j]) + radius;
@@ -143,9 +117,7 @@ main()
         break;
     }
 
-    // If greater than zero, then it is a visible light
     if (dist > 0.0) {
-      // Add index to the shared array of visible indices
       uint offset = atomicAdd(shared_visible_point_light_count, 1);
       share_visible_point_lights[offset] = int(lightIndex);
     }
@@ -153,15 +125,12 @@ main()
 
   passCount = (spot_lights.count + threadCount - 1) / threadCount;
   for (uint i = 0; i < passCount; i++) {
-    // Get the lightIndex to test for this thread / pass. If the index is >=
-    // light count, then this thread can stop testing lights
     uint lightIndex = i * threadCount + gl_LocalInvocationIndex;
     if (lightIndex >= spot_lights.count)
       break;
 
     SpotLight light = spot_lights.lights[lightIndex];
     float radius = light.range;
-    // Check if light radius is in frustum
     float dist = 0.0;
     for (uint j = 0; j < 6; j++) {
       dist = dot(vec4(light.pos - light.direction * (light.range * 0.7), 1.0),

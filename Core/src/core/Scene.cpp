@@ -52,10 +52,7 @@ calculate_aabb(const TransformComponent& transform) -> Engine::Core::AABB
     aabb_max,
   };
 
-  glm::mat4 model_matrix =
-    glm::translate(glm::mat4(1.0F), transform.translation) *
-    glm::mat4_cast(transform.rotation) *
-    glm::scale(glm::mat4(1.0F), transform.scale);
+  glm::mat4 model_matrix = transform.compute();
 
   Engine::Core::AABB aabb;
   for (const auto& vertex : vertices) {
@@ -256,13 +253,24 @@ Scene::on_render_editor(Graphics::Renderer& renderer, const Camera& camera)
   for (auto&& [entity, light, mesh, transform] :
        registry.view<PointLightComponent, MeshComponent, TransformComponent>()
          .each()) {
-    renderer.submit_static_light(mesh.mesh, transform.compute());
+    const auto light_colour = light.radiance * light.intensity;
+    renderer.submit_static_light(
+      mesh.mesh, transform.compute(), glm::vec4{ light_colour, 1.0F });
   }
 
   for (auto&& [entity, light, mesh, transform] :
        registry.view<SpotLightComponent, MeshComponent, TransformComponent>()
          .each()) {
-    renderer.submit_static_light(mesh.mesh, transform.compute());
+    const auto light_colour = light.radiance * light.intensity;
+    renderer.submit_static_light(
+      mesh.mesh, transform.compute(), glm::vec4{ light_colour, 1.0F });
+  }
+
+  for (auto&& [entity, transform] :
+       registry.view<const TransformComponent>().each()) {
+    Engine::Core::AABB aabb = Utilities::calculate_aabb(transform);
+    renderer.get_2d_renderer().submit_aabb(
+      aabb, transform.compute(), { 0.1, 0.9, 0.8, 1.0 });
   }
 
   renderer.end_scene();
@@ -284,10 +292,8 @@ Scene::find_intersected_entity(const glm::vec3& ray,
   entt::entity closest_entity = entt::null;
 
   auto view = registry.view<const TransformComponent>();
-  for (auto entity : view) {
-    const auto& transform = view.get<TransformComponent>(entity);
+  for (auto&& [entity, transform] : view.each()) {
     Engine::Core::AABB aabb = Utilities::calculate_aabb(transform);
-
     if (Utilities::intersects(aabb, ray, camera_position)) {
       float distance = glm::distance(camera_position, transform.translation);
       if (distance < closest_distance) {

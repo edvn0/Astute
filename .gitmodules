@@ -29,3 +29,6 @@
 [submodule "Library/thread-pool"]
 	path = Library/thread-pool
 	url = git@github.com:bshoshany/thread-pool.git
+[submodule "Library/ImGuizmo"]
+	path = Library/ImGuizmo
+	url = git@github.com:edvn0/ImGuizmo.git

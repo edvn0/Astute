@@ -31,8 +31,8 @@ Material::Material(Configuration config)
 }
 
 auto
-Material::set(const std::string_view name,
-              const Core::Ref<Image>& image) -> bool
+Material::set(const std::string_view name, const Core::Ref<Image>& image)
+  -> bool
 {
   if (!image) {
     return false;
@@ -65,6 +65,30 @@ Material::set(const std::string_view name,
       desc.dstBinding = resource->get_register();
       desc.pImageInfo = &imgs.at(as_string)->descriptor_info;
     });
+
+  return true;
+}
+
+auto
+Material::set(const std::string_view name, const StorageBuffer& storage) -> bool
+{
+  const auto* resource = find_resource_by_name(name);
+  if (resource == nullptr) {
+    error("Could not find {} as a uniform.", name);
+    return false;
+  }
+
+  storage_buffers[std::string{ name }] = &storage;
+
+  write_descriptors.for_each([&resource, &buf = storage.get_descriptor_info()](
+                               const auto&, auto& container) {
+    auto& desc = container[resource->get_register()];
+    desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    desc.descriptorCount = 1;
+    desc.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    desc.dstBinding = resource->get_register();
+    desc.pBufferInfo = &buf;
+  });
 
   return true;
 }
@@ -169,9 +193,8 @@ Material::find_resource_by_name(const std::string_view name) const
 }
 
 auto
-Material::set(const std::string_view name,
-              const void* data,
-              Core::usize size) -> void
+Material::set(const std::string_view name, const void* data, Core::usize size)
+  -> void
 {
   const auto& shader_buffers = shader->get_reflection_data().constant_buffers;
   const Engine::Reflection::ShaderUniform* found = nullptr;

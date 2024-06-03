@@ -11,10 +11,11 @@
 
 #include "thread_pool/ResultContainer.hpp"
 
+#include <entt/entt.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
-
-#include <entt/entt.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/matrix_decompose.hpp>
 #include <mutex>
 #include <queue>
 #include <utility>
@@ -200,6 +201,7 @@ public:
   {
     return registry.view<Components...>();
   }
+  auto get_registry() -> auto& { return registry; }
   auto find_intersected_entity(const glm::vec3&, const glm::vec3&)
     -> entt::entity;
 

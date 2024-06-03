@@ -4,6 +4,7 @@
 #include "core/Camera.hpp"
 #include "core/Event.hpp"
 #include "core/Input.hpp"
+#include "core/Maths.hpp"
 #include "core/Scene.hpp"
 #include "core/Types.hpp"
 #include "logging/Logger.hpp"

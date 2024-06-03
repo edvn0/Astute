@@ -15,7 +15,9 @@ namespace ED {
 class CommandBufferDispatcher
 {
 public:
-  CommandBufferDispatcher();
+  explicit CommandBufferDispatcher(Engine::Graphics::CommandBuffer&,
+                                   VkRenderPass = nullptr,
+                                   VkFramebuffer = nullptr);
 
   template<typename F>
     requires std::invocable<F, Engine::Graphics::CommandBuffer*>
@@ -24,10 +26,10 @@ public:
     tasks.push(std::forward<F>(func));
   }
 
-  auto execute() -> void;
+  auto execute(bool = true) -> void;
 
 private:
-  Engine::Core::Scope<Engine::Graphics::CommandBuffer> command_buffer;
+  Engine::Graphics::CommandBuffer* command_buffer;
   std::queue<std::function<void(Engine::Graphics::CommandBuffer*)>> tasks{};
 
   auto construct_secondary()

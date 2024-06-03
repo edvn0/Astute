@@ -64,3 +64,5 @@ endfunction()
 
 add_assimp()
 add_subdirectory(FastNoise2)
+
+add_subdirectory(ImGuizmo)

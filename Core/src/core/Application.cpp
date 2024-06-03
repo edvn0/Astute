@@ -107,9 +107,9 @@ Application::run() -> i32
       last_fps_time = current_second_time;
       statistics.frame_time = frame_duration * 1000.0;
 
-      info("Frametime: {:.5f}ms. FPS: {}Hz",
-           statistics.frame_time,
-           statistics.frames_per_seconds);
+      trace("Frametime: {:.5f}ms. FPS: {}Hz",
+            statistics.frame_time,
+            statistics.frames_per_seconds);
     }
 
     Graphics::DescriptorResource::the().end_frame();

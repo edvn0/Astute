@@ -38,7 +38,7 @@ MainGeometryRenderPass::construct_impl() -> void
           { .format = VK_FORMAT_R32G32B32A32_SFLOAT, }, // normals
           { .format = VK_FORMAT_R32G32B32A32_SFLOAT, }, // albedo + specular strength
           { .format = VK_FORMAT_R32_SFLOAT, }, // shadow position
-          { .format=VK_FORMAT_D32_SFLOAT, }, // depth
+          { .format = VK_FORMAT_D32_SFLOAT, }, // depth
       },
       .samples = VK_SAMPLE_COUNT_1_BIT,
       .existing_images = { {4, get_renderer().get_render_pass("Predepth").get_depth_attachment(), }, },
@@ -134,9 +134,11 @@ MainGeometryRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                      submesh.index_count,
                      instance_count,
                      submesh.base_index,
-                     submesh.base_vertex,
+                     static_cast<Core::i32>(submesh.base_vertex),
                      0);
   }
+
+  get_renderer().get_2d_renderer().flush(command_buffer);
 }
 
 auto

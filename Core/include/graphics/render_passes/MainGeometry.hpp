@@ -7,7 +7,7 @@ namespace Engine::Graphics {
 class MainGeometryRenderPass final : public RenderPass
 {
 public:
-  MainGeometryRenderPass(Renderer& ren)
+  explicit MainGeometryRenderPass(Renderer& ren)
     : RenderPass(ren)
   {
   }

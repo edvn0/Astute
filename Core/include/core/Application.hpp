@@ -47,9 +47,9 @@ public:
 
   static auto the() -> Application&;
 
-  auto current_frame_index() const -> u32;
-  auto get_image_count() const -> u32;
-  auto get_swapchain() const -> const Graphics::Swapchain&;
+  [[nodiscard]] auto current_frame_index() const -> u32;
+  [[nodiscard]] auto get_image_count() const -> u32;
+  [[nodiscard]] auto get_swapchain() const -> const Graphics::Swapchain&;
   auto get_swapchain() -> Graphics::Swapchain&;
 
   static auto defer_destruction(std::function<void()>&& func) -> void
@@ -63,13 +63,29 @@ public:
     post_frame_funcs.emplace_back(std::move(func));
   }
 
-protected:
-  auto get_statistics() const -> const Statistics& { return statistics; }
+  [[nodiscard]] auto get_statistics() const -> const Statistics&
+  {
+    return statistics;
+  }
   auto get_statistics() -> Statistics& { return statistics; }
-  auto get_configuration() const -> const Configuration& { return config; }
-  auto get_configuration() -> Configuration& { return config; }
-  auto get_window() const -> const Graphics::Window& { return *window; }
+  [[nodiscard]] auto get_configuration() const -> const Configuration&
+  {
+    return config;
+  }
+  [[nodiscard]] auto get_window() const -> const Graphics::Window&
+  {
+    return *window;
+  }
   auto get_window() -> Graphics::Window& { return *window; }
+
+  // Make singleton
+  Application(const Application&) = delete;
+  Application(Application&&) = delete;
+  auto operator=(const Application&) -> Application& = delete;
+  auto operator=(Application&&) -> Application& = delete;
+
+protected:
+  auto get_configuration() -> Configuration& { return config; }
 
 private:
   Configuration config{};
@@ -82,12 +98,6 @@ private:
   Scope<Graphics::Window> window;
   Scope<Graphics::InterfaceSystem> interface_system;
   auto forward_incoming_events(Event&) -> void;
-
-  // Make singleton
-  Application(const Application&) = delete;
-  Application(Application&&) = delete;
-  auto operator=(const Application&) -> Application& = delete;
-  auto operator=(Application&&) -> Application& = delete;
 
   static inline Application* instance{ nullptr };
 };
