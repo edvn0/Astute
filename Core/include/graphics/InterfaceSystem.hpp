@@ -1,13 +1,17 @@
 #pragma once
 
 #include <functional>
-#include <imgui.h>
 #include <mutex>
 #include <queue>
 
 #include "core/FrameBasedCollection.hpp"
 #include "graphics/CommandBuffer.hpp"
 #include "graphics/Forward.hpp"
+
+extern "C"
+{
+  struct ImFont;
+}
 
 namespace Engine::Graphics {
 

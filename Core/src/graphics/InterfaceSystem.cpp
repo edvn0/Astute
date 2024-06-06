@@ -147,7 +147,6 @@ InterfaceSystem::begin_frame() -> void
   if (font != nullptr) {
     ImGui::PushFont(font);
   }
-  // ImGuizmo::BeginFrame();
 }
 
 auto

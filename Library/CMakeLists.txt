@@ -66,3 +66,15 @@ add_assimp()
 add_subdirectory(FastNoise2)
 
 add_subdirectory(ImGuizmo)
+
+function(add_ktx)
+    set(KTX_FEATURE_STATIC_LIBRARY ON)
+    set(KTX_FEATURE_LOADTEST_APPS OFF)
+    set(KTX_FEATURE_GL_UPLOAD OFF)
+    set(KTX_FEATURE_TESTS OFF)
+    set(KTX_FEATURE_TOOLS OFF)
+
+    add_subdirectory(KTX-Software)
+endfunction()
+
+add_ktx()

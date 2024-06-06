@@ -52,10 +52,28 @@ GPUBuffer::GPUBuffer(GPUBufferType type, Core::usize input_size)
 
 GPUBuffer::~GPUBuffer()
 {
+  if (!is_destroyed) {
+    destroy();
+  }
+}
+
+auto
+GPUBuffer::destroy() -> void
+{
+  if (is_destroyed) {
+    return;
+  }
+
+  trace("Destroying buffer of type: {}, size: {}",
+        to_string(buffer_type),
+        Core::human_readable_size(size));
+
   Allocator allocator{
     std::format("GPUBuffer::~GPUBuffer({}, {})", to_string(buffer_type), size),
   };
   allocator.deallocate_buffer(alloc_impl->allocation, buffer);
+
+  is_destroyed = true;
 }
 
 auto

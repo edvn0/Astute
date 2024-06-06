@@ -194,6 +194,101 @@ transition_image_layout(VkCommandBuffer buffer,
   );
 }
 
+auto
+transition_image_layout(VkCommandBuffer command_buffer,
+                        VkImage image,
+                        VkImageLayout old_layout,
+                        VkImageLayout new_layout,
+                        VkImageSubresourceRange subresource) -> void
+{
+  VkImageMemoryBarrier image_memory_barrier{};
+  image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  image_memory_barrier.oldLayout = old_layout;
+  image_memory_barrier.newLayout = new_layout;
+  image_memory_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  image_memory_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  image_memory_barrier.image = image;
+  image_memory_barrier.subresourceRange = subresource;
+
+  VkPipelineStageFlags sourceStage;
+  VkPipelineStageFlags destinationStage;
+
+  switch (old_layout) {
+    case VK_IMAGE_LAYOUT_UNDEFINED:
+      image_memory_barrier.srcAccessMask = 0;
+      sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+      break;
+    case VK_IMAGE_LAYOUT_PREINITIALIZED:
+      image_memory_barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+      sourceStage = VK_PIPELINE_STAGE_HOST_BIT;
+      break;
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+      image_memory_barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+      sourceStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+      break;
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+      image_memory_barrier.srcAccessMask =
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+      sourceStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+      break;
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+      image_memory_barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+      sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+      break;
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+      image_memory_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+      sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+      break;
+    case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+      image_memory_barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+      sourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+      break;
+    default:
+      sourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+      break;
+  }
+
+  switch (new_layout) {
+    case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+      image_memory_barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+      destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+      break;
+    case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+      image_memory_barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+      destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+      break;
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+      image_memory_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+      destinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+      break;
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+      image_memory_barrier.dstAccessMask =
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+      destinationStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+      break;
+    case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+      image_memory_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+      destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+      break;
+    default:
+      destinationStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+      break;
+  }
+
+  vkCmdPipelineBarrier(command_buffer,
+                       sourceStage,
+                       destinationStage,
+                       0, // No dependency flags
+                       0,
+                       nullptr, // No memory barriers
+                       0,
+                       nullptr, // No buffer memory barriers
+                       1,
+                       &image_memory_barrier // Image memory barrier
+  );
+}
+
 void
 copy_buffer_to_image(VkBuffer buffer,
                      VkImage image,
@@ -348,6 +443,8 @@ Image::destroy() -> void
   destroyed = true;
 }
 
+Image::Image() = default;
+
 Image::~Image()
 {
   if (!destroyed) {
@@ -450,7 +547,8 @@ Image::load_from_memory(Core::u32 width,
     .sample_count = config.sample_count,
     .usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
              VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-    .additional_name_data = std::format("LoadedFromMemory@{}", config.path) });
+    .additional_name_data = std::format("LoadedFromMemory@{}", config.path),
+  });
 
   Allocator allocator{ "Image" };
   VkBufferCreateInfo buffer_create_info{};
@@ -605,15 +703,15 @@ Image::resolve_msaa(const Image&, const CommandBuffer*) -> Core::Scope<Image>
 }
 
 auto
-Image::reference_resolve_msaa(const Image&, const CommandBuffer*)
-  -> Core::Ref<Image>
+Image::reference_resolve_msaa(const Image&,
+                              const CommandBuffer*) -> Core::Ref<Image>
 {
   return nullptr;
 }
 
 auto
-Image::copy_image(const Image& source, const CommandBuffer& command_buffer)
-  -> Core::Ref<Image>
+Image::copy_image(const Image& source,
+                  const CommandBuffer& command_buffer) -> Core::Ref<Image>
 {
   auto image = Image::construct(source.configuration);
 

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.23)
 
-project(Core CXX)
+project(Core CXX C)
 
 add_library(Core STATIC
     include/AstuteCore.hpp/
@@ -40,6 +40,7 @@ add_library(Core STATIC
     include/graphics/Renderer.hpp
     include/graphics/Renderer2D.hpp
     include/graphics/RendererExtensions.hpp
+    include/graphics/TextureCube.hpp
     include/graphics/Shader.hpp
     include/graphics/ShaderBuffers.hpp
     include/graphics/Swapchain.hpp
@@ -86,6 +87,7 @@ add_library(Core STATIC
     src/graphics/Shader.cpp
     src/graphics/Swapchain.cpp
     src/graphics/Vertex.cpp
+    src/graphics/TextureCube.cpp
     src/graphics/TextureGenerator.cpp
     src/graphics/Window.cpp
     src/graphics/render_passes/Deferred.cpp
@@ -111,7 +113,7 @@ target_include_directories(Core SYSTEM PRIVATE
     ${CMAKE_SOURCE_DIR}/Library/VulkanMemoryAllocator/include
     ${CMAKE_SOURCE_DIR}/Library/filewatch)
 
-target_link_libraries(Core PUBLIC ThreadPool glfw Vulkan::Vulkan PRIVATE VulkanMemoryAllocator imguizmo imgui glm EnTT::EnTT stbimage::stbimage assimp FastNoise2 ShaderCompilation Logging Platform)
+target_link_libraries(Core PUBLIC ThreadPool ktx glfw Vulkan::Vulkan PRIVATE VulkanMemoryAllocator imguizmo imgui glm EnTT::EnTT stbimage::stbimage assimp FastNoise2 ShaderCompilation Logging Platform)
 target_precompile_headers(Core PRIVATE include/pch/CorePCH.hpp)
 target_compile_definitions(Core PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)
 

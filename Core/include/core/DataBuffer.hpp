@@ -36,6 +36,25 @@ public:
     }
   }
 
+  template<class T>
+  explicit DataBuffer(std::span<const T> input_data)
+    : buffer_size(input_data.size_bytes())
+  {
+    if (buffer_size > 0) {
+      allocate_storage(buffer_size);
+      std::memcpy(data.get(), input_data.data(), buffer_size);
+    }
+  }
+  template<class T>
+  explicit DataBuffer(std::span<T> input_data)
+    : buffer_size(input_data.size_bytes())
+  {
+    if (buffer_size > 0) {
+      allocate_storage(buffer_size);
+      std::memcpy(data.get(), input_data.data(), buffer_size);
+    }
+  }
+
   DataBuffer() = default;
   ~DataBuffer() = default;
 

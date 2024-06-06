@@ -13,6 +13,8 @@
 #include "graphics/Swapchain.hpp"
 #include "graphics/Window.hpp"
 
+#include <cassert>
+
 namespace Engine::Core {
 
 auto
@@ -116,7 +118,7 @@ Application::run() -> i32
     Profiler::the().end_session();
 
     std::scoped_lock lock(post_frame_mutex);
-    for (auto& func : post_frame_funcs) {
+    for (const auto& func : post_frame_funcs) {
       func();
     }
     post_frame_funcs.clear();

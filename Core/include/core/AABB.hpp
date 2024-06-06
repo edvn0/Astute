@@ -1,20 +1,18 @@
 #pragma once
 
-#include <glm/glm.hpp>
+#include "core/Types.hpp"
 
+#include <glm/glm.hpp>
 #include <type_traits>
 
 namespace Engine::Core {
 
 struct AABB
 {
-  glm::vec3 min, max;
+  glm::vec3 min{ 0.0F };
+  glm::vec3 max{ 0.0F };
 
-  constexpr AABB()
-    : min(0.0f)
-    , max(0.0f)
-  {
-  }
+  constexpr AABB() = default;
 
   constexpr AABB(const glm::vec3& in_min, const glm::vec3& in_max)
     : min(in_min)
@@ -33,10 +31,10 @@ struct AABB
     max.z = glm::max(new_position.z, max.z);
   }
 
-  auto scaled(std::floating_point auto value) const -> Core::AABB
+  constexpr auto scaled(std::floating_point auto value) const -> Core::AABB
   {
-    return AABB(min * static_cast<float>(value),
-                max * static_cast<float>(value));
+    return AABB(min * static_cast<Core::f32>(value),
+                max * static_cast<Core::f32>(value));
   }
 };
 

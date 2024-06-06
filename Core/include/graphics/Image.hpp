@@ -75,7 +75,7 @@ struct ImageConfiguration
   const bool is_transfer{ false };
 
   /// \brief Layout of the image
-  const VkImageLayout layout{
+  VkImageLayout layout{
     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
   };
 
@@ -123,6 +123,12 @@ transition_image_layout(
   Core::u32 mip_levels = 1,
   Core::u32 current_mip_base = 0) -> void;
 
+auto transition_image_layout(VkCommandBuffer,
+                             VkImage,
+                             VkImageLayout,
+                             VkImageLayout,
+                             VkImageSubresourceRange) -> void;
+
 auto
 copy_buffer_to_image(VkCommandBuffer,
                      VkBuffer buffer,
@@ -133,8 +139,10 @@ copy_buffer_to_image(VkCommandBuffer,
 auto
 copy_buffer_to_image(VkCommandBuffer, const Core::DataBuffer&, Image&) -> void;
 
-auto create_sampler(VkFilter, VkSamplerAddressMode, VkBorderColor, Core::u32)
-  -> VkSampler;
+auto create_sampler(VkFilter,
+                    VkSamplerAddressMode,
+                    VkBorderColor,
+                    Core::u32) -> VkSampler;
 auto
 create_sampler(VkFilter,
                VkFilter,
@@ -149,7 +157,7 @@ class Image
 {
 public:
   VkImage image{ nullptr };
-  Core::Scope<ImageImpl> alloc_impl;
+  Core::Scope<ImageImpl> alloc_impl{ nullptr };
   VkImageView view{ nullptr };
   std::unordered_map<Core::u32, VkImageView> layer_image_views{};
   std::unordered_map<Core::u32, VkImageView> mip_image_views{};
@@ -163,7 +171,7 @@ public:
   bool destroyed{ false };
 
   ~Image();
-  Image() = default;
+  Image();
   explicit Image(const ImageConfiguration&);
 
   Image(const Image&) = delete;
@@ -261,8 +269,8 @@ public:
   static auto reference_resolve_msaa(const Image&,
                                      const CommandBuffer* = nullptr)
     -> Core::Ref<Image>;
-  static auto copy_image(const Image& source, const CommandBuffer&)
-    -> Core::Ref<Image>;
+  static auto copy_image(const Image& source,
+                         const CommandBuffer&) -> Core::Ref<Image>;
 
   static auto construct(const ImageConfiguration&) -> Core::Ref<Image>;
 

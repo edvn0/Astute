@@ -1,6 +1,9 @@
 # Prerequisites
 *.d
 
+.json
+Astute.json
+
 test_output
 vs2022
 html

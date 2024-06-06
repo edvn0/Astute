@@ -32,3 +32,6 @@
 [submodule "Library/ImGuizmo"]
 	path = Library/ImGuizmo
 	url = git@github.com:edvn0/ImGuizmo.git
+[submodule "Library/KTX-Software"]
+	path = Library/KTX-Software
+	url = git@github.com:KhronosGroup/KTX-Software.git

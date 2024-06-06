@@ -14,15 +14,17 @@ constexpr auto
 convert_to_imguizmo(GizmoState state) -> ImGuizmo::OPERATION
 {
   switch (state) {
-    case GizmoState::Rotate:
+    using enum GizmoState;
+    case Rotate:
       return ImGuizmo::OPERATION::ROTATE;
-    case GizmoState::Scale:
+    case Scale:
       return ImGuizmo::OPERATION::SCALE;
-    case GizmoState::Translate:
+    case Translate:
       return ImGuizmo::OPERATION::TRANSLATE;
     default:
-      throw;
+      debug_break();
   }
+  return ImGuizmo::OPERATION::TRANSLATE;
 }
 
 constexpr auto
@@ -36,7 +38,7 @@ convert_to_bits(GizmoState state) -> u8
     case GizmoState::Scale:
       return 0x2;
     default:
-      throw;
+      debug_break();
   }
 }
 
@@ -46,22 +48,19 @@ calculate_ray(const glm::vec2& mouse_pos,
               const glm::mat4& projection_matrix,
               const glm::vec2& viewport_size) -> glm::vec3
 {
-  // Normalize the mouse coordinates to range [-1, 1]
-  glm::vec2 normalized_coords =
+  auto normalized_coords =
     glm::vec2((2.0F * mouse_pos.x) / viewport_size.x - 1.0F,
               (2.0F * mouse_pos.y) / viewport_size.y - 1.0F);
 
-  info("Mouse position: {} {}", normalized_coords.x, normalized_coords.y);
-
   // Clip coordinates
-  glm::vec4 clip_coords = glm::vec4(normalized_coords, -1.0F, 1.0F);
+  auto clip_coords = glm::vec4(normalized_coords, -1.0F, 1.0F);
 
   // Convert to eye coordinates
-  glm::vec4 eye_coords = glm::inverse(projection_matrix) * clip_coords;
+  auto eye_coords = glm::inverse(projection_matrix) * clip_coords;
   eye_coords = glm::vec4(eye_coords.x, eye_coords.y, -1.0F, 0.0F);
 
   // Convert to world coordinates
-  glm::vec3 ray_world =
+  auto ray_world =
     glm::normalize(glm::vec3(glm::inverse(view_matrix) * eye_coords));
 
   return ray_world;
@@ -70,8 +69,9 @@ calculate_ray(const glm::vec2& mouse_pos,
 } // namespace utilities
 namespace {
 
-constexpr auto for_each_in_tuple = [](auto&& tuple, auto&& func) {
-  std::apply([&func](auto&&... args) { (func(args), ...); }, tuple);
+constexpr auto for_each_in_tuple = []<class T>(T&& tuple, auto&& func) {
+  std::apply([&func](auto&&... args) { (func(args), ...); },
+             std::forward<T>(tuple));
 };
 
 constexpr auto

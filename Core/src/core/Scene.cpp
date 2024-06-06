@@ -5,6 +5,7 @@
 #include "core/Scene.hpp"
 #include "graphics/Device.hpp"
 #include "graphics/Material.hpp"
+#include "graphics/TextureCube.hpp"
 #include "graphics/Vertex.hpp"
 #include "logging/Logger.hpp"
 
@@ -56,8 +57,7 @@ calculate_aabb(const TransformComponent& transform) -> Engine::Core::AABB
 
   Engine::Core::AABB aabb;
   for (const auto& vertex : vertices) {
-    glm::vec3 transformed_vertex =
-      glm::vec3(model_matrix * glm::vec4(vertex, 1.0F));
+    auto transformed_vertex = glm::vec3(model_matrix * glm::vec4(vertex, 1.0F));
     aabb.update_min_max(transformed_vertex);
   }
 
@@ -130,12 +130,15 @@ update_lights(entt::registry& registry,
 Scene::Scene(const std::string_view name_view)
   : name(name_view)
 {
+  auto texture =
+    Graphics::TextureCube::construct("Assets/images/cubemap_yokohama_rgba.ktx");
+
   auto cube_mesh = Core::make_ref<Graphics::StaticMesh>(
     Core::make_ref<Graphics::MeshAsset>("Assets/meshes/cube/cube.gltf"));
 
   info("Creating scene: {}", name);
   auto sponza_mesh =
-    Graphics::StaticMesh::construct("Assets/meshes/sponza_new/sponza.gltf");
+    Graphics::StaticMesh::construct("Assets/meshes/little_tokyo/scene.gltf");
   auto cerberus_mesh =
     Graphics::StaticMesh::construct("Assets/meshes/cerb/cerberus.gltf");
 
@@ -146,8 +149,6 @@ Scene::Scene(const std::string_view name_view)
     transform2.translation = { 0, 5, 0 };
     transform2.rotation = glm::rotate(
       glm::mat4{ 1.0F }, glm::radians(180.0F), glm::vec3{ 1, 0, 0 });
-    // Floor is big!
-    transform2.scale = { 0.01, 0.01, 0.01 };
   }
 
   {
@@ -158,17 +159,15 @@ Scene::Scene(const std::string_view name_view)
     transform2.rotation = glm::rotate(
       glm::mat4{ 1.0F }, glm::radians(180.0F), glm::vec3{ 1, 0, 0 });
     // Floor is big!
-    transform2.scale = { 0.01, 0.01, 0.01 };
   }
 
   const auto& bounds = sponza_mesh->get_mesh_asset()->get_bounding_box();
-  const auto scaled = bounds.scaled(0.01);
+  const auto& scaled = bounds;
   for (auto i = 0; i < 127; i++) {
-    auto light = create_entity(std::format("PointLight{}, i", i));
+    auto light = create_entity(std::format("PointLight{}", i));
     registry.emplace<MeshComponent>(light, cube_mesh);
     auto& t = registry.emplace<TransformComponent>(light);
     auto& light_data = registry.emplace<PointLightComponent>(light);
-    t.scale *= 0.1;
     t.translation = Random::random_in(scaled);
     t.translation.y -= 5;
     light_data.radiance = Random::random_colour();
@@ -183,8 +182,6 @@ Scene::Scene(const std::string_view name_view)
     auto light = create_entity(std::format("SpotLight{}", i));
     auto& t = registry.emplace<TransformComponent>(light);
     registry.emplace<MeshComponent>(light, cube_mesh);
-    t.scale *= 0.1;
-
     t.translation = Random::random_in(scaled);
     t.translation.y -= 5;
     auto& light_data = registry.emplace<SpotLightComponent>(light);
@@ -231,8 +228,8 @@ Scene::on_update_editor(f64 ts) -> void
 }
 
 auto
-Scene::on_render_editor(Graphics::Renderer& renderer, const Camera& camera)
-  -> void
+Scene::on_render_editor(Graphics::Renderer& renderer,
+                        const Camera& camera) -> void
 {
   renderer.begin_scene(*this,
                        {
@@ -267,7 +264,10 @@ Scene::on_render_editor(Graphics::Renderer& renderer, const Camera& camera)
   }
 
   for (auto&& [entity, transform] :
-       registry.view<const TransformComponent>().each()) {
+       registry
+         .view<const TransformComponent>(
+           entt::exclude<SpotLightComponent, PointLightComponent>)
+         .each()) {
     Engine::Core::AABB aabb = Utilities::calculate_aabb(transform);
     renderer.get_2d_renderer().submit_aabb(
       aabb, transform.compute(), { 0.1, 0.9, 0.8, 1.0 });

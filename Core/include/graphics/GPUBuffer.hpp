@@ -28,6 +28,7 @@ class GPUBuffer
 public:
   GPUBuffer(GPUBufferType, Core::usize);
   ~GPUBuffer();
+  auto destroy() -> void;
 
   [[nodiscard]] constexpr auto get_size() const -> Core::usize { return size; }
 
@@ -59,6 +60,7 @@ public:
 
 private:
   Core::usize size;
+  bool is_destroyed{ false };
 
   GPUBufferType buffer_type{ GPUBufferType::Invalid };
   VkBuffer buffer;
@@ -92,6 +94,8 @@ public:
     : StagingBuffer(data.span())
   {
   }
+
+  auto destroy() { buffer.destroy(); }
 
   [[nodiscard]] constexpr auto size() const -> Core::usize
   {
