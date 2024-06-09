@@ -8,7 +8,7 @@ layout(location = 0) out vec4 colour;
 
 layout(set = 1, binding = 5) uniform sampler2D fullscreen_texture;
 layout(set = 1, binding = 6) uniform sampler2D bloom_texture;
-// layout(binding = 7) uniform sampler2D u_BloomDirtTexture;
+layout(set = 1, binding = 7) uniform sampler2D bloom_dirt_texture;
 
 layout(push_constant) uniform Uniforms
 {
@@ -84,20 +84,18 @@ main()
 
   vec3 color = texture(fullscreen_texture, tex_coords).rgb;
 
-  ivec2 texSize = textureSize(fullscreen_texture, 0);
+  ivec2 texSize = textureSize(bloom_texture, 0);
   vec2 fTexSize = vec2(float(texSize.x), float(texSize.y));
   vec3 bloom =
-    UpsampleTent9(
-      fullscreen_texture, 0, tex_coords, 1.0f / fTexSize, sampleScale) *
+    UpsampleTent9(bloom_texture, 0, tex_coords, 1.0f / fTexSize, sampleScale) *
     uniforms.BloomIntensity;
-  // vec3 bloomDirt =
-  //  texture(u_BloomDirtTexture, tex_coords).rgb *
-  //  uniforms.BloomDirtIntensity;
+  vec3 bloomDirt =
+    texture(bloom_dirt_texture, tex_coords).rgb * uniforms.BloomDirtIntensity;
 
   float d = 0.0;
 
   color += bloom;
-  color += bloom;
+  color += bloom * bloomDirt;
   color *= uniforms.Exposure;
 
   color = ACESTonemap(color);

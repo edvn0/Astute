@@ -110,22 +110,28 @@ CompositionRenderPass::on_resize(const Core::Extent& ext) -> void
   pipe->on_resize(ext);
 }
 
+CompositionRenderPass::CompositionSettings::CompositionSettings()
+{
+  dirt_texture = Renderer::get_black_texture();
+}
+
 auto
 CompositionRenderPass::CompositionSettings::expose_to_ui(Material&) -> void
 {
   ImGui::Text("Composition Settings");
-  ImGui::DragFloat("Bloom intensity", &Intensity, 0.001F, 0.01F, 3.0F);
-  ImGui::DragFloat("Dirt intensity", &DirtIntensity, 0.001F, 0.01F, 3.0F);
+  ImGui::DragFloat("Bloom Intensity", &Intensity, 0.05f, 0.0f, 20.0f);
+  ImGui::DragFloat("Dirt Intensity", &DirtIntensity, 0.05f, 0.0f, 20.0f);
 }
 
 auto
 CompositionRenderPass::CompositionSettings::apply_to_material(
   Material& material) -> void
 {
-  material.set("uniforms.Exposure", 1.0F);
+  material.set("uniforms.Exposure", 0.8F);
   material.set("uniforms.Opacity", 1.0F);
   material.set("uniforms.BloomIntensity", Intensity);
   material.set("uniforms.BloomDirtIntensity", DirtIntensity);
+  material.set("bloom_dirt_texture", dirt_texture);
 }
 
 } // namespace Engine::Graphics

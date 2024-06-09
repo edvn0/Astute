@@ -123,6 +123,30 @@ Renderer::Renderer(Configuration config, const Window* window)
   : size(window->get_swapchain().get_size())
   , old_size(size)
 {
+  {
+    Core::DataBuffer data_buffer{
+      sizeof(Core::u32),
+    };
+    static constexpr auto white_data = 0xFFFFFFFF;
+    data_buffer.write(&white_data, sizeof(Core::u32), 0U);
+
+    white_texture = Image::load_from_memory(1,
+                                            1,
+                                            data_buffer,
+                                            {
+                                              .path = "white-default-texture",
+                                            });
+
+    Core::u32 black_data{ 0 };
+    data_buffer.write(&black_data, sizeof(Core::u32), 0U);
+    black_texture = Image::load_from_memory(1,
+                                            1,
+                                            data_buffer,
+                                            {
+                                              .path = "black-default-texture",
+                                            });
+  }
+
   Shader::initialise_compiler(Compilation::ShaderCompilerConfiguration{
     .optimisation_level = 2,
     .debug_information_level = Compilation::DebugInformationLevel::Full,
@@ -191,24 +215,6 @@ Renderer::Renderer(Configuration config, const Window* window)
     transform_buffer = Core::make_scope<Core::DataBuffer>(total_size);
     transform_buffer->fill_zero();
   }
-
-  Core::DataBuffer data_buffer{
-    sizeof(Core::u32),
-  };
-  static constexpr auto white_data = 0xFFFFFFFF;
-  data_buffer.write(&white_data, sizeof(Core::u32), 0U);
-
-  white_texture = Image::load_from_memory(1,
-                                          1,
-                                          data_buffer,
-                                          {
-                                            .path = "white-default-texture",
-                                          });
-
-  Core::u32 black_data{ 0 };
-  data_buffer.write(&black_data, sizeof(Core::u32), 0U);
-  black_texture = Image::load_from_memory(
-    1, 1, data_buffer, { .path = "black-default-texture" });
 
   const glm::uvec2 viewport_size{ size.width, size.height };
 

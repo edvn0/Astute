@@ -84,14 +84,11 @@ BloomRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 
   auto& [_, shader, pipeline, light_culling_material] = get_data();
 
-  // m_BloomComputeMaterial->Set("output_image", m_BloomComputeTexture);
-
   struct BloomComputePushConstants
   {
     glm::vec4 Params;
     float LOD = 0.0f;
-    int Mode =
-      0; // 0 = prefilter, 1 = downsample, 2 = firstUpsample, 3 = upsample
+    int Mode = 0;
   } bloomComputePushConstants;
   auto* casted_settings = static_cast<BloomSettings*>(get_settings());
   bloomComputePushConstants.Params = {
@@ -121,29 +118,6 @@ BloomRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
   allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
   allocInfo.descriptorSetCount = 1;
   allocInfo.pSetLayouts = &descriptorSetLayout;
-
-  /* if (false) {
-    VkImageMemoryBarrier imageMemoryBarrier = {};
-    imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageMemoryBarrier.image = inputImage->GetImageInfo().Image;
-    imageMemoryBarrier.subresourceRange = {
-      VK_IMAGE_ASPECT_COLOR_BIT, 0, inputImage->GetSpecification().Mips, 0, 1
-    };
-    imageMemoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    vkCmdPipelineBarrier(pipeline->GetActiveCommandBuffer(),
-                         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                         0,
-                         0,
-                         nullptr,
-                         0,
-                         nullptr,
-                         1,
-                         &imageMemoryBarrier);
-  } */
 
   // Output image
   VkDescriptorSet descriptorSet =

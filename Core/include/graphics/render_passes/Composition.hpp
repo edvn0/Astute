@@ -23,11 +23,14 @@ private:
   {
   public:
     bool Enabled = true;
-    Core::f32 Threshold = 1.0f;
-    Core::f32 Knee = 0.1f;
-    Core::f32 UpsampleScale = 1.0f;
-    Core::f32 Intensity = 1.0f;
-    Core::f32 DirtIntensity = 1.0f;
+    Core::f32 Threshold = 1.0F;
+    Core::f32 Knee = 0.1F;
+    Core::f32 UpsampleScale = 1.0F;
+    Core::f32 Intensity = 1.0F;
+    Core::f32 DirtIntensity = 1.0F;
+    Core::Ref<Image> dirt_texture{ nullptr };
+
+    CompositionSettings();
 
     auto expose_to_ui(Material&) -> void override;
     auto apply_to_material(Material&) -> void override;
