@@ -13,6 +13,7 @@
 #include "graphics/Mesh.hpp"
 #include "graphics/RenderPass.hpp"
 #include "graphics/Renderer2D.hpp"
+#include "graphics/TextureCube.hpp"
 
 #include "graphics/ShaderBuffers.hpp"
 
@@ -266,6 +267,8 @@ private:
 
   std::vector<SubmeshTransformBuffer> transform_buffers;
   std::unordered_map<CommandKey, TransformMapData> mesh_transform_map;
+
+  Core::Ref<TextureCube> current_cubemap;
 
   static inline Core::Ref<Image> white_texture;
   static inline Core::Ref<Image> black_texture;

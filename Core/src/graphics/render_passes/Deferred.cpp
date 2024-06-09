@@ -102,11 +102,25 @@ DeferredRenderPass::construct_impl() -> void
     .shader = deferred_shader.get(),
   });
 
+  auto& input_render_pass = get_renderer().get_render_pass("MainGeometry");
+  deferred_material->set("cubemap", cubemap);
+  deferred_material->set("position_map",
+                         input_render_pass.get_colour_attachment(0));
+  deferred_material->set("normal_map",
+                         input_render_pass.get_colour_attachment(1));
+  deferred_material->set("albedo_specular_map",
+                         input_render_pass.get_colour_attachment(2));
+  deferred_material->set("shadow_position_map",
+                         input_render_pass.get_colour_attachment(3));
+  deferred_material->set("noise_map", noise_map);
+
   setup_file_watcher("Assets/shaders/deferred.frag");
 }
 
-DeferredRenderPass::DeferredRenderPass(Renderer& ren)
+DeferredRenderPass::DeferredRenderPass(Renderer& ren,
+                                       const Core::Ref<Image>& cube)
   : RenderPass(ren)
+  , cubemap(cube)
 {
   watch = Core::make_scope<Impl>();
 }
@@ -125,17 +139,6 @@ DeferredRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
           deferred_shader,
           deferred_pipeline,
           deferred_material] = get_data();
-
-  auto& input_render_pass = get_renderer().get_render_pass("MainGeometry");
-  deferred_material->set("position_map",
-                         input_render_pass.get_colour_attachment(0));
-  deferred_material->set("normal_map",
-                         input_render_pass.get_colour_attachment(1));
-  deferred_material->set("albedo_specular_map",
-                         input_render_pass.get_colour_attachment(2));
-  deferred_material->set("shadow_position_map",
-                         input_render_pass.get_colour_attachment(3));
-  deferred_material->set("noise_map", noise_map);
 
   auto* renderer_desc_set =
     get_renderer().generate_and_update_descriptor_write_sets(

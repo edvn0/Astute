@@ -703,15 +703,15 @@ Image::resolve_msaa(const Image&, const CommandBuffer*) -> Core::Scope<Image>
 }
 
 auto
-Image::reference_resolve_msaa(const Image&,
-                              const CommandBuffer*) -> Core::Ref<Image>
+Image::reference_resolve_msaa(const Image&, const CommandBuffer*)
+  -> Core::Ref<Image>
 {
   return nullptr;
 }
 
 auto
-Image::copy_image(const Image& source,
-                  const CommandBuffer& command_buffer) -> Core::Ref<Image>
+Image::copy_image(const Image& source, const CommandBuffer& command_buffer)
+  -> Core::Ref<Image>
 {
   auto image = Image::construct(source.configuration);
 
@@ -996,6 +996,19 @@ Image::invalidate_hash() -> void
                std::bit_cast<const void*>(view),
                std::bit_cast<const void*>(sampler),
                std::bit_cast<const void*>(image));
+}
+
+auto
+Image::allocate(VkImageCreateInfo& info) -> void
+{
+  if (!alloc_impl)
+    alloc_impl = Core::make_scope<ImageImpl>();
+  Allocator allocator{
+    get_path(),
+  };
+
+  alloc_impl->allocation =
+    allocator.allocate_image(image, alloc_impl->allocation_info, info, {});
 }
 
 auto

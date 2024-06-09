@@ -13,9 +13,14 @@ struct Impl;
 class DeferredRenderPass final : public RenderPass
 {
 public:
-  explicit DeferredRenderPass(Renderer&);
+  explicit DeferredRenderPass(Renderer&, const Core::Ref<Image>&);
   ~DeferredRenderPass() override;
   auto on_resize(const Core::Extent&) -> void override;
+
+  auto set_cubemap(const Core::Ref<Image>& new_cubemap)
+  {
+    cubemap = new_cubemap;
+  }
 
 protected:
   auto construct_impl() -> void override;
@@ -34,6 +39,7 @@ private:
   auto recreate_pipeline() -> void;
 
   Core::Ref<Image> noise_map;
+  Core::Ref<Image> cubemap;
 };
 
 } // namespace Engine::Graphics

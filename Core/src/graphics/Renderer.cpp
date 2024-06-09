@@ -149,11 +149,15 @@ Renderer::Renderer(Configuration config, const Window* window)
     "Bloom",    "Composition",
   };
 
+  current_cubemap =
+    TextureCube::construct("Assets/images/cubemap_yokohama_rgba.ktx");
+
   render_passes["MainGeometry"] =
     Core::make_scope<MainGeometryRenderPass>(*this);
   render_passes["Shadow"] =
     Core::make_scope<ShadowRenderPass>(*this, config.shadow_pass_size);
-  render_passes["Deferred"] = Core::make_scope<DeferredRenderPass>(*this);
+  render_passes["Deferred"] =
+    Core::make_scope<DeferredRenderPass>(*this, current_cubemap->get_image());
   render_passes["Predepth"] = Core::make_scope<PredepthRenderPass>(*this);
   render_passes["Lights"] = Core::make_scope<LightsRenderPass>(*this);
   render_passes["LightCulling"] =
@@ -502,7 +506,7 @@ Renderer::flush_draw_lists() -> void
 
   // Shadow pass
   render_passes.at("Shadow")->execute(*command_buffer);
-  // Prepdepth pass
+  // Predepth pass
   render_passes.at("Predepth")->execute(*command_buffer);
   {
     compute_command_buffer->begin();

@@ -130,8 +130,6 @@ update_lights(entt::registry& registry,
 Scene::Scene(const std::string_view name_view)
   : name(name_view)
 {
-  auto texture =
-    Graphics::TextureCube::construct("Assets/images/cubemap_yokohama_rgba.ktx");
 
   auto cube_mesh = Core::make_ref<Graphics::StaticMesh>(
     Core::make_ref<Graphics::MeshAsset>("Assets/meshes/cube/cube.gltf"));
@@ -228,8 +226,8 @@ Scene::on_update_editor(f64 ts) -> void
 }
 
 auto
-Scene::on_render_editor(Graphics::Renderer& renderer,
-                        const Camera& camera) -> void
+Scene::on_render_editor(Graphics::Renderer& renderer, const Camera& camera)
+  -> void
 {
   renderer.begin_scene(*this,
                        {

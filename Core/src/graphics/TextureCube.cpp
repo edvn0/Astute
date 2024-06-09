@@ -4,6 +4,7 @@
 
 #include "core/DataBuffer.hpp"
 #include "core/Verify.hpp"
+#include "graphics/Allocator.hpp"
 #include "graphics/GPUBuffer.hpp"
 #include "graphics/Image.hpp"
 #include "logging/Logger.hpp"
@@ -13,6 +14,57 @@
 #include <ktxvulkan.h>
 
 namespace Engine::Graphics {
+
+static constexpr auto
+to_string(ktx_error_code_e e) -> std::string_view
+{
+  switch (e) {
+    case KTX_SUCCESS:
+      return "KTX_SUCCESS";
+    case KTX_FILE_DATA_ERROR:
+      return "KTX_FILE_DATA_ERROR";
+    case KTX_FILE_ISPIPE:
+      return "KTX_FILE_ISPIPE";
+    case KTX_FILE_OPEN_FAILED:
+      return "KTX_FILE_OPEN_FAILED";
+    case KTX_FILE_OVERFLOW:
+      return "KTX_FILE_OVERFLOW";
+    case KTX_FILE_READ_ERROR:
+      return "KTX_FILE_READ_ERROR";
+    case KTX_FILE_SEEK_ERROR:
+      return "KTX_FILE_SEEK_ERROR";
+    case KTX_FILE_UNEXPECTED_EOF:
+      return "KTX_FILE_UNEXPECTED_EOF";
+    case KTX_FILE_WRITE_ERROR:
+      return "KTX_FILE_WRITE_ERROR";
+    case KTX_GL_ERROR:
+      return "KTX_GL_ERROR";
+    case KTX_INVALID_OPERATION:
+      return "KTX_INVALID_OPERATION";
+    case KTX_INVALID_VALUE:
+      return "KTX_INVALID_VALUE";
+    case KTX_NOT_FOUND:
+      return "KTX_NOT_FOUND";
+    case KTX_OUT_OF_MEMORY:
+      return "KTX_OUT_OF_MEMORY";
+    case KTX_TRANSCODE_FAILED:
+      return "KTX_TRANSCODE_FAILED";
+    case KTX_UNKNOWN_FILE_FORMAT:
+      return "KTX_UNKNOWN_FILE_FORMAT";
+    case KTX_UNSUPPORTED_TEXTURE_TYPE:
+      return "KTX_UNSUPPORTED_TEXTURE_TYPE";
+    case KTX_UNSUPPORTED_FEATURE:
+      return "KTX_UNSUPPORTED_FEATURE";
+    case KTX_LIBRARY_NOT_LINKED:
+      return "KTX_LIBRARY_NOT_LINKED";
+    case KTX_DECOMPRESS_LENGTH_ERROR:
+      return "KTX_DECOMPRESS_LENGTH_ERROR";
+    case KTX_DECOMPRESS_CHECKSUM_ERROR:
+      return "KTX_DECOMPRESS_CHECKSUM_ERROR";
+    default:
+      return "Missing";
+  }
+}
 
 struct Mipmap final
 {
@@ -36,26 +88,13 @@ TextureCube::load_from_file(const std::string& path) -> bool
     return false;
   }
 
-  // KTX loading.
-  if (p.extension().compare(".ktx") != 0) {
-    info("Only KTX files are supported for texture cube loading.");
-    return false;
-  }
-
-  ktxTexture2* loaded_texture = nullptr;
-  ktxResult result = ktxTexture2_CreateFromNamedFile(
-    path.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &loaded_texture);
+  ktxTexture* loaded_texture = nullptr;
+  ktxResult result =
+    ktxTexture_CreateFromNamedFile(path.c_str(), 0x0, &loaded_texture);
   if (result != KTX_SUCCESS) {
-    error("Failed to load KTX file: {}", path);
+    auto error_code = to_string(result);
+    error("Failed to load KTX file: {}. Code: {}", path, error_code);
     return false;
-  }
-
-  if (ktxTexture2_NeedsTranscoding(loaded_texture)) {
-    result = ktxTexture2_TranscodeBasis(loaded_texture, KTX_TTF_BC7_RGBA, 0);
-    if (result != KTX_SUCCESS) {
-      throw std::runtime_error(
-        "Could not transcode the input texture to the selected target format.");
-    }
   }
 
   auto output_image = Core::make_ref<Image>();
@@ -65,15 +104,19 @@ TextureCube::load_from_file(const std::string& path) -> bool
   auto width = loaded_texture->baseWidth;
   auto height = loaded_texture->baseHeight;
   auto mipLevels = loaded_texture->numLevels;
+  auto layers = loaded_texture->numLayers;
   output_image->configuration.width = width;
   output_image->configuration.height = height;
   output_image->configuration.mip_levels = mipLevels;
+  output_image->configuration.layers = layers;
 
-  ktx_uint8_t* ktxTextureData = ktxTexture_GetData((ktxTexture*)loaded_texture);
   ktx_size_t ktxTextureSize =
-    ktxTexture_GetDataSize((ktxTexture*)loaded_texture);
+    ktxTexture_GetDataSize(ktxTexture(loaded_texture));
+  std::vector<Core::u8> data;
+  data.resize(ktxTextureSize);
+  ktxTexture_LoadImageData(loaded_texture, data.data(), ktxTextureSize);
 
-  StagingBuffer staging_buffer{ std::span{ ktxTextureData, ktxTextureSize } };
+  StagingBuffer staging_buffer{ std::span{ data } };
   auto device = Device::the().device();
 
   // Create optimal tiled target image
@@ -81,7 +124,7 @@ TextureCube::load_from_file(const std::string& path) -> bool
   imageCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   imageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
   imageCreateInfo.format = // Format from the KTX file
-    static_cast<VkFormat>(loaded_texture->vkFormat);
+    static_cast<VkFormat>(ktxTexture_GetVkFormat(loaded_texture));
   imageCreateInfo.mipLevels = mipLevels;
   imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
   imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -99,8 +142,7 @@ TextureCube::load_from_file(const std::string& path) -> bool
   // This flag is required for cube map images
   imageCreateInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 
-  VK_CHECK(
-    vkCreateImage(device, &imageCreateInfo, nullptr, &output_image->image));
+  output_image->allocate(imageCreateInfo);
 
   std::vector<VkBufferImageCopy> bufferCopyRegions;
   for (uint32_t face = 0; face < 6; face++) {
@@ -190,7 +232,13 @@ TextureCube::load_from_file(const std::string& path) -> bool
 
   // Clean up staging resources
   staging_buffer.destroy();
-  ktxTexture2_Destroy(loaded_texture);
+  ktxTexture_Destroy(loaded_texture);
+
+  image = output_image;
+
+  image->descriptor_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  image->descriptor_info.imageView = image->view;
+  image->descriptor_info.sampler = image->sampler;
   return true;
 }
 

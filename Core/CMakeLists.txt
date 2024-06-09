@@ -115,7 +115,7 @@ target_include_directories(Core SYSTEM PRIVATE
 
 target_link_libraries(Core PUBLIC ThreadPool ktx glfw Vulkan::Vulkan PRIVATE VulkanMemoryAllocator imguizmo imgui glm EnTT::EnTT stbimage::stbimage assimp FastNoise2 ShaderCompilation Logging Platform)
 target_precompile_headers(Core PRIVATE include/pch/CorePCH.hpp)
-target_compile_definitions(Core PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)
+target_compile_definitions(Core PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE -DImTextureID=ImU64)
 
 if("Clang" IN_LIST CMAKE_CXX_COMPILER_ID)
     target_compile_options(Core PRIVATE -Wno-unused-local-typedef)

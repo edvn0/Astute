@@ -139,10 +139,8 @@ copy_buffer_to_image(VkCommandBuffer,
 auto
 copy_buffer_to_image(VkCommandBuffer, const Core::DataBuffer&, Image&) -> void;
 
-auto create_sampler(VkFilter,
-                    VkSamplerAddressMode,
-                    VkBorderColor,
-                    Core::u32) -> VkSampler;
+auto create_sampler(VkFilter, VkSamplerAddressMode, VkBorderColor, Core::u32)
+  -> VkSampler;
 auto
 create_sampler(VkFilter,
                VkFilter,
@@ -236,6 +234,7 @@ public:
   [[nodiscard]] auto get_usage() const { return configuration.usage; }
   [[nodiscard]] auto get_layer_count() const { return configuration.layers; }
   [[nodiscard]] auto get_path() const { return configuration.path; }
+  auto allocate(VkImageCreateInfo&) -> void;
 
   auto write_to_file(std::string_view path) const -> bool;
 
@@ -269,8 +268,8 @@ public:
   static auto reference_resolve_msaa(const Image&,
                                      const CommandBuffer* = nullptr)
     -> Core::Ref<Image>;
-  static auto copy_image(const Image& source,
-                         const CommandBuffer&) -> Core::Ref<Image>;
+  static auto copy_image(const Image& source, const CommandBuffer&)
+    -> Core::Ref<Image>;
 
   static auto construct(const ImageConfiguration&) -> Core::Ref<Image>;
 
