@@ -136,9 +136,7 @@ Scene::Scene(const std::string_view name_view)
 
   info("Creating scene: {}", name);
   auto sponza_mesh =
-    Graphics::StaticMesh::construct("Assets/meshes/little_tokyo/scene.gltf");
-  auto cerberus_mesh =
-    Graphics::StaticMesh::construct("Assets/meshes/cerb/cerberus.gltf");
+    Graphics::StaticMesh::construct("Assets/meshes/sponza_new/sponza.gltf");
 
   {
     auto sponza = create_entity("Sponza");
@@ -147,27 +145,18 @@ Scene::Scene(const std::string_view name_view)
     transform2.translation = { 0, 5, 0 };
     transform2.rotation = glm::rotate(
       glm::mat4{ 1.0F }, glm::radians(180.0F), glm::vec3{ 1, 0, 0 });
-  }
-
-  {
-    auto cerberos = create_entity("Cerberos");
-    registry.emplace<MeshComponent>(cerberos, cerberus_mesh);
-    auto& transform2 = registry.emplace<TransformComponent>(cerberos);
-    transform2.translation = { 0, 5, 0 };
-    transform2.rotation = glm::rotate(
-      glm::mat4{ 1.0F }, glm::radians(180.0F), glm::vec3{ 1, 0, 0 });
-    // Floor is big!
+    transform2.scale *= 0.01;
   }
 
   const auto& bounds = sponza_mesh->get_mesh_asset()->get_bounding_box();
-  const auto& scaled = bounds;
+  const auto& scaled = bounds.scaled(0.01);
   for (auto i = 0; i < 127; i++) {
     auto light = create_entity(std::format("PointLight{}", i));
     registry.emplace<MeshComponent>(light, cube_mesh);
     auto& t = registry.emplace<TransformComponent>(light);
+    t.scale *= 0.01;
     auto& light_data = registry.emplace<PointLightComponent>(light);
     t.translation = Random::random_in(scaled);
-    t.translation.y -= 5;
     light_data.radiance = Random::random_colour();
     light_data.intensity = Random::random<Core::f32>(0.5, 1.0);
     light_data.light_size = Random::random<Core::f32>(0.1, 1.0);
@@ -180,8 +169,9 @@ Scene::Scene(const std::string_view name_view)
     auto light = create_entity(std::format("SpotLight{}", i));
     auto& t = registry.emplace<TransformComponent>(light);
     registry.emplace<MeshComponent>(light, cube_mesh);
+    t.scale *= 0.01;
+
     t.translation = Random::random_in(scaled);
-    t.translation.y -= 5;
     auto& light_data = registry.emplace<SpotLightComponent>(light);
     light_data.radiance = Random::random_colour();
     light_data.angle = Random::random<Core::f32>(30.0, 90.0);
@@ -289,9 +279,10 @@ Scene::find_intersected_entity(const glm::vec3& ray,
   auto closest_distance = std::numeric_limits<float>::max();
   entt::entity closest_entity = entt::null;
 
-  auto view = registry.view<const TransformComponent>();
+  auto view = registry.view<const TransformComponent>(
+    entt::exclude<PointLightComponent, SpotLightComponent>);
   for (auto&& [entity, transform] : view.each()) {
-    Engine::Core::AABB aabb = Utilities::calculate_aabb(transform);
+    const auto aabb = Utilities::calculate_aabb(transform);
     if (Utilities::intersects(aabb, ray, camera_position)) {
       float distance = glm::distance(camera_position, transform.translation);
       if (distance < closest_distance) {

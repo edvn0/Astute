@@ -17,8 +17,9 @@ struct RendererUBO
   glm::mat4 view_proj{};
   glm::vec4 colour_and_intensity{ 0.5F, 0.5F, 0.5F, 2.0F };
   glm::vec4 specular_colour_and_intensity{ 0.5F, 0.5F, 0.5F, 2.0F };
-  glm::vec4 cascade_splits{};
   glm::vec3 camera_pos{};
+  float padding{};
+  std::array<Core::Padded<Core::f32, 12>, 10> cascade_splits{};
 
   static constexpr std::string_view name = "RendererUBO";
 };
@@ -103,7 +104,7 @@ struct ScreenDataUBO
 
 struct DirectionalShadowProjectionUBO
 {
-  std::array<glm::mat4, 4> view_projections;
+  std::array<glm::mat4, 10> view_projections;
   static constexpr std::string_view name = "DirectionalShadowProjectionUBO";
 };
 

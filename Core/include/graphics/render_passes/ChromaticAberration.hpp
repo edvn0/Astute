@@ -2,6 +2,8 @@
 
 #include "graphics/RenderPass.hpp"
 
+#include <glm/glm.hpp>
+
 namespace Engine::Graphics {
 
 class ChromaticAberrationRenderPass final : public RenderPass
@@ -22,7 +24,7 @@ private:
   class ChromaticAberrationSettings : public RenderPassSettings
   {
   public:
-    Core::f32 chromatic_aberration = 0.001F;
+    glm::vec3 chromatic_aberration{ 0.001F };
 
     auto expose_to_ui(Material&) -> void override;
     auto apply_to_material(Material&) -> void override;

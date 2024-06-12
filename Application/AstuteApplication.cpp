@@ -310,7 +310,7 @@ AstuteApplication::handle_events(Event& event) -> void
 
     if (keycode == KeyCode::KEY_9) {
       chosen_image = chosen_image + 1;
-      chosen_image = chosen_image % 4;
+      chosen_image = chosen_image % 10;
       return true;
     }
 

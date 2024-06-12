@@ -37,7 +37,7 @@ public:
   virtual auto set_near_clip(float set_value) -> void = 0;
   virtual auto set_far_clip(float set_value) -> void = 0;
 
-  virtual auto get_fov() const -> float { return 0; }
+  [[nodiscard]] virtual auto get_fov() const -> float { return 0; }
 
   [[nodiscard]] virtual auto get_position() const -> const glm::vec3& = 0;
   [[nodiscard]] virtual auto get_direction() const -> const glm::vec3& = 0;
@@ -96,7 +96,7 @@ public:
   auto get_exposure() -> float& { return exposure; }
 
 protected:
-  float exposure = 0.8f;
+  float exposure = 0.8F;
 
 private:
   glm::mat4 projection_matrix{ 1.0F };
@@ -202,7 +202,7 @@ public:
     return near_clip;
   }
   [[nodiscard]] auto get_far_clip() const -> float override { return far_clip; }
-  auto get_fov() const -> float override { return vertical_fov; }
+  [[nodiscard]] auto get_fov() const -> float override { return vertical_fov; }
 
   auto set_near_clip(float set_value) -> void override
   {
@@ -267,6 +267,11 @@ private:
 
   constexpr static float min_speed{ 0.002F };
   constexpr static float max_speed{ 2.0F };
+
+  void handle_gamepad_input(Core::i32 gamepad_id,
+                            std::array<Engine::Core::u8, 15>& buttons,
+                            std::array<float, 6>& axes,
+                            Core::f32 time_step);
 };
 
 struct SceneRendererCamera

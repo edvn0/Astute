@@ -10,8 +10,8 @@ layout(std140, set = 0, binding = 0) uniform RendererUBO
   mat4 view_projection;
   vec4 light_colour_intensity;
   vec4 specular_colour_intensity;
-  vec4 cascade_splits;
   vec3 camera_position;
+  float cascade_splits[10];
 }
 renderer;
 
@@ -90,7 +90,7 @@ screen_data;
 
 layout(std140, set = 0, binding = 7) uniform DirectionalShadowProjectionUBO
 {
-  mat4 view_projections[4];
+  mat4 view_projections[10];
 }
 directional_shadow_projections;
 

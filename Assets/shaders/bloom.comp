@@ -15,9 +15,9 @@ layout(push_constant) uniform Uniforms
   float LOD;
   int Mode;
 }
-u_Uniforms;
+pc;
 
-#define MODE_prefilter 0
+#define MODE_PREFILTER 0
 #define MODE_DOWNSAMPLE 1
 #define MODE_UPSAMPLE_FIRST 2
 #define MODE_UPSAMPLE 3
@@ -28,15 +28,13 @@ DownsampleBox13(sampler2D tex, float lod, vec2 uv, vec2 texelSize)
   // Center
   vec3 A = textureLod(tex, uv, lod).rgb;
 
-  texelSize *= 0.5f; // Sample from center of texels
+  texelSize *= 0.5f;
 
-  // Inner box
   vec3 B = textureLod(tex, uv + texelSize * vec2(-1.0f, -1.0f), lod).rgb;
   vec3 C = textureLod(tex, uv + texelSize * vec2(-1.0f, 1.0f), lod).rgb;
   vec3 D = textureLod(tex, uv + texelSize * vec2(1.0f, 1.0f), lod).rgb;
   vec3 E = textureLod(tex, uv + texelSize * vec2(1.0f, -1.0f), lod).rgb;
 
-  // Outer box
   vec3 F = textureLod(tex, uv + texelSize * vec2(-2.0f, -2.0f), lod).rgb;
   vec3 G = textureLod(tex, uv + texelSize * vec2(-2.0f, 0.0f), lod).rgb;
   vec3 H = textureLod(tex, uv + texelSize * vec2(0.0f, 2.0f), lod).rgb;
@@ -73,8 +71,7 @@ prefilter(vec4 color, vec2 uv)
 {
   float clampValue = 20.0F;
   color = clamp(color, vec4(0.0f), vec4(clampValue));
-  color =
-    quadratic_threshold(color, u_Uniforms.Params.x, u_Uniforms.Params.yzw);
+  color = quadratic_threshold(color, pc.Params.x, pc.Params.yzw);
   return color;
 }
 
@@ -111,40 +108,40 @@ main()
     vec2(float(invocID.x) / imgSize.x, float(invocID.y) / imgSize.y);
   texCoords += (1.0f / imgSize) * 0.5f;
 
-  vec2 texSize = vec2(textureSize(input_texture, int(u_Uniforms.LOD)));
+  vec2 texSize = vec2(textureSize(input_texture, int(pc.LOD)));
   vec4 color = vec4(1, 0, 1, 1);
-  if (u_Uniforms.Mode == MODE_prefilter) {
+  if (pc.Mode == MODE_PREFILTER) {
     color.rgb = DownsampleBox13(input_texture, 0, texCoords, 1.0f / texSize);
     color = prefilter(color, texCoords);
     color.a = 1.0F;
-  } else if (u_Uniforms.Mode == MODE_UPSAMPLE_FIRST) {
-    vec2 bloomTexSize =
-      vec2(textureSize(input_texture, int(u_Uniforms.LOD + 1.0f)));
-    float sampleScale = 1.0F;
+  } else if (pc.Mode == MODE_UPSAMPLE_FIRST) {
+    vec2 bloom_texture_size =
+      vec2(textureSize(input_texture, int(pc.LOD + 1.0f)));
+    float sample_scale = 1.0F;
     vec3 upsampledTexture = upsample_tent_9(input_texture,
-                                            u_Uniforms.LOD + 1.0f,
+                                            pc.LOD + 1.0f,
                                             texCoords,
-                                            1.0f / bloomTexSize,
-                                            sampleScale);
+                                            1.0f / bloom_texture_size,
+                                            sample_scale);
 
-    vec3 existing = textureLod(input_texture, texCoords, u_Uniforms.LOD).rgb;
+    vec3 existing = textureLod(input_texture, texCoords, pc.LOD).rgb;
     color.rgb = existing + upsampledTexture;
-  } else if (u_Uniforms.Mode == MODE_UPSAMPLE) {
-    vec2 bloomTexSize =
-      vec2(textureSize(input_bloom_texture, int(u_Uniforms.LOD + 1.0f)));
-    float sampleScale = 1.0F;
+  } else if (pc.Mode == MODE_UPSAMPLE) {
+    vec2 bloom_texture_size =
+      vec2(textureSize(input_bloom_texture, int(pc.LOD + 1.0f)));
+    float sample_scale = 1.0F;
     vec3 upsampledTexture = upsample_tent_9(input_bloom_texture,
-                                            u_Uniforms.LOD + 1.0f,
+                                            pc.LOD + 1.0f,
                                             texCoords,
-                                            1.0f / bloomTexSize,
-                                            sampleScale);
+                                            1.0f / bloom_texture_size,
+                                            sample_scale);
 
-    vec3 existing = textureLod(input_texture, texCoords, u_Uniforms.LOD).rgb;
+    vec3 existing = textureLod(input_texture, texCoords, pc.LOD).rgb;
     color.rgb = existing + upsampledTexture;
-  } else if (u_Uniforms.Mode == MODE_DOWNSAMPLE) {
+  } else if (pc.Mode == MODE_DOWNSAMPLE) {
     // Downsample
     color.rgb =
-      DownsampleBox13(input_texture, u_Uniforms.LOD, texCoords, 1.0f / texSize);
+      DownsampleBox13(input_texture, pc.LOD, texCoords, 1.0f / texSize);
   }
 
   imageStore(output_image, ivec2(gl_GlobalInvocationID), color);

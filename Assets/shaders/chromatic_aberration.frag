@@ -11,7 +11,7 @@ layout(set = 1, binding = 7) uniform sampler2D fullscreen_texture;
 
 layout(push_constant) uniform PushConstants
 {
-  float aberration_offset;
+  vec3 aberration_offset;
 }
 uniforms;
 vec3
@@ -23,9 +23,9 @@ tonemap_aces(vec4 color);
 void
 main()
 {
-  vec2 red_offset = v_tex_coord + vec2(uniforms.aberration_offset, 0.0);
-  vec2 green_offset = v_tex_coord;
-  vec2 blue_offset = v_tex_coord - vec2(uniforms.aberration_offset, 0.0);
+  vec2 red_offset = v_tex_coord + vec2(uniforms.aberration_offset.x, 0.0);
+  vec2 green_offset = v_tex_coord + vec2(uniforms.aberration_offset.y, 0.0);
+  vec2 blue_offset = v_tex_coord + vec2(uniforms.aberration_offset.z, 0.0);
 
   vec3 color;
   color.r = texture(fullscreen_texture, red_offset).r;

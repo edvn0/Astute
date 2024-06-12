@@ -18,8 +18,9 @@
 
 namespace Engine::Graphics {
 
+static constexpr auto shadow_map_count = 10ULL;
 static constexpr auto create_layer_views = [](auto& image) {
-  auto sequence = Core::monotone_sequence<4>();
+  auto sequence = Core::monotone_sequence<shadow_map_count>();
   image->create_specific_layer_image_views(std::span{ sequence });
 };
 
@@ -27,7 +28,6 @@ auto
 ShadowRenderPass::construct_impl() -> void
 {
   auto&& [_, shadow_shader, __, shadow_material] = get_data();
-  static constexpr auto shadow_map_count = 4ULL;
   cascaded_shadow_map = Core::make_ref<Image>(ImageConfiguration{
     .width = size,
     .height = size,
@@ -66,7 +66,7 @@ ShadowRenderPass::construct_impl() -> void
       Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
         .framebuffer = other_framebuffers.back().get(),
         .shader = shadow_shader.get(),
-        .depth_comparator = VK_COMPARE_OP_LESS,
+        .depth_comparator = VK_COMPARE_OP_LESS_OR_EQUAL,
         .override_vertex_attributes = { {
           {
             0,
@@ -83,11 +83,9 @@ auto
 ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 {
   ASTUTE_PROFILE_FUNCTION();
+  auto& material = get_material();
 
-  const auto& [_, shadow_shader, __, shadow_material] = get_data();
-
-  auto* descriptor_set =
-    generate_and_update_descriptor_write_sets(*shadow_material);
+  auto* descriptor_set = generate_and_update_descriptor_write_sets(*material);
 
   static auto perform_pass = [&](const Core::DataBuffer& cascade_buffer,
                                  const IPipeline& pipeline) {

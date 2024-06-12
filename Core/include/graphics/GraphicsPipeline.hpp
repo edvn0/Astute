@@ -30,9 +30,9 @@ public:
     const Topology topology{ Topology::TriangleList };
     const Core::f32 clear_depth_value{ 0.0F };
     const std::optional<std::vector<VkVertexInputAttributeDescription>>
-      override_vertex_attributes{};
+      override_vertex_attributes{ std::nullopt };
     const std::optional<std::vector<VkVertexInputAttributeDescription>>
-      override_instance_attributes{};
+      override_instance_attributes{ std::nullopt };
   };
 
   explicit GraphicsPipeline(const Configuration&);

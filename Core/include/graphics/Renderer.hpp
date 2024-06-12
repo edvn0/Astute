@@ -205,27 +205,28 @@ private:
   auto generate_and_update_descriptor_write_sets(Material&) -> VkDescriptorSet;
 
   // UBOs
-  UniformBufferObject<RendererUBO> renderer_ubo{};
-  UniformBufferObject<ShadowUBO> shadow_ubo{};
-  UniformBufferObject<PointLightUBO> point_light_ubo{};
-  UniformBufferObject<SpotLightUBO> spot_light_ubo{};
+  UniformBufferObject<RendererUBO> renderer_ubo;
+  UniformBufferObject<ShadowUBO> shadow_ubo;
+  UniformBufferObject<PointLightUBO> point_light_ubo;
+  UniformBufferObject<SpotLightUBO> spot_light_ubo;
   UniformBufferObject<VisiblePointLightSSBO, GPUBufferType::Storage>
-    visible_point_lights_ssbo{};
+    visible_point_lights_ssbo;
   UniformBufferObject<VisibleSpotLightSSBO, GPUBufferType::Storage>
-    visible_spot_lights_ssbo{};
-  UniformBufferObject<ScreenDataUBO> screen_data_ubo{};
+    visible_spot_lights_ssbo;
+  UniformBufferObject<ScreenDataUBO> screen_data_ubo;
 
   auto compute_directional_shadow_projections(const Core::SceneRendererCamera&,
                                               const glm::vec3&) -> void;
   UniformBufferObject<DirectionalShadowProjectionUBO>
-    directional_shadow_projections_ubo{};
+    directional_shadow_projections_ubo;
 
   struct PostProcessingStep
   {
     std::string name;
     const bool is_compute{ false };
 
-    constexpr auto operator<=>(const PostProcessingStep&) const = default;
+    constexpr auto operator<=>(const PostProcessingStep&) const
+      -> std::strong_ordering = default;
   };
   struct HasherPPStep
   {
@@ -236,16 +237,16 @@ private:
       return hasher_str(step.name) ^ hasher_bool(step.is_compute);
     }
   };
-  std::unordered_set<PostProcessingStep, HasherPPStep> post_processing_steps{};
+  std::unordered_set<PostProcessingStep, HasherPPStep> post_processing_steps;
 
   glm::uvec3 light_culling_work_groups{};
-  glm::vec4 cascade_splits{};
+  std::array<Core::f32, 10> cascade_splits{};
   Core::f32 cascade_near_plane_offset{ -50.0F };
   Core::f32 cascade_far_plane_offset{ 50.0F };
 
   struct DrawCommand
   {
-    Core::Ref<StaticMesh> static_mesh{};
+    Core::Ref<StaticMesh> static_mesh;
     Core::u32 submesh_index{ 0 };
     Core::u32 instance_count{ 0 };
   };

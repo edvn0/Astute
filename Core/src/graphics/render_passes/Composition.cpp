@@ -36,7 +36,6 @@ CompositionRenderPass::construct_impl() -> void
       .framebuffer = composition_framebuffer.get(),
       .shader = composition_shader.get(),
       .sample_count = VK_SAMPLE_COUNT_1_BIT,
-      .cull_mode = VK_CULL_MODE_BACK_BIT,
       .depth_comparator = VK_COMPARE_OP_LESS,
       .override_vertex_attributes = {
           {  },
@@ -119,8 +118,8 @@ auto
 CompositionRenderPass::CompositionSettings::expose_to_ui(Material&) -> void
 {
   ImGui::Text("Composition Settings");
-  ImGui::DragFloat("Bloom Intensity", &Intensity, 0.05f, 0.0f, 20.0f);
-  ImGui::DragFloat("Dirt Intensity", &DirtIntensity, 0.05f, 0.0f, 20.0f);
+  ImGui::DragFloat("Bloom Intensity", &Intensity, 0.05F, 0.0F, 20.0F);
+  ImGui::DragFloat("Dirt Intensity", &DirtIntensity, 0.05F, 0.0F, 20.0F);
 }
 
 auto

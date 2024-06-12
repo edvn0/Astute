@@ -123,6 +123,19 @@ Renderer::Renderer(Configuration config, const Window* window)
   : size(window->get_swapchain().get_size())
   , old_size(size)
 {
+  struct
+  {
+    [[nodiscard]] static auto get_device() -> VkDevice
+    {
+      return Device::the().device();
+    }
+    [[nodiscard]] static auto get_queue_type() -> QueueType
+    {
+      return QueueType::Graphics;
+    }
+  } a{};
+  thread_pool = Core::make_scope<ED::ThreadPool>(a, 4U);
+
   {
     Core::DataBuffer data_buffer{
       sizeof(Core::u32),
@@ -209,7 +222,8 @@ Renderer::Renderer(Configuration config, const Window* window)
   activate_post_processing_step("Composition");
 
   transform_buffers.resize(3);
-  static constexpr auto total_size = 100 * 1000 * sizeof(TransformVertexData);
+  static constexpr auto total_size =
+    100ULL * 1000 * sizeof(TransformVertexData);
   for (auto& [vertex_buffer, transform_buffer] : transform_buffers) {
     vertex_buffer = Core::make_scope<VertexBuffer>(total_size);
     transform_buffer = Core::make_scope<Core::DataBuffer>(total_size);
@@ -231,19 +245,6 @@ Renderer::Renderer(Configuration config, const Window* window)
     static_cast<Core::usize>(light_culling_work_groups.x *
                              light_culling_work_groups.y) *
     4 * 1024);
-
-  struct
-  {
-    [[nodiscard]] static auto get_device() -> VkDevice
-    {
-      return Device::the().device();
-    }
-    [[nodiscard]] static auto get_queue_type() -> QueueType
-    {
-      return QueueType::Graphics;
-    }
-  } a{};
-  thread_pool = Core::make_scope<ED::ThreadPool>(a, 4U);
 
   renderer_2d = Core::make_scope<Renderer2D>(*this, 1000U);
 }
@@ -306,8 +307,9 @@ Renderer::begin_scene(Core::Scene& scene,
          view_proj,
          light_colour_intensity,
          specular_colour_intensity,
-         ubo_cascade_splits,
-         camera_pos] = renderer_ubo.get_data();
+         camera_pos,
+         pad,
+         ubo_cascade_splits] = renderer_ubo.get_data();
   view = camera.camera.get_view_matrix();
   proj = camera.camera.get_projection_matrix();
   view_proj = proj * view;
@@ -316,7 +318,9 @@ Renderer::begin_scene(Core::Scene& scene,
   specular_colour_intensity = light_environment.specular_colour_and_intensity;
   compute_directional_shadow_projections(
     camera, glm::normalize(-light_environment.sun_position));
-  ubo_cascade_splits = cascade_splits;
+  for (auto i = 0U; i < cascade_splits.size(); i++) {
+    ubo_cascade_splits.at(i) = cascade_splits.at(i);
+  }
   renderer_ubo.update();
 
   auto& [light_view, light_proj, light_view_proj, light_pos, light_dir] =
@@ -369,7 +373,7 @@ Renderer::compute_directional_shadow_projections(
   };
   auto cascades = cascade_calculator.compute_cascades(camera, light_direction);
   auto& [view_projections] = directional_shadow_projections_ubo.get_data();
-  for (auto i = 0ULL; i < 4; i++) {
+  for (auto i = 0ULL; i < 10; i++) {
     cascade_splits[static_cast<Core::i32>(i)] = cascades[i].split_depth;
     view_projections[i] = cascades[i].view_projection;
   }

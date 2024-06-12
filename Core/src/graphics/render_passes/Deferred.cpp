@@ -88,7 +88,6 @@ DeferredRenderPass::construct_impl() -> void
       .framebuffer = deferred_framebuffer.get(),
       .shader = deferred_shader.get(),
       .sample_count = VK_SAMPLE_COUNT_1_BIT,
-      .cull_mode = VK_CULL_MODE_BACK_BIT,
       .depth_comparator = VK_COMPARE_OP_LESS,
       .override_vertex_attributes = {
           {  },
@@ -232,7 +231,6 @@ DeferredRenderPass::recreate_pipeline()
       .framebuffer = deferred_framebuffer.get(),
       .shader = deferred_shader.get(),
       .sample_count = VK_SAMPLE_COUNT_1_BIT,
-      .cull_mode = VK_CULL_MODE_BACK_BIT,
       .depth_comparator = VK_COMPARE_OP_LESS,
       .override_vertex_attributes = {},
       .override_instance_attributes = {},

@@ -19,14 +19,14 @@ struct CascadeData
 
 class ShadowCascadeCalculator
 {
-  static constexpr auto shadow_map_cascade_count = 4ULL;
-  static constexpr float cascade_split_lambda = 0.95f;
-  static constexpr float shadow_resolution = 4096.0f;
+  static constexpr auto shadow_map_cascade_count = 10ULL;
+  static constexpr float cascade_split_lambda = 0.95F;
+  static constexpr float shadow_resolution = 4096.0F;
   static constexpr std::array<glm::vec3, 8> frustum_corners = {
-    glm::vec3(-1.0f, 1.0f, -1.0f), glm::vec3(1.0f, 1.0f, -1.0f),
-    glm::vec3(1.0f, -1.0f, -1.0f), glm::vec3(-1.0f, -1.0f, -1.0f),
-    glm::vec3(-1.0f, 1.0f, 1.0f),  glm::vec3(1.0f, 1.0f, 1.0f),
-    glm::vec3(1.0f, -1.0f, 1.0f),  glm::vec3(-1.0f, -1.0f, 1.0f),
+    glm::vec3(-1.0F, 1.0F, -1.0F), glm::vec3(1.0F, 1.0F, -1.0F),
+    glm::vec3(1.0F, -1.0F, -1.0F), glm::vec3(-1.0F, -1.0F, -1.0F),
+    glm::vec3(-1.0F, 1.0F, 1.0F),  glm::vec3(1.0F, 1.0F, 1.0F),
+    glm::vec3(1.0F, -1.0F, 1.0F),  glm::vec3(-1.0F, -1.0F, 1.0F),
   };
 
   Core::f32& cascade_near_plane_offset;
@@ -53,7 +53,7 @@ public:
     std::array<float, shadow_map_cascade_count> cascade_splits =
       calculate_cascade_splits(camera.near, camera.far);
 
-    float last_split_dist = 0.0f;
+    float last_split_dist = 0.0F;
     for (Core::u32 i = 0; i < shadow_map_cascade_count; i++) {
       float split_dist = cascade_splits[i];
 
@@ -71,7 +71,7 @@ public:
         adjust_shadow_matrix(light_orthographic_matrix, shadow_resolution);
 
       output[i].split_depth =
-        (camera.near + split_dist * (camera.far - camera.near)) * -1.0f;
+        (camera.near + split_dist * (camera.far - camera.near)) * -1.0F;
       output[i].view = light_view_matrix;
       output[i].view_projection = light_orthographic_matrix * light_view_matrix;
 
@@ -82,7 +82,7 @@ public:
   }
 
 private:
-  auto calculate_cascade_splits(float near_clip, float far_clip)
+  static auto calculate_cascade_splits(float near_clip, float far_clip)
     -> std::array<float, shadow_map_cascade_count>
   {
     std::array<float, shadow_map_cascade_count> cascade_splits{};
@@ -104,17 +104,17 @@ private:
     return cascade_splits;
   }
 
-  auto calculate_frustum_corners_world(const SceneRendererCamera& camera,
-                                       float split_dist,
-                                       float last_split_dist)
+  static auto calculate_frustum_corners_world(const SceneRendererCamera& camera,
+                                              float split_dist,
+                                              float last_split_dist)
     -> std::array<glm::vec3, 8>
   {
-    std::array<glm::vec3, 8> frustum_corners_world = frustum_corners;
+    auto frustum_corners_world = frustum_corners;
+    auto projection = camera.camera.get_projection_matrix();
 
-    glm::mat4 inv_cam =
-      glm::inverse(camera.camera.get_projection_matrix() * camera.view_matrix);
+    glm::mat4 inv_cam = glm::inverse(projection * camera.view_matrix);
     for (auto& corner : frustum_corners_world) {
-      glm::vec4 inv_corner = inv_cam * glm::vec4(corner, 1.0f);
+      glm::vec4 inv_corner = inv_cam * glm::vec4(corner, 1.0F);
       corner = glm::vec3(inv_corner) / inv_corner.w;
     }
 
@@ -129,62 +129,67 @@ private:
     return frustum_corners_world;
   }
 
-  auto calculate_frustum_bounds(
+  static auto calculate_frustum_bounds(
     const std::array<glm::vec3, 8>& frustum_corners_world)
     -> std::tuple<glm::vec3, glm::vec3, glm::vec3>
   {
-    glm::vec3 frustum_center = glm::vec3(0.0f);
+    auto frustum_center = glm::vec3(0.0F);
     for (const auto& corner : frustum_corners_world) {
       frustum_center += corner;
     }
-    frustum_center /= 8.0f;
+    frustum_center /= 8.0F;
 
-    float radius = 0.0f;
+    float radius = 0.0F;
     for (const auto& corner : frustum_corners_world) {
       float distance = glm::length(corner - frustum_center);
       radius = glm::max(radius, distance);
     }
-    radius = std::ceil(radius * 16.0f) / 16.0f;
+    radius = std::ceil(radius * 16.0F) / 16.0F;
 
-    glm::vec3 max_extents = glm::vec3(radius);
-    glm::vec3 min_extents = -max_extents;
+    const auto max_extents = glm::vec3(radius);
+    const auto min_extents = -max_extents;
 
-    return { min_extents, max_extents, frustum_center };
+    return {
+      min_extents,
+      max_extents,
+      frustum_center,
+    };
   }
 
-  auto calculate_light_view_matrix(const glm::vec3& frustum_center,
-                                   const glm::vec3& light_direction,
-                                   const glm::vec3& min_extents) -> glm::mat4
-  {
-    glm::vec3 light_dir = -glm::normalize(light_direction);
-    return glm::lookAt(frustum_center - light_dir * -min_extents.z,
-                       frustum_center,
-                       glm::vec3(0.0f, 1.0f, 0.0f));
-  }
-
-  auto calculate_light_orthographic_matrix(const glm::vec3& min_extents,
-                                           const glm::vec3& max_extents)
+  static auto calculate_light_view_matrix(const glm::vec3& frustum_center,
+                                          const glm::vec3& light_direction,
+                                          const glm::vec3& min_extents)
     -> glm::mat4
+  {
+    glm::vec3 light_dir = glm::normalize(light_direction);
+    return glm::lookAt(frustum_center - light_dir * min_extents.z,
+                       frustum_center,
+                       glm::vec3(0.0F, 1.0F, 0.0F));
+  }
+
+  [[nodiscard]] auto calculate_light_orthographic_matrix(
+    const glm::vec3& min_extents,
+    const glm::vec3& max_extents) const -> glm::mat4
   {
     return glm::ortho(min_extents.x,
                       max_extents.x,
                       min_extents.y,
                       max_extents.y,
-                      0.0f + cascade_near_plane_offset,
+                      cascade_near_plane_offset,
                       max_extents.z - min_extents.z + cascade_far_plane_offset);
   }
 
-  auto adjust_shadow_matrix(glm::mat4 light_orthographic_matrix,
-                            float input_shadow_resolution) -> glm::mat4
+  static auto adjust_shadow_matrix(glm::mat4 light_orthographic_matrix,
+                                   float input_shadow_resolution) -> glm::mat4
   {
     glm::vec4 shadow_origin =
-      (light_orthographic_matrix * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f)) *
-      input_shadow_resolution / 2.0f;
+      (light_orthographic_matrix * glm::vec4(0.0F, 0.0F, 0.0F, 1.0F)) *
+      input_shadow_resolution / 2.0F;
     glm::vec4 rounded_origin = glm::round(shadow_origin);
     glm::vec4 round_offset = rounded_origin - shadow_origin;
-    round_offset = round_offset * 2.0f / input_shadow_resolution;
-    round_offset.z = 0.0f;
-    round_offset.w = 0.0f;
+    round_offset = round_offset * 2.0F / input_shadow_resolution;
+    round_offset.z = 0.0F;
+    round_offset.w = 0.0F;
 
     light_orthographic_matrix[3] += round_offset;
     return light_orthographic_matrix;

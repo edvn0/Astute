@@ -9,6 +9,8 @@ namespace Engine::Core {
 class Input
 {
 public:
+  Input() = delete;
+
   template<KeyCode K>
   static auto pressed() -> bool
   {
@@ -30,6 +32,26 @@ public:
     return released(M);
   }
 
+  static auto is_gamepad_present(Core::i32 gamepad) -> bool;
+  static auto get_gamepad_name(Core::i32 gamepad) -> std::string;
+
+  static auto get_gamepad_buttons(Core::i32 gamepad, unsigned char* buttons)
+    -> bool;
+  template<Core::usize Count>
+  static auto get_gamepad_buttons(Core::i32 gamepad,
+                                  std::array<Core::u8, Count>& buttons) -> bool
+  {
+    return get_gamepad_buttons(gamepad, buttons.data());
+  }
+  static auto get_gamepad_axes(Core::i32 gamepad, float* axes) -> bool;
+
+  template<Core::usize Count>
+  static auto get_gamepad_axes(Core::i32 gamepad,
+                               std::array<Core::f32, Count>& axes) -> bool
+  {
+    return get_gamepad_axes(gamepad, axes.data());
+  }
+
   static auto released(KeyCode code) -> bool;
   static auto released(MouseCode code) -> bool;
   static auto pressed(MouseCode code) -> bool;
@@ -38,7 +60,6 @@ public:
   static auto initialise(GLFWwindow* win) { window = win; }
 
 private:
-  Input() = delete;
   static inline GLFWwindow* window;
 };
 

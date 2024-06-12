@@ -99,6 +99,7 @@ protected:
   virtual auto unbind(CommandBuffer& command_buffer) -> void;
   auto generate_and_update_descriptor_write_sets(Material&) -> VkDescriptorSet;
   auto get_data() -> auto& { return pass; }
+  auto get_material() -> auto& { return std::get<Core::Scope<Material>>(pass); }
   [[nodiscard]] auto get_data() const -> const auto& { return pass; }
   auto get_renderer() -> Renderer& { return renderer; }
   static auto get_mutex() -> auto& { return render_pass_mutex; }
