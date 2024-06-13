@@ -19,7 +19,7 @@ if ($buildType -and $validBuildTypes -contains $buildType) {
 
     # Check if cmake build was successful
     if ($?) {
-        & ".\build\Application\$buildType\App"
+        & ".\build\Application\$buildType\App" -s 4096
     }
     else {
         Write-Error "cmake build failed. Application will not be run."

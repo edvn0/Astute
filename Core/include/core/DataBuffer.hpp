@@ -36,6 +36,25 @@ public:
     }
   }
 
+  template<class T>
+  explicit DataBuffer(std::span<const T> input_data)
+    : buffer_size(input_data.size_bytes())
+  {
+    if (buffer_size > 0) {
+      allocate_storage(buffer_size);
+      std::memcpy(data.get(), input_data.data(), buffer_size);
+    }
+  }
+  template<class T>
+  explicit DataBuffer(std::span<T> input_data)
+    : buffer_size(input_data.size_bytes())
+  {
+    if (buffer_size > 0) {
+      allocate_storage(buffer_size);
+      std::memcpy(data.get(), input_data.data(), buffer_size);
+    }
+  }
+
   DataBuffer() = default;
   ~DataBuffer() = default;
 
@@ -229,6 +248,10 @@ public:
   }
 
   [[nodiscard]] auto size() const noexcept -> usize { return buffer_size; }
+  [[nodiscard]] auto size_u32() const noexcept -> Core::u32
+  {
+    return static_cast<Core::u32>(buffer_size);
+  }
   [[nodiscard]] auto hash() const noexcept -> usize
   {
     return std::hash<usize>{}(buffer_size) ^

@@ -86,6 +86,9 @@ Device::is_device_suitable(VkPhysicalDevice device,
   if (!supported_features.samplerAnisotropy) {
     is_suitable = false;
   }
+  if (!supported_features.depthClamp) {
+    is_suitable = false;
+  }
   if (!supported_features.logicOp) {
     is_suitable = false;
   }
@@ -96,6 +99,12 @@ Device::is_device_suitable(VkPhysicalDevice device,
     is_suitable = false;
   }
   if (!supported_features.pipelineStatisticsQuery) {
+    is_suitable = false;
+  }
+  if (!supported_features.independentBlend) {
+    is_suitable = false;
+  }
+  if (!supported_features.textureCompressionBC) {
     is_suitable = false;
   }
 
@@ -227,10 +236,13 @@ Device::create_device(VkSurfaceKHR surface) -> void
 
   VkPhysicalDeviceFeatures device_features{};
   device_features.samplerAnisotropy = VK_TRUE;
+  device_features.depthClamp = VK_TRUE;
   device_features.logicOp = VK_TRUE;
   device_features.wideLines = VK_TRUE;
   device_features.sampleRateShading = VK_TRUE;
   device_features.pipelineStatisticsQuery = VK_TRUE;
+  device_features.independentBlend = VK_TRUE;
+  device_features.textureCompressionBC = VK_TRUE;
 
   VkPhysicalDeviceFeatures2 device_features_2{};
   VkPhysicalDeviceMemoryPriorityFeaturesEXT memory_priority_features{};
@@ -353,7 +365,7 @@ Device::execute_immediate(QueueType type,
   }
 
   // Submit to queue
-  auto queue = get_queue(type);
+  auto* queue = get_queue(type);
   vkQueueSubmit(queue, 1, &submit_info, to_use);
   static constexpr auto default_fence_timeout = 100000000000;
   vkWaitForFences(device(), 1, &to_use, VK_TRUE, default_fence_timeout);

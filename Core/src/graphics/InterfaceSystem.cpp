@@ -16,6 +16,7 @@
 
 // clang-format off
 #include <imgui.h>
+#include <ImGuizmo/ImGuizmo.h>
 #include <backends/imgui_impl_glfw.h>
 #include <backends/imgui_impl_vulkan.h>
 // clang-format on
@@ -28,17 +29,50 @@ InterfaceSystem::InterfaceSystem(const Window& win)
   system_name = std::format("imgui_{}.ini", ED::Platform::get_system_name());
 
   std::array<VkDescriptorPoolSize, 11> pool_sizes = {
-    VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
-    { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
-    { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
-    { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
-    { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
-    { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
-    { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
-    { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
-    { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
-    { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
-    { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 },
+    VkDescriptorPoolSize{
+      VK_DESCRIPTOR_TYPE_SAMPLER,
+      1000,
+    },
+    {
+      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      1000,
+    },
+    {
+      VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+      1000,
+    },
+    {
+      VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+      1000,
+    },
+    {
+      VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,
+      1000,
+    },
+    {
+      VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,
+      1000,
+    },
+    {
+      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+      1000,
+    },
+    {
+      VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      1000,
+    },
+    {
+      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+      1000,
+    },
+    {
+      VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC,
+      1000,
+    },
+    {
+      VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,
+      1000,
+    },
   };
 
   VkDescriptorPoolCreateInfo pool_info = {};
@@ -75,7 +109,7 @@ InterfaceSystem::InterfaceSystem(const Window& win)
     style.Colors[ImGuiCol_WindowBg].w = 1.0F;
   }
   style.Colors[ImGuiCol_WindowBg] =
-    ImVec4(0.15f, 0.15f, 0.15f, style.Colors[ImGuiCol_WindowBg].w);
+    ImVec4(0.15F, 0.15F, 0.15F, style.Colors[ImGuiCol_WindowBg].w);
 
   ImGui_ImplGlfw_InitForVulkan(const_cast<GLFWwindow*>(window->get_native()),
                                true);
@@ -109,23 +143,23 @@ InterfaceSystem::begin_frame() -> void
   ImGui_ImplVulkan_NewFrame();
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
-  if (font) {
+  ImGuizmo::BeginFrame();
+  if (font != nullptr) {
     ImGui::PushFont(font);
   }
-  // ImGuizmo::BeginFrame();
 }
 
 auto
 InterfaceSystem::end_frame() -> void
 {
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
-  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
-  ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.10f, 0.10f, 0.10f, 1.00f));
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.F);
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.F);
+  ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.10F, 0.10F, 0.10F, 1.00F));
   // ImGui::RenderNotifications();
   ImGui::PopStyleVar(2);
   ImGui::PopStyleColor(1);
 
-  if (font) {
+  if (font != nullptr) {
     ImGui::PopFont();
   }
   ImGui::Render();
@@ -145,7 +179,7 @@ InterfaceSystem::end_frame() -> void
 
   auto frame_index = window->get_swapchain().get_current_buffer_index();
 
-  auto draw_command_buffer = window->get_swapchain().get_drawbuffer();
+  auto* draw_command_buffer = window->get_swapchain().get_drawbuffer();
 
   VkCommandBufferBeginInfo begin_info{};
   begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -193,12 +227,12 @@ InterfaceSystem::end_frame() -> void
     vkBeginCommandBuffer(command_buffer, &inherited_begin_info);
 
     VkViewport viewport{};
-    viewport.x = 0.0f;
+    viewport.x = 0.0F;
     viewport.y = static_cast<float>(height);
     viewport.height = -static_cast<float>(height);
     viewport.width = static_cast<float>(width);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
+    viewport.minDepth = 0.0F;
+    viewport.maxDepth = 1.0F;
     vkCmdSetViewport(command_buffer, 0, 1, &viewport);
 
     VkRect2D scissor{};

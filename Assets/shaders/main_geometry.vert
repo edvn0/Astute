@@ -18,24 +18,7 @@ layout(location = 1) out vec3 fragment_tangents;
 layout(location = 2) out vec3 fragment_bitangents;
 layout(location = 3) out vec2 fragment_uvs;
 layout(location = 4) out vec3 world_space_fragment_position;
-layout(location = 5) out vec4 shadow_space_fragment_position;
-
-const mat4 bias = mat4(0.5,
-                       0.0,
-                       0.0,
-                       0.0,
-                       0.0,
-                       0.5,
-                       0.0,
-                       0.0,
-                       0.0,
-                       0.0,
-                       1.0,
-                       0.0,
-                       0.5,
-                       0.5,
-                       0.0,
-                       1.0);
+layout(location = 5) out vec3 view_position;
 
 invariant precise gl_Position;
 
@@ -54,5 +37,5 @@ main()
   fragment_uvs = uvs;
 
   world_space_fragment_position = computed.xyz;
-  shadow_space_fragment_position = bias * shadow.view_projection * computed;
+  view_position = vec3(renderer.view * computed);
 }

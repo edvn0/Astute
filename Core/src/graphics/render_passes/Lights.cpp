@@ -11,9 +11,17 @@
 
 namespace Engine::Graphics {
 
-auto
-LightsRenderPass::construct() -> void
+LightsRenderPass::LightsRenderPass(Renderer& ren)
+  : RenderPass(ren)
+  , storage_buffer(sizeof(glm::vec4) * 5000)
 {
+}
+
+auto
+LightsRenderPass::construct_impl() -> void
+{
+  ASTUTE_PROFILE_FUNCTION();
+
   auto&& [lights_framebuffer, lights_shader, lights_pipeline, lights_material] =
     get_data();
   lights_framebuffer = Core::make_scope<Framebuffer>(FramebufferSpecification{
@@ -21,7 +29,10 @@ LightsRenderPass::construct() -> void
     .height = get_renderer().get_size().height,
     .clear_colour_on_load = false,
     .clear_depth_on_load = false,
-    .attachments = { { VK_FORMAT_R32G32B32A32_SFLOAT, VK_FORMAT_D32_SFLOAT } },
+    .attachments = { {
+      { .format = VK_FORMAT_R32G32B32A32_SFLOAT },
+      { .format = VK_FORMAT_D32_SFLOAT },
+    } },
     .samples = VK_SAMPLE_COUNT_1_BIT,
     .existing_images = { {
                            0,
@@ -52,18 +63,19 @@ LightsRenderPass::construct() -> void
     .shader = lights_shader.get(),
   });
 
-  lights_material->set(
-    "predepth_map",
-    get_renderer().get_render_pass("Predepth").get_depth_attachment());
+  lights_material->set("InstanceColours", storage_buffer);
 }
 
 auto
 LightsRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 {
+  ASTUTE_PROFILE_FUNCTION();
   const auto& [lights_framebuffer,
                lights_shader,
                lights_pipeline,
                lights_material] = get_data();
+
+  storage_buffer.write(std::span(get_renderer().get_lights_data()));
 
   auto* renderer_desc_set =
     generate_and_update_descriptor_write_sets(*lights_material);
@@ -71,7 +83,10 @@ LightsRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
   lights_material->update_descriptor_write_sets(renderer_desc_set);
 
   for (auto&& [key, command] : get_renderer().lights_draw_commands) {
-    auto&& [mesh, submesh_index, instance_count] = command;
+    ASTUTE_PROFILE_SCOPE("Lights Render pass draw command");
+    const auto& mesh = command.static_mesh;
+    const auto& submesh_index = command.submesh_index;
+    const auto& instance_count = command.instance_count;
 
     const auto& mesh_asset = mesh->get_mesh_asset();
     const auto& transform_vertex_buffer =
@@ -116,7 +131,7 @@ LightsRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                      submesh.index_count,
                      instance_count,
                      submesh.base_index,
-                     submesh.base_vertex,
+                     static_cast<Core::i32>(submesh.base_vertex),
                      0);
   }
 }

@@ -3,7 +3,9 @@
 #include "graphics/RendererExtensions.hpp"
 
 #include "graphics/CommandBuffer.hpp"
+#include "graphics/ComputePipeline.hpp"
 #include "graphics/GPUBuffer.hpp"
+#include "graphics/GraphicsPipeline.hpp"
 #include "graphics/Image.hpp"
 
 #include <array>
@@ -15,7 +17,8 @@ namespace Engine::Graphics::RendererExtensions {
 auto
 begin_renderpass(const CommandBuffer& command_buffer,
                  const IFramebuffer& framebuffer,
-                 const bool flip) -> void
+                 const bool flip,
+                 const bool primary) -> void
 {
   VkRenderPassBeginInfo render_pass_begin_info = {};
   render_pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -28,7 +31,12 @@ begin_renderpass(const CommandBuffer& command_buffer,
   render_pass_begin_info.pClearValues = clear_values.data();
   vkCmdBeginRenderPass(command_buffer.get_command_buffer(),
                        &render_pass_begin_info,
-                       VK_SUBPASS_CONTENTS_INLINE);
+                       primary ? VK_SUBPASS_CONTENTS_INLINE
+                               : VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+
+  if (!primary) {
+    return;
+  }
 
   // Scissors and viewport
   auto&& [width, height] = framebuffer.get_extent();
@@ -57,6 +65,15 @@ auto
 end_renderpass(const CommandBuffer& command_buffer) -> void
 {
   vkCmdEndRenderPass(command_buffer.get_command_buffer());
+}
+
+auto
+bind_pipeline(const CommandBuffer& command_buffer, const IPipeline& pipeline)
+  -> void
+{
+  vkCmdBindPipeline(command_buffer.get_command_buffer(),
+                    pipeline.get_bind_point(),
+                    pipeline.get_pipeline());
 }
 
 auto
@@ -116,7 +133,7 @@ bind_vertex_buffer(const CommandBuffer& command,
   std::array<VkDeviceSize, 1> offsets{
     offset,
   };
-  auto cmd_buffer = command.get_command_buffer();
+  auto* cmd_buffer = command.get_command_buffer();
 
   std::array vk_buffers{
     buffer.get_buffer(),

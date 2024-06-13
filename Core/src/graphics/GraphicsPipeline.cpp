@@ -2,8 +2,8 @@
 
 #include "core/Verify.hpp"
 #include "graphics/Device.hpp"
-#include "graphics/Framebuffer.hpp"
 #include "graphics/GraphicsPipeline.hpp"
+#include "graphics/IFramebuffer.hpp"
 #include "graphics/Image.hpp"
 #include "graphics/Shader.hpp"
 
@@ -13,11 +13,47 @@
 
 namespace Engine::Graphics {
 
+namespace {
+// Conversion functions
+auto
+to_vulkan_topology(Topology topology) -> VkPrimitiveTopology
+{
+  switch (topology) {
+    case Topology::PointList:
+      return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+    case Topology::LineList:
+      return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+    case Topology::LineStrip:
+      return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+    case Topology::TriangleList:
+      return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    case Topology::TriangleStrip:
+      return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+    case Topology::TriangleFan:
+      return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
+    default:
+      return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  }
+}
+
+auto
+to_vulkan_polygon_mode(Topology topology) -> VkPolygonMode
+{
+  switch (topology) {
+    case Topology::PointList:
+      return VK_POLYGON_MODE_POINT;
+    default:
+      return VK_POLYGON_MODE_FILL;
+  }
+}
+}
+
 GraphicsPipeline::GraphicsPipeline(const Configuration& config)
   : sample_count(config.sample_count)
   , cull_mode(config.cull_mode)
   , face_mode(config.face_mode)
   , depth_comparator(config.depth_comparator)
+  , topology(config.topology)
   , clear_depth_value(config.clear_depth_value)
   , override_vertex_attributes(config.override_vertex_attributes)
   , override_instance_attributes(config.override_instance_attributes)
@@ -165,7 +201,7 @@ GraphicsPipeline::create_pipeline() -> void
   VkPipelineInputAssemblyStateCreateInfo input_assembly_info{};
   input_assembly_info.sType =
     VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-  input_assembly_info.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  input_assembly_info.topology = to_vulkan_topology(topology);
   input_assembly_info.primitiveRestartEnable = VK_FALSE;
   pipeline_info.pInputAssemblyState = &input_assembly_info;
 
@@ -174,20 +210,20 @@ GraphicsPipeline::create_pipeline() -> void
     VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
   rasterization_info.depthClampEnable = VK_FALSE;
   rasterization_info.rasterizerDiscardEnable = VK_FALSE;
-  rasterization_info.polygonMode = VK_POLYGON_MODE_FILL;
-  rasterization_info.lineWidth = 1.0f;
+  rasterization_info.polygonMode = to_vulkan_polygon_mode(topology);
+  rasterization_info.lineWidth = 1.0F;
   rasterization_info.cullMode = cull_mode;
   rasterization_info.frontFace = face_mode;
-  if (framebuffer && framebuffer->has_depth_attachment()) {
+  if ((framebuffer != nullptr) && framebuffer->has_depth_attachment()) {
     rasterization_info.depthBiasEnable =
       framebuffer->get_depth_attachment()->configuration.format ==
           VK_FORMAT_D32_SFLOAT
         ? VK_FALSE
         : VK_TRUE;
   }
-  rasterization_info.depthBiasConstantFactor = 0.0f;
-  rasterization_info.depthBiasClamp = 0.0f;
-  rasterization_info.depthBiasSlopeFactor = 0.0f;
+  rasterization_info.depthBiasConstantFactor = 0.0F;
+  rasterization_info.depthBiasClamp = 0.0F;
+  rasterization_info.depthBiasSlopeFactor = 0.0F;
   pipeline_info.pRasterizationState = &rasterization_info;
 
   VkPipelineMultisampleStateCreateInfo multisample_info{};

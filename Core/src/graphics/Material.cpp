@@ -44,9 +44,9 @@ Material::set(const std::string_view name, const Core::Ref<Image>& image)
   }
 
   const auto as_string = std::string{ name };
-  const auto contains = images.contains(as_string);
 
-  if (contains && images[as_string]->hash() != image->hash()) {
+  if (const auto contains = images.contains(as_string);
+      contains && images[as_string]->hash() != image->hash()) {
     images.at(as_string) = image;
   } else if (contains && images[as_string]->hash() == image->hash()) {
     return true;
@@ -54,13 +54,40 @@ Material::set(const std::string_view name, const Core::Ref<Image>& image)
     images[as_string] = image;
   }
 
-  write_descriptors.for_each([&](const auto&, auto& container) {
+  write_descriptors.for_each(
+    [&imgs = images, &resource, &as_string, count = image->get_layer_count()](
+      const auto&, auto& container) {
+      auto& desc = container[resource->get_register()];
+      desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      desc.descriptorCount = 1;
+      desc.dstArrayElement = 0;
+      desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+      desc.dstBinding = resource->get_register();
+      desc.pImageInfo = &imgs.at(as_string)->descriptor_info;
+    });
+
+  return true;
+}
+
+auto
+Material::set(const std::string_view name, const StorageBuffer& storage) -> bool
+{
+  const auto* resource = find_resource_by_name(name);
+  if (resource == nullptr) {
+    error("Could not find {} as a uniform.", name);
+    return false;
+  }
+
+  storage_buffers[std::string{ name }] = &storage;
+
+  write_descriptors.for_each([&resource, &buf = storage.get_descriptor_info()](
+                               const auto&, auto& container) {
     auto& desc = container[resource->get_register()];
     desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     desc.descriptorCount = 1;
-    desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    desc.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     desc.dstBinding = resource->get_register();
-    desc.pImageInfo = &images.at(as_string)->descriptor_info;
+    desc.pBufferInfo = &buf;
   });
 
   return true;
@@ -82,14 +109,15 @@ Material::override_property(const std::string_view name,
   const auto as_string = std::string{ name };
   images[as_string] = image;
 
-  write_descriptors.for_each([&](const auto&, auto& container) {
-    auto& desc = container[resource->get_register()];
-    desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    desc.descriptorCount = 1;
-    desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    desc.dstBinding = resource->get_register();
-    desc.pImageInfo = &images.at(as_string)->descriptor_info;
-  });
+  write_descriptors.for_each(
+    [this, &resource, &as_string](const auto&, auto& container) {
+      auto& desc = container[resource->get_register()];
+      desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      desc.descriptorCount = 1;
+      desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+      desc.dstBinding = resource->get_register();
+      desc.pImageInfo = &images.at(as_string)->descriptor_info;
+    });
 
   return true;
 }

@@ -6,6 +6,16 @@
 
 namespace Engine::Graphics {
 
+enum class Topology : Core::u8
+{
+  PointList = 0,
+  LineList = 1,
+  LineStrip = 2,
+  TriangleList = 3,
+  TriangleStrip = 4,
+  TriangleFan = 5,
+};
+
 class GraphicsPipeline : public IPipeline
 {
 public:
@@ -17,11 +27,12 @@ public:
     const VkCullModeFlags cull_mode{ VK_CULL_MODE_BACK_BIT };
     const VkFrontFace face_mode{ VK_FRONT_FACE_CLOCKWISE };
     const VkCompareOp depth_comparator{ VK_COMPARE_OP_GREATER_OR_EQUAL };
+    const Topology topology{ Topology::TriangleList };
     const Core::f32 clear_depth_value{ 0.0F };
     const std::optional<std::vector<VkVertexInputAttributeDescription>>
-      override_vertex_attributes{};
+      override_vertex_attributes{ std::nullopt };
     const std::optional<std::vector<VkVertexInputAttributeDescription>>
-      override_instance_attributes{};
+      override_instance_attributes{ std::nullopt };
   };
 
   explicit GraphicsPipeline(const Configuration&);
@@ -49,6 +60,7 @@ private:
   const VkCullModeFlags cull_mode{ VK_CULL_MODE_NONE };
   const VkFrontFace face_mode{ VK_FRONT_FACE_COUNTER_CLOCKWISE };
   const VkCompareOp depth_comparator{ VK_COMPARE_OP_GREATER_OR_EQUAL };
+  const Topology topology{ Topology::TriangleList };
   const Core::f32 clear_depth_value{ 0.0F };
   const std::optional<std::vector<VkVertexInputAttributeDescription>>
     override_vertex_attributes{};

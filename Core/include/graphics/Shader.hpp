@@ -99,7 +99,7 @@ public:
    * @param set_index the descriptor set as described by a shader
    * @return const VkWriteDescriptorSet*
    */
-  [[nodiscard]] auto get_descriptor_set(std::string_view, Core::u32) const
+  [[nodiscard]] auto get_descriptor_set(std::string_view, Core::u32 = 0) const
     -> const VkWriteDescriptorSet*;
 
   [[nodiscard]] auto hash() const -> Core::usize;

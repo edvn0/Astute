@@ -129,6 +129,7 @@ private:
 
   std::string file_path;
 
+  Core::Scope<CommandBuffer> command_buffer;
   ED::CommandBufferDispatcher dispatcher;
   std::mutex mutex;
   std::unordered_map<Core::u32,

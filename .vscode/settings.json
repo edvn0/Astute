@@ -131,7 +131,8 @@
     "expected": "cpp",
     "*.glsl": "glsl",
     "cassert": "cpp",
-    "*.rh": "cpp"
+    "*.rh": "cpp",
+    "cfenv": "cpp"
   },
   "[glsl]": {
     "files.autoSave": "off"

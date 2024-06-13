@@ -58,7 +58,7 @@ struct Impl
 };
 
 auto
-DeferredRenderPass::construct() -> void
+DeferredRenderPass::construct_impl() -> void
 {
   noise_map = TextureGenerator::simplex_noise(100, 100);
   const auto& ext = get_renderer().get_size();
@@ -66,13 +66,20 @@ DeferredRenderPass::construct() -> void
           deferred_shader,
           deferred_pipeline,
           deferred_material] = get_data();
-  deferred_framebuffer =
-    Core::make_scope<Framebuffer>(FramebufferSpecification{
-      .width = ext.width,
-      .height = ext.height,
-      .attachments = { VK_FORMAT_R32G32B32A32_SFLOAT, },
-      .debug_name = "Deferred",
-    });
+  deferred_framebuffer = Core::make_scope<Framebuffer>(FramebufferSpecification{
+    .width = ext.width,
+    .height = ext.height,
+    .attachments = {
+      {
+                       .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+                     },
+
+                     {
+                       .format = VK_FORMAT_R32_UINT,
+                       .blend = false,
+                     }, },
+    .debug_name = "Deferred",
+  });
 
   deferred_shader = Shader::compile_graphics_scoped(
     "Assets/shaders/deferred.vert", "Assets/shaders/deferred.frag");
@@ -81,7 +88,6 @@ DeferredRenderPass::construct() -> void
       .framebuffer = deferred_framebuffer.get(),
       .shader = deferred_shader.get(),
       .sample_count = VK_SAMPLE_COUNT_1_BIT,
-      .cull_mode = VK_CULL_MODE_BACK_BIT,
       .depth_comparator = VK_COMPARE_OP_LESS,
       .override_vertex_attributes = {
           {  },
@@ -95,11 +101,25 @@ DeferredRenderPass::construct() -> void
     .shader = deferred_shader.get(),
   });
 
+  auto& input_render_pass = get_renderer().get_render_pass("MainGeometry");
+  deferred_material->set("cubemap", cubemap);
+  deferred_material->set("position_map",
+                         input_render_pass.get_colour_attachment(0));
+  deferred_material->set("normal_map",
+                         input_render_pass.get_colour_attachment(1));
+  deferred_material->set("albedo_specular_map",
+                         input_render_pass.get_colour_attachment(2));
+  deferred_material->set("shadow_position_map",
+                         input_render_pass.get_colour_attachment(3));
+  deferred_material->set("noise_map", noise_map);
+
   setup_file_watcher("Assets/shaders/deferred.frag");
 }
 
-DeferredRenderPass::DeferredRenderPass(Renderer& ren)
+DeferredRenderPass::DeferredRenderPass(Renderer& ren,
+                                       const Core::Ref<Image>& cube)
   : RenderPass(ren)
+  , cubemap(cube)
 {
   watch = Core::make_scope<Impl>();
 }
@@ -112,24 +132,12 @@ DeferredRenderPass::~DeferredRenderPass()
 auto
 DeferredRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 {
+  ASTUTE_PROFILE_FUNCTION();
+
   auto&& [deferred_framebuffer,
           deferred_shader,
           deferred_pipeline,
           deferred_material] = get_data();
-
-  auto& input_render_pass = get_renderer().get_render_pass("MainGeometry");
-  deferred_material->set("position_map",
-                         input_render_pass.get_colour_attachment(0));
-  deferred_material->set("normal_map",
-                         input_render_pass.get_colour_attachment(1));
-  deferred_material->set("albedo_specular_map",
-                         input_render_pass.get_colour_attachment(2));
-  deferred_material->set("shadow_position_map",
-                         input_render_pass.get_colour_attachment(3));
-  deferred_material->set(
-    "shadow_map",
-    get_renderer().get_render_pass("Shadow").get_depth_attachment());
-  deferred_material->set("noise_map", noise_map);
 
   auto* renderer_desc_set =
     get_renderer().generate_and_update_descriptor_write_sets(
@@ -223,7 +231,6 @@ DeferredRenderPass::recreate_pipeline()
       .framebuffer = deferred_framebuffer.get(),
       .shader = deferred_shader.get(),
       .sample_count = VK_SAMPLE_COUNT_1_BIT,
-      .cull_mode = VK_CULL_MODE_BACK_BIT,
       .depth_comparator = VK_COMPARE_OP_LESS,
       .override_vertex_attributes = {},
       .override_instance_attributes = {},

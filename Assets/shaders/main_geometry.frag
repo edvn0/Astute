@@ -1,18 +1,23 @@
 #version 460
 
+#extension GL_EXT_debug_printf : enable
+
 #include "buffers.glsl"
+#include "util.glsl"
 
 layout(location = 0) in vec3 fragment_normal;
 layout(location = 1) in vec3 fragment_tangents;
 layout(location = 2) in vec3 fragment_bitangents;
 layout(location = 3) in vec2 fragment_uvs;
 layout(location = 4) in vec3 world_space_fragment_position;
-layout(location = 5) in vec4 shadow_space_fragment_position;
+layout(location = 5) in vec3 view_position;
 
 layout(location = 0) out vec4 fragment_position;
 layout(location = 1) out vec4 fragment_normals;
 layout(location = 2) out vec4 fragment_albedo_spec;
-layout(location = 3) out vec4 fragment_shadow_position;
+layout(location = 3) out float fragment_shadow_value;
+
+layout(set = 0, binding = 10) uniform sampler2DArray shadow_map;
 
 layout(set = 1, binding = 5) uniform sampler2D normal_map;
 layout(set = 1, binding = 6) uniform sampler2D albedo_map;
@@ -57,8 +62,28 @@ main()
   fragment_albedo_spec.a = specular_strength * roughness_value;
 
   fragment_position = vec4(world_space_fragment_position, 1.0);
+  uint chosen_cascade_index = 0;
+  for (uint i = 0; i < 3; ++i) {
+    if (view_position.z < renderer.cascade_splits[i]) {
+      chosen_cascade_index = i + 1;
+    }
+  }
+  vec4 shadow_space_fragment_position =
+    bias *
+    directional_shadow_projections.view_projections[chosen_cascade_index] *
+    fragment_position;
+  vec3 shadow_uvs =
+    shadow_space_fragment_position.xyz / shadow_space_fragment_position.w;
+  if (shadow_uvs.z > 1.0) {
+    fragment_shadow_value = 1.0; // Outside shadow map bounds, assume no shadow
+  } else {
+    float bias = max(
+      0.005 * (1.0 - dot(N, normalize(-shadow.sun_direction.xyz))), 0.0005F);
 
-  fragment_shadow_position = shadow_space_fragment_position;
+    float shadow_value_here =
+      texture(shadow_map, vec3(shadow_uvs.xy, chosen_cascade_index)).r;
+    fragment_shadow_value = shadow_value_here > shadow_uvs.z - bias ? 1.0 : 0.2;
+  }
 }
 
 vec4

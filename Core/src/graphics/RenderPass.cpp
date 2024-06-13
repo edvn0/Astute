@@ -8,21 +8,34 @@
 
 namespace Engine::Graphics {
 
+RenderPass::RenderPass(Renderer& input)
+  : renderer(input)
+{
+}
+
 auto
-RenderPass::execute(CommandBuffer& command_buffer, bool is_compute) -> void
+RenderPass::construct() -> void
+{
+  construct_impl();
+
+  is_compute = false;
+  if (const auto& pipe = std::get<Core::Scope<IPipeline>>(pass);
+      pipe != nullptr) {
+    is_compute = std::get<Core::Scope<IPipeline>>(pass)->get_bind_point() ==
+                 VK_PIPELINE_BIND_POINT_COMPUTE;
+  }
+}
+
+auto
+RenderPass::execute(CommandBuffer& command_buffer) -> void
 {
 #ifdef ASTUTE_DEBUG
   if (!is_valid()) {
     return;
   }
 #endif
-
   bind(command_buffer);
-  if (is_compute) {
-    execute_compute_impl(command_buffer);
-  } else {
-    execute_impl(command_buffer);
-  }
+  execute_impl(command_buffer);
   unbind(command_buffer);
 }
 
@@ -36,14 +49,20 @@ RenderPass::get_colour_attachment(Core::u32 index) const
 auto
 RenderPass::get_depth_attachment() const -> const Core::Ref<Image>&
 {
-  return get_framebuffer()->get_depth_attachment();
+  if (const auto& framebuffer = get_framebuffer();
+      framebuffer != nullptr && framebuffer->has_depth_attachment()) {
+    return framebuffer->get_depth_attachment();
+  }
+
+  const auto& extraneous_framebuffer = get_extraneous_framebuffer(0);
+  return extraneous_framebuffer->get_depth_attachment();
 }
 
 auto
 RenderPass::bind(CommandBuffer& command_buffer) -> void
 {
   const auto& pipeline = std::get<Core::Scope<IPipeline>>(pass);
-  if (pipeline->get_bind_point() == VK_PIPELINE_BIND_POINT_GRAPHICS) {
+  if (!is_compute) {
     RendererExtensions::begin_renderpass(command_buffer, *get_framebuffer());
   }
 
@@ -55,8 +74,7 @@ RenderPass::bind(CommandBuffer& command_buffer) -> void
 auto
 RenderPass::unbind(CommandBuffer& command_buffer) -> void
 {
-  const auto& pipeline = std::get<Core::Scope<IPipeline>>(pass);
-  if (pipeline->get_bind_point() == VK_PIPELINE_BIND_POINT_GRAPHICS) {
+  if (!is_compute) {
     RendererExtensions::end_renderpass(command_buffer);
   }
 }
@@ -69,8 +87,9 @@ RenderPass::generate_and_update_descriptor_write_sets(Material& material)
 }
 
 auto
-RenderPass::blit_to(const CommandBuffer&, const Framebuffer&, BlitProperties)
-  -> void
+RenderPass::blit_to(const CommandBuffer&,
+                    const Framebuffer&,
+                    BlitProperties) -> void
 {
 }
 

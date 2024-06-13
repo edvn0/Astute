@@ -15,12 +15,12 @@ public:
   {
   }
   ~LightCullingRenderPass() override = default;
-  auto construct() -> void override;
   auto on_resize(const Core::Extent&) -> void override;
 
 protected:
+  auto construct_impl() -> void override;
   auto destruct_impl() -> void override;
-  auto execute_compute_impl(CommandBuffer&) -> void override;
+  auto execute_impl(CommandBuffer&) -> void override;
   auto is_valid() const -> bool override
   {
     auto&& [_, shader, pipeline, material] = get_data();

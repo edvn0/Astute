@@ -22,7 +22,7 @@
 namespace Engine::Graphics {
 
 auto
-LightCullingRenderPass::construct() -> void
+LightCullingRenderPass::construct_impl() -> void
 {
   auto&& [_,
           light_culling_shader,
@@ -41,9 +41,10 @@ LightCullingRenderPass::construct() -> void
 }
 
 auto
-LightCullingRenderPass::execute_compute_impl(CommandBuffer& command_buffer)
-  -> void
+LightCullingRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 {
+  ASTUTE_PROFILE_FUNCTION();
+
   auto& [light_culling_framebuffer,
          light_culling_shader,
          light_culling_pipeline,

@@ -6,6 +6,7 @@
 
 #include <backends/imgui_impl_vulkan.h>
 #include <format>
+#include <imgui.h>
 #include <initializer_list>
 #include <span>
 
@@ -13,27 +14,23 @@ namespace Engine::Core::UI {
 
 namespace {
 
-static unsigned int ui_id_counter = 0;
-static char ui_id_buffer[10] = "ID";
-
 auto
 generate_id() -> const char*
 {
+  static Core::u32 ui_id_counter{ 0 };
+  static std::array<char, 10> ui_id_buffer = { "ID" };
   std::ostringstream stream;
-  stream << "ID" << std::hex
-         << ui_id_counter++; // Convert to hexadecimal and increment
+  stream << std::format("{:08x}", ui_id_counter);
+  ui_id_counter += 1;
   std::string id_str = stream.str();
 
-  // Ensure the buffer is large enough for the string and a null terminator
-  size_t buffer_length = sizeof(ui_id_buffer);
-  if (id_str.length() + 1 <= buffer_length) {
-    std::copy(id_str.begin(), id_str.end(), ui_id_buffer);
+  if (auto buffer_length = sizeof(ui_id_buffer);
+      id_str.length() + 1 <= buffer_length) {
+    std::ranges::copy(id_str.begin(), id_str.end(), ui_id_buffer.begin());
     ui_id_buffer[id_str.length()] = '\0'; // Null-terminate the string
-  } else {
-    // Handle error or buffer overflow
   }
 
-  return ui_id_buffer;
+  return ui_id_buffer.data();
 }
 
 template<std::floating_point T, Core::usize N>
@@ -42,12 +39,16 @@ auto
 convert_to_imvec(const Core::Vector<T, N>& vector)
 {
   ImVec4 result;
-
-  // Always set x; all your Vector instances have at least one component
   result.x = static_cast<float>(vector.data.at(0));
-  result.y = N > 1 ? static_cast<float>(vector.data.at(1)) : 0.0f;
-  result.z = N > 2 ? static_cast<float>(vector.data.at(2)) : 0.0f;
-  result.w = N > 3 ? static_cast<float>(vector.data.at(3)) : 0.0f;
+  if constexpr (N > 1) {
+    result.y = static_cast<float>(vector.data.at(1));
+  }
+  if constexpr (N > 2) {
+    result.z = static_cast<float>(vector.data.at(2));
+  }
+  if constexpr (N > 3) {
+    result.w = static_cast<float>(vector.data.at(3));
+  }
 
   return result;
 }
@@ -129,9 +130,13 @@ coloured_text(const Core::Vec4& colour, std::string&& formatted) -> void
 }
 
 auto
-begin(const std::string_view data) -> bool
+begin(const std::string_view data, const WindowConfiguration& config) -> bool
 {
-  return ImGui::Begin(data.data());
+  const auto flag = ImGuiWindowFlags_NoTitleBar;
+  const auto added_stack_symbols = std::format("##{}", data);
+  return config.expandable
+           ? ImGui::Begin(data.data())
+           : ImGui::Begin(added_stack_symbols.data(), nullptr, flag);
 }
 
 auto
@@ -150,15 +155,23 @@ auto
 image(const Graphics::Image& image,
       const Core::FloatExtent& extent,
       const Core::Vec4& colour,
-      bool flipped) -> void
+      bool flipped,
+      Core::u32 array_index) -> void
 {
-  const auto& [sampler, view, layout] = image.get_descriptor_info();
-  auto set = add_image(sampler, view, layout);
+  VkImageView view{ nullptr };
+  auto&& [sampler, v, layout] = image.get_descriptor_info();
+  if (image.get_layer_count() > 1) {
+    view = image.get_layer_image_view(array_index);
+  } else {
+    view = v;
+  }
+
+  auto* set = add_image(sampler, view, layout);
   auto made = make_id(set, sampler, view, layout, image.hash());
   ImGui::PushID(made.c_str());
   static constexpr auto uv0 = ImVec2(0, 0);
   static constexpr auto uv1 = ImVec2(1, 1);
-  ImGui::Image(set,
+  ImGui::Image(std::bit_cast<ImU64>(set),
                convert_to_imvec(extent),
                flipped ? uv1 : uv0,
                flipped ? uv0 : uv1,

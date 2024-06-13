@@ -2,7 +2,10 @@
 
 #include "graphics/Renderer.hpp"
 
+#include "core/Clock.hpp"
+#include "core/Profiler.hpp"
 #include "core/Scene.hpp"
+#include "core/Verify.hpp"
 #include "logging/Logger.hpp"
 
 #include "core/Application.hpp"
@@ -11,12 +14,14 @@
 
 #include "graphics/RendererExtensions.hpp"
 
+#include <ranges>
+
 #include "graphics/render_passes/MainGeometry.hpp"
 
 namespace Engine::Graphics {
 
 auto
-MainGeometryRenderPass::construct() -> void
+MainGeometryRenderPass::construct_impl() -> void
 {
   const auto& ext = get_renderer().get_size();
   auto&& [main_geometry_framebuffer,
@@ -29,11 +34,11 @@ MainGeometryRenderPass::construct() -> void
       .height= ext.height,
       .clear_depth_on_load = false,
       .attachments = {
-          VK_FORMAT_R32G32B32A32_SFLOAT, // world pos
-          VK_FORMAT_R32G32B32A32_SFLOAT, // normals
-          VK_FORMAT_R32G32B32A32_SFLOAT, // albedo + specular strength
-          VK_FORMAT_R32G32B32A32_SFLOAT, // shadow position
-          VK_FORMAT_D32_SFLOAT, // depth
+          { .format = VK_FORMAT_R32G32B32A32_SFLOAT, }, // world pos
+          { .format = VK_FORMAT_R32G32B32A32_SFLOAT, }, // normals
+          { .format = VK_FORMAT_R32G32B32A32_SFLOAT, }, // albedo + specular strength
+          { .format = VK_FORMAT_R32_SFLOAT, }, // shadow position
+          { .format = VK_FORMAT_D32_SFLOAT, }, // depth
       },
       .samples = VK_SAMPLE_COUNT_1_BIT,
       .existing_images = { {4, get_renderer().get_render_pass("Predepth").get_depth_attachment(), }, },
@@ -56,18 +61,36 @@ MainGeometryRenderPass::construct() -> void
 auto
 MainGeometryRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 {
+  ASTUTE_PROFILE_FUNCTION();
+  const auto& depth_attachment =
+    get_renderer().get_render_pass("Shadow").get_depth_attachment();
+
   const auto& [main_geometry_framebuffer,
                main_geometry_shader,
                main_geometry_pipeline,
                main_geometry_material] = get_data();
 
+  main_geometry_material->set("shadow_map", depth_attachment);
   auto* renderer_desc_set =
     generate_and_update_descriptor_write_sets(*main_geometry_material);
 
   main_geometry_material->update_descriptor_write_sets(renderer_desc_set);
+  std::unordered_map<Core::u32, VkDescriptorSet> material_desc_sets;
+  for (const auto& [key, command] : get_renderer().draw_commands) {
+    const auto& [mesh, submesh_index, instance_count] = command;
+    const auto& submesh =
+      mesh->get_mesh_asset()->get_submeshes().at(submesh_index);
+    const auto& material = mesh->get_materials().at(submesh.material_index);
+    if (!material_desc_sets.contains(submesh.material_index)) {
+      auto* material_descriptor_set =
+        material->generate_and_update_descriptor_write_sets();
+      material_desc_sets[submesh.material_index] = material_descriptor_set;
+    }
+  }
 
-  for (auto&& [key, command] : get_renderer().draw_commands) {
-    auto&& [mesh, submesh_index, instance_count] = command;
+  for (const auto& [key, command] : get_renderer().draw_commands) {
+    ASTUTE_PROFILE_SCOPE("Main geometry draw command");
+    const auto& [mesh, submesh_index, instance_count] = command;
 
     const auto& mesh_asset = mesh->get_mesh_asset();
     const auto& transform_vertex_buffer =
@@ -76,10 +99,9 @@ MainGeometryRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
         .transform_buffer;
     auto offset = get_renderer().mesh_transform_map.at(key).offset;
     const auto& submesh = mesh_asset->get_submeshes().at(submesh_index);
-
     const auto& material = mesh->get_materials().at(submesh.material_index);
     auto* material_descriptor_set =
-      material->generate_and_update_descriptor_write_sets();
+      material_desc_sets.at(submesh.material_index);
 
     RendererExtensions::bind_vertex_buffer(
       command_buffer, mesh_asset->get_vertex_buffer(), 0);
@@ -112,9 +134,11 @@ MainGeometryRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                      submesh.index_count,
                      instance_count,
                      submesh.base_index,
-                     submesh.base_vertex,
+                     static_cast<Core::i32>(submesh.base_vertex),
                      0);
   }
+
+  get_renderer().get_2d_renderer().flush(command_buffer);
 }
 
 auto

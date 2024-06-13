@@ -18,6 +18,7 @@ function(add_imgui)
     add_library(imgui STATIC ${IMGUI_SOURCES})
     target_include_directories(imgui PUBLIC ${IMGUI_DIR} ${IMGUI_DIR}/backends)
     target_link_libraries(imgui PUBLIC glfw Vulkan::Vulkan)
+    target_compile_definitions(imgui PRIVATE -DImTextureID=ImU64)
 endfunction()
 
 add_imgui()
@@ -64,3 +65,17 @@ endfunction()
 
 add_assimp()
 add_subdirectory(FastNoise2)
+
+add_subdirectory(ImGuizmo)
+
+function(add_ktx)
+    set(KTX_FEATURE_STATIC_LIBRARY ON)
+    set(KTX_FEATURE_LOADTEST_APPS OFF)
+    set(KTX_FEATURE_GL_UPLOAD OFF)
+    set(KTX_FEATURE_TESTS OFF)
+    set(KTX_FEATURE_TOOLS OFF)
+
+    add_subdirectory(KTX-Software)
+endfunction()
+
+add_ktx()

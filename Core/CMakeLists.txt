@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.23)
 
-project(Core CXX)
+project(Core CXX C)
 
 add_library(Core STATIC
     include/AstuteCore.hpp/
@@ -20,6 +20,7 @@ add_library(Core STATIC
     include/core/Scene.hpp
     include/core/Types.hpp
     include/core/Verify.hpp
+    include/core/Profiler.hpp
     include/graphics/Allocator.hpp
     include/graphics/CommandBuffer.hpp
     include/graphics/DescriptorResource.hpp
@@ -37,7 +38,9 @@ add_library(Core STATIC
     include/graphics/Mesh.hpp
     include/graphics/RenderPass.hpp
     include/graphics/Renderer.hpp
+    include/graphics/Renderer2D.hpp
     include/graphics/RendererExtensions.hpp
+    include/graphics/TextureCube.hpp
     include/graphics/Shader.hpp
     include/graphics/ShaderBuffers.hpp
     include/graphics/Swapchain.hpp
@@ -50,6 +53,9 @@ add_library(Core STATIC
     include/graphics/render_passes/LightCulling.hpp
     include/graphics/render_passes/Predepth.hpp
     include/graphics/render_passes/Lights.hpp
+    include/graphics/render_passes/ChromaticAberration.hpp
+    include/graphics/render_passes/Composition.hpp
+    include/graphics/render_passes/Bloom.hpp
     include/pch/CorePCH.hpp
     include/ui/UI.hpp
     src/core/Application.cpp
@@ -59,6 +65,7 @@ add_library(Core STATIC
     src/core/Input.cpp
     src/core/Random.cpp
     src/core/Scene.cpp
+    src/core/Profiler.cpp
     src/graphics/Allocator.cpp
     src/graphics/CommandBuffer.cpp
     src/graphics/DescriptorResource.cpp
@@ -75,10 +82,12 @@ add_library(Core STATIC
     src/graphics/Mesh.cpp
     src/graphics/RenderPass.cpp
     src/graphics/Renderer.cpp
+    src/graphics/Renderer2D.cpp
     src/graphics/RendererExtensions.cpp
     src/graphics/Shader.cpp
     src/graphics/Swapchain.cpp
     src/graphics/Vertex.cpp
+    src/graphics/TextureCube.cpp
     src/graphics/TextureGenerator.cpp
     src/graphics/Window.cpp
     src/graphics/render_passes/Deferred.cpp
@@ -87,6 +96,9 @@ add_library(Core STATIC
     src/graphics/render_passes/LightCulling.cpp
     src/graphics/render_passes/Predepth.cpp
     src/graphics/render_passes/Lights.cpp
+    src/graphics/render_passes/ChromaticAberration.cpp
+    src/graphics/render_passes/Composition.cpp
+    src/graphics/render_passes/Bloom.cpp
     src/ui/UI.cpp
 )
 target_include_directories(Core PUBLIC include
@@ -101,13 +113,9 @@ target_include_directories(Core SYSTEM PRIVATE
     ${CMAKE_SOURCE_DIR}/Library/VulkanMemoryAllocator/include
     ${CMAKE_SOURCE_DIR}/Library/filewatch)
 
-target_link_libraries(Core PUBLIC ThreadPool glfw Vulkan::Vulkan PRIVATE VulkanMemoryAllocator imgui glm EnTT::EnTT stbimage::stbimage assimp FastNoise2 ShaderCompilation Logging Platform)
+target_link_libraries(Core PUBLIC ThreadPool ktx glfw Vulkan::Vulkan PRIVATE VulkanMemoryAllocator imguizmo imgui glm EnTT::EnTT stbimage::stbimage assimp FastNoise2 ShaderCompilation Logging Platform)
 target_precompile_headers(Core PRIVATE include/pch/CorePCH.hpp)
-target_compile_definitions(Core PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)
-
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    target_compile_definitions(Core PRIVATE ASTUTE_DEBUG)
-endif()
+target_compile_definitions(Core PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE -DImTextureID=ImU64)
 
 if("Clang" IN_LIST CMAKE_CXX_COMPILER_ID)
     target_compile_options(Core PRIVATE -Wno-unused-local-typedef)

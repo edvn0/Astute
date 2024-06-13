@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 
 #include <concepts>
+#include <limits>
 #include <type_traits>
 
 namespace Engine::Core::Random {
@@ -35,6 +36,9 @@ auto
 random(Core::f64 min, Core::f32 max) -> Core::f64;
 auto
 random(Core::f32 min, Core::f64 max) -> Core::f64;
+auto
+random_uint(Core::u64 min = 0,
+            Core::u64 max = std::numeric_limits<Core::u64>::max()) -> Core::u64;
 
 inline auto
 random() -> Core::f64

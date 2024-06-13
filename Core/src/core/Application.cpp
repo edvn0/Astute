@@ -2,6 +2,7 @@
 
 #include "core/Application.hpp"
 #include "core/Clock.hpp"
+#include "core/Profiler.hpp"
 #include "logging/Logger.hpp"
 
 #include "graphics/Allocator.hpp"
@@ -11,6 +12,8 @@
 #include "graphics/InterfaceSystem.hpp"
 #include "graphics/Swapchain.hpp"
 #include "graphics/Window.hpp"
+
+#include <cassert>
 
 namespace Engine::Core {
 
@@ -76,6 +79,7 @@ Application::run() -> i32
       continue;
     }
 
+    Profiler::the().begin_session("Astute");
     Graphics::DescriptorResource::the().begin_frame();
 
     auto current_frame_time = Clock::now();
@@ -105,15 +109,16 @@ Application::run() -> i32
       last_fps_time = current_second_time;
       statistics.frame_time = frame_duration * 1000.0;
 
-      info("Frametime: {:.5f}ms. FPS: {}Hz",
-           statistics.frame_time,
-           statistics.frames_per_seconds);
+      trace("Frametime: {:.5f}ms. FPS: {}Hz",
+            statistics.frame_time,
+            statistics.frames_per_seconds);
     }
 
     Graphics::DescriptorResource::the().end_frame();
+    Profiler::the().end_session();
 
     std::scoped_lock lock(post_frame_mutex);
-    for (auto& func : post_frame_funcs) {
+    for (const auto& func : post_frame_funcs) {
       func();
     }
     post_frame_funcs.clear();

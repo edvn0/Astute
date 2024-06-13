@@ -3,12 +3,13 @@
 #include "graphics/Renderer.hpp"
 
 #include "core/Application.hpp"
+#include "core/Clock.hpp"
+#include "core/Random.hpp"
 #include "core/Scene.hpp"
+#include "core/ShadowCascadeCalculator.hpp"
+
 #include "logging/Logger.hpp"
 
-#include "core/Clock.hpp"
-
-#include "core/Random.hpp"
 #include "graphics/DescriptorResource.hpp"
 #include "graphics/GPUBuffer.hpp"
 #include "graphics/Swapchain.hpp"
@@ -19,6 +20,9 @@
 #include "graphics/RendererExtensions.hpp"
 #include "graphics/TextureGenerator.hpp"
 
+#include "graphics/render_passes/Bloom.hpp"
+#include "graphics/render_passes/ChromaticAberration.hpp"
+#include "graphics/render_passes/Composition.hpp"
 #include "graphics/render_passes/Deferred.hpp"
 #include "graphics/render_passes/LightCulling.hpp"
 #include "graphics/render_passes/Lights.hpp"
@@ -36,10 +40,10 @@ namespace Engine::Graphics {
 static constexpr auto update_lights = []<class Light>(Light& light_ubo,
                                                       auto& env_lights) {
   auto i = 0ULL;
-  auto& [count, lights] = light_ubo.get_data();
-  count = static_cast<Core::i32>(env_lights.size());
+  auto& [ubo_count, ubo_lights] = light_ubo.get_data();
+  ubo_count = static_cast<Core::i32>(env_lights.size());
   for (const auto& light : env_lights) {
-    lights.at(i) = light;
+    ubo_lights.at(i) = light;
     i++;
   }
   light_ubo.update();
@@ -49,7 +53,7 @@ auto
 Renderer::generate_and_update_descriptor_write_sets(Material& material)
   -> VkDescriptorSet
 {
-  static std::array<IShaderBindable*, 7> structure_identifiers = {
+  static std::array<IShaderBindable*, 8> structure_identifiers = {
     &renderer_ubo,
     &shadow_ubo,
     &point_light_ubo,
@@ -57,6 +61,7 @@ Renderer::generate_and_update_descriptor_write_sets(Material& material)
     &visible_point_lights_ssbo,
     &visible_spot_lights_ssbo,
     &screen_data_ubo,
+    &directional_shadow_projections_ubo
   };
   const auto& shader = material.get_shader();
 
@@ -68,15 +73,15 @@ Renderer::generate_and_update_descriptor_write_sets(Material& material)
   if (write_descriptor_sets.empty()) {
     write_descriptor_sets.reserve(structure_identifiers.size());
     for (const auto& identifier : structure_identifiers) {
-      auto write = shader->get_descriptor_set(identifier->get_name(), 0);
-      if (!write) {
+      const auto* write = shader->get_descriptor_set(identifier->get_name(), 0);
+      if (write == nullptr) {
         error("Failed to find descriptor set for identifier: {}",
               identifier->get_name());
         continue;
       }
 
-      auto* buffer_info = &identifier->get_descriptor_info();
-      if (!buffer_info) {
+      const auto* buffer_info = &identifier->get_descriptor_info();
+      if (buffer_info == nullptr) {
         error("Failed to find buffer info for identifier: {}",
               identifier->get_name());
         continue;
@@ -98,7 +103,7 @@ Renderer::generate_and_update_descriptor_write_sets(Material& material)
   const auto& layouts = shader->get_descriptor_set_layouts();
   alloc_info.descriptorSetCount = 1;
   alloc_info.pSetLayouts = &layouts.at(0);
-  auto allocated =
+  auto* allocated =
     DescriptorResource::the().allocate_descriptor_set(alloc_info);
 
   for (auto& wds : write_descriptor_sets) {
@@ -118,6 +123,43 @@ Renderer::Renderer(Configuration config, const Window* window)
   : size(window->get_swapchain().get_size())
   , old_size(size)
 {
+  struct
+  {
+    [[nodiscard]] static auto get_device() -> VkDevice
+    {
+      return Device::the().device();
+    }
+    [[nodiscard]] static auto get_queue_type() -> QueueType
+    {
+      return QueueType::Graphics;
+    }
+  } a{};
+  thread_pool = Core::make_scope<ED::ThreadPool>(a, 4U);
+
+  {
+    Core::DataBuffer data_buffer{
+      sizeof(Core::u32),
+    };
+    static constexpr auto white_data = 0xFFFFFFFF;
+    data_buffer.write(&white_data, sizeof(Core::u32), 0U);
+
+    white_texture = Image::load_from_memory(1,
+                                            1,
+                                            data_buffer,
+                                            {
+                                              .path = "white-default-texture",
+                                            });
+
+    Core::u32 black_data{ 0 };
+    data_buffer.write(&black_data, sizeof(Core::u32), 0U);
+    black_texture = Image::load_from_memory(1,
+                                            1,
+                                            data_buffer,
+                                            {
+                                              .path = "black-default-texture",
+                                            });
+  }
+
   Shader::initialise_compiler(Compilation::ShaderCompilerConfiguration{
     .optimisation_level = 2,
     .debug_information_level = Compilation::DebugInformationLevel::Full,
@@ -139,16 +181,28 @@ Renderer::Renderer(Configuration config, const Window* window)
   std::unordered_map<RendererTechnique, std::vector<std::string>>
     technique_construction_order;
   technique_construction_order[RendererTechnique::Deferred] = {
-    "Shadow", "Predepth", "MainGeometry", "Deferred", "Lights",
+    "Shadow",   "Predepth",    "MainGeometry",
+    "Deferred", "Lights",      "ChromaticAberration",
+    "Bloom",    "Composition",
   };
+
+  current_cubemap =
+    TextureCube::construct("Assets/images/cubemap_yokohama_rgba.ktx");
 
   render_passes["MainGeometry"] =
     Core::make_scope<MainGeometryRenderPass>(*this);
   render_passes["Shadow"] =
     Core::make_scope<ShadowRenderPass>(*this, config.shadow_pass_size);
-  render_passes["Deferred"] = Core::make_scope<DeferredRenderPass>(*this);
+  render_passes["Deferred"] =
+    Core::make_scope<DeferredRenderPass>(*this, current_cubemap->get_image());
   render_passes["Predepth"] = Core::make_scope<PredepthRenderPass>(*this);
   render_passes["Lights"] = Core::make_scope<LightsRenderPass>(*this);
+  render_passes["LightCulling"] =
+    Core::make_scope<LightCullingRenderPass>(*this, light_culling_work_groups);
+  render_passes["ChromaticAberration"] =
+    Core::make_scope<ChromaticAberrationRenderPass>(*this);
+  render_passes["Composition"] = Core::make_scope<CompositionRenderPass>(*this);
+  render_passes["Bloom"] = Core::make_scope<BloomRenderPass>(*this);
 
   for (const auto& k :
        technique_construction_order.at(RendererTechnique::Deferred)) {
@@ -156,41 +210,25 @@ Renderer::Renderer(Configuration config, const Window* window)
   }
 
   technique_construction_order[RendererTechnique::ForwardPlus] = {
-    "LightCulling",
+    "LightCulling"
   };
-
-  render_passes["LightCulling"] =
-    Core::make_scope<LightCullingRenderPass>(*this, light_culling_work_groups);
   for (const auto& k :
        technique_construction_order.at(RendererTechnique::ForwardPlus)) {
     render_passes.at(k)->construct();
   }
 
+  activate_post_processing_step("Bloom");
+  activate_post_processing_step("ChromaticAberration");
+  activate_post_processing_step("Composition");
+
   transform_buffers.resize(3);
-  static constexpr auto total_size = 100 * 1000 * sizeof(TransformVertexData);
+  static constexpr auto total_size =
+    100ULL * 1000 * sizeof(TransformVertexData);
   for (auto& [vertex_buffer, transform_buffer] : transform_buffers) {
     vertex_buffer = Core::make_scope<VertexBuffer>(total_size);
     transform_buffer = Core::make_scope<Core::DataBuffer>(total_size);
     transform_buffer->fill_zero();
   }
-
-  Core::DataBuffer data_buffer{
-    sizeof(Core::u32),
-  };
-  static constexpr auto white_data = 0xFFFFFFFF;
-  data_buffer.write(&white_data, sizeof(Core::u32), 0U);
-
-  white_texture = Image::load_from_memory(1,
-                                          1,
-                                          data_buffer,
-                                          {
-                                            .path = "white-default-texture",
-                                          });
-
-  Core::u32 black_data{ 0 };
-  data_buffer.write(&black_data, sizeof(Core::u32), 0U);
-  black_texture = Image::load_from_memory(
-    1, 1, data_buffer, { .path = "black-default-texture" });
 
   const glm::uvec2 viewport_size{ size.width, size.height };
 
@@ -208,12 +246,7 @@ Renderer::Renderer(Configuration config, const Window* window)
                              light_culling_work_groups.y) *
     4 * 1024);
 
-  struct
-  {
-    auto get_device() const -> VkDevice { return Device::the().device(); }
-    auto get_queue_type() const -> QueueType { return QueueType::Graphics; }
-  } a{};
-  thread_pool = Core::make_scope<ED::ThreadPool>(a, 4U);
+  renderer_2d = Core::make_scope<Renderer2D>(*this, 1000U);
 }
 
 Renderer::~Renderer() = default;
@@ -224,7 +257,7 @@ Renderer::destruct() -> void
   white_texture->destroy();
   black_texture->destroy();
 
-  for (auto& [k, v] : render_passes) {
+  for (const auto& [k, v] : render_passes) {
     v->destruct();
   }
 
@@ -234,8 +267,8 @@ Renderer::destruct() -> void
 }
 
 auto
-Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
-  -> void
+Renderer::begin_scene(Core::Scene& scene,
+                      const Core::SceneRendererCamera& camera) -> void
 {
   if (old_size != size) {
     Device::the().wait();
@@ -247,11 +280,13 @@ Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
     auto& deferred = get_render_pass("Deferred");
     auto& predepth = get_render_pass("Predepth");
     auto& lights = get_render_pass("Lights");
+    auto& chromatic_aberration = get_render_pass("ChromaticAberration");
     predepth.on_resize(size);
     shadow_render_pass.on_resize(size);
     main_geom.on_resize(size);
     deferred.on_resize(size);
     lights.on_resize(size);
+    chromatic_aberration.on_resize(size);
 
     const glm::uvec2 viewport_size{ size.width, size.height };
 
@@ -272,13 +307,20 @@ Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
          view_proj,
          light_colour_intensity,
          specular_colour_intensity,
-         camera_pos] = renderer_ubo.get_data();
+         camera_pos,
+         pad,
+         ubo_cascade_splits] = renderer_ubo.get_data();
   view = camera.camera.get_view_matrix();
   proj = camera.camera.get_projection_matrix();
   view_proj = proj * view;
   camera_pos = camera.camera.get_position();
   light_colour_intensity = light_environment.colour_and_intensity;
   specular_colour_intensity = light_environment.specular_colour_and_intensity;
+  compute_directional_shadow_projections(
+    camera, glm::normalize(-light_environment.sun_position));
+  for (auto i = 0U; i < cascade_splits.size(); i++) {
+    ubo_cascade_splits.at(i) = cascade_splits.at(i);
+  }
   renderer_ubo.update();
 
   auto& [light_view, light_proj, light_view_proj, light_pos, light_dir] =
@@ -318,6 +360,24 @@ Renderer::begin_scene(Core::Scene& scene, const SceneRendererCamera& camera)
   static auto begin = Core::Clock::now();
   screen_data.time = static_cast<Core::f32>(Core::Clock::now() - begin);
   screen_data_ubo.update();
+}
+
+auto
+Renderer::compute_directional_shadow_projections(
+  const Core::SceneRendererCamera& camera,
+  const glm::vec3& light_direction) -> void
+{
+  static Core::ShadowCascadeCalculator cascade_calculator{
+    cascade_near_plane_offset,
+    cascade_far_plane_offset,
+  };
+  auto cascades = cascade_calculator.compute_cascades(camera, light_direction);
+  auto& [view_projections] = directional_shadow_projections_ubo.get_data();
+  for (auto i = 0ULL; i < 10; i++) {
+    cascade_splits[static_cast<Core::i32>(i)] = cascades[i].split_depth;
+    view_projections[i] = cascades[i].view_projection;
+  }
+  directional_shadow_projections_ubo.update();
 }
 
 auto
@@ -375,9 +435,9 @@ Renderer::submit_static_mesh(Core::Ref<StaticMesh>& static_mesh,
 
 auto
 Renderer::submit_static_light(Core::Ref<StaticMesh>& static_mesh,
-                              const glm::mat4& transform) -> void
+                              const glm::mat4& transform,
+                              const glm::vec4& colour_times_intensity) -> void
 {
-
   const auto& source = static_mesh->get_mesh_asset();
   const auto& submesh_data = source->get_submeshes();
   for (const auto submesh_index : static_mesh->get_submeshes()) {
@@ -386,7 +446,7 @@ Renderer::submit_static_light(Core::Ref<StaticMesh>& static_mesh,
 
     const auto& vertex_buffer = source->get_vertex_buffer();
     const auto& index_buffer = source->get_index_buffer();
-    auto& material =
+    const auto& material =
       source->get_materials().at(submesh_data[submesh_index].material_index);
 
     CommandKey key{ &vertex_buffer, &index_buffer, material.get(), 0 };
@@ -414,6 +474,7 @@ Renderer::submit_static_light(Core::Ref<StaticMesh>& static_mesh,
     command.static_mesh = static_mesh;
     command.submesh_index = submesh_index;
     command.instance_count++;
+    lights_instance_data.emplace_back(colour_times_intensity);
   }
 }
 
@@ -452,13 +513,17 @@ Renderer::flush_draw_lists() -> void
   vb->write(std::span{ output });
 
   command_buffer->begin();
-  compute_command_buffer->begin();
 
   // Shadow pass
   render_passes.at("Shadow")->execute(*command_buffer);
-  // Prepdepth pass
+  // Predepth pass
   render_passes.at("Predepth")->execute(*command_buffer);
-  // render_passes.at("LightCulling")->execute(*compute_command_buffer, true);
+  {
+    compute_command_buffer->begin();
+    render_passes.at("LightCulling")->execute(*compute_command_buffer);
+    compute_command_buffer->end();
+    compute_command_buffer->submit();
+  }
   if (technique == RendererTechnique::Deferred) {
     // Geometry pass
     render_passes.at("MainGeometry")->execute(*command_buffer);
@@ -467,13 +532,18 @@ Renderer::flush_draw_lists() -> void
 
     render_passes.at("Lights")->execute(*command_buffer);
   } else if (technique == RendererTechnique::ForwardPlus) {
-    // TODO: Not yet implemented.
     render_passes.at("ForwardPlusGeometry")->execute(*command_buffer);
     render_passes.at("Composite")->execute(*command_buffer);
   }
 
-  compute_command_buffer->end();
-  compute_command_buffer->submit();
+  for (const auto& step : post_processing_steps) {
+    if (!render_passes.contains(step.name)) {
+      continue;
+    }
+    const auto& render_pass = render_passes.at(step.name);
+    render_pass->execute(*command_buffer);
+  }
+
   command_buffer->end();
   command_buffer->submit();
 
@@ -481,6 +551,47 @@ Renderer::flush_draw_lists() -> void
   shadow_draw_commands.clear();
   lights_draw_commands.clear();
   mesh_transform_map.clear();
+  lights_instance_data.clear();
+}
+
+auto
+Renderer::screenshot() const -> void
+{
+  static auto index = 0ULL;
+  Device::the().wait();
+  const auto* image = get_final_output();
+  if (image->write_to_file(
+        std::format("Assets/images/screenshot-{}.png", index))) {
+    info("Screenshot saved to screenshot.png");
+    index++;
+  } else {
+    error("Failed to save screenshot to screenshot.png");
+  }
+}
+
+auto
+Renderer::get_shadow_output_image() const -> const Image*
+{
+  return render_passes.at("Shadow")
+    ->get_extraneous_framebuffer(0)
+    ->get_depth_attachment()
+    .get();
+}
+
+[[nodiscard]] auto
+Renderer::get_final_output() const -> const Image*
+{
+  if (!post_processing_steps.empty()) {
+    return render_passes.at("Composition")
+      ->get_framebuffer()
+      ->get_colour_attachment(0)
+      .get();
+  }
+
+  return render_passes.at("Lights")
+    ->get_framebuffer()
+    ->get_colour_attachment(0)
+    .get();
 }
 
 } // namespace Engine::Graphics

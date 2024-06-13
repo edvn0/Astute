@@ -27,7 +27,7 @@ public:
   auto end() -> void;
   auto submit() -> void;
 
-  auto get_command_buffer() const -> VkCommandBuffer
+  [[nodiscard]] auto get_command_buffer() const -> VkCommandBuffer
   {
     return active_command_buffer;
   }
@@ -52,7 +52,7 @@ private:
 
   auto destroy() -> void;
 
-  auto is_secondary() const -> bool { return !primary; } 
+  [[nodiscard]] auto is_secondary() const -> bool { return !primary; }
 };
 
 } // namespace Engine::Graphics

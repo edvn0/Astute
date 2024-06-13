@@ -7,15 +7,15 @@ namespace Engine::Graphics {
 class MainGeometryRenderPass final : public RenderPass
 {
 public:
-  MainGeometryRenderPass(Renderer& ren)
+  explicit MainGeometryRenderPass(Renderer& ren)
     : RenderPass(ren)
   {
   }
   ~MainGeometryRenderPass() override = default;
-  auto construct() -> void override;
   auto on_resize(const Core::Extent&) -> void override;
 
 protected:
+  auto construct_impl() -> void override;
   auto destruct_impl() -> void override;
   auto execute_impl(CommandBuffer&) -> void override;
 };

@@ -91,13 +91,13 @@ CommandBuffer::begin(const VkCommandBufferBeginInfo* begin_info) -> void
 {
   VkCommandBufferBeginInfo default_begin_info = {};
   default_begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  if (begin_info) {
+  default_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  if (begin_info != nullptr) {
     // Copy to default_begin_info
     default_begin_info.flags = begin_info->flags;
     default_begin_info.pInheritanceInfo = begin_info->pInheritanceInfo;
     default_begin_info.pNext = begin_info->pNext;
   }
-  default_begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
   current_frame_index = image_count_from_application
                           ? Core::Application::the().current_frame_index()

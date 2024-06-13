@@ -42,14 +42,38 @@ GPUBuffer::GPUBuffer(GPUBufferType type, Core::usize input_size)
 {
   alloc_impl = Core::make_scope<GPUBufferImpl>();
   construct_buffer();
+
+  descriptor_info = {
+    .buffer = buffer,
+    .offset = 0,
+    .range = get_size(),
+  };
 }
 
 GPUBuffer::~GPUBuffer()
 {
+  if (!is_destroyed) {
+    destroy();
+  }
+}
+
+auto
+GPUBuffer::destroy() -> void
+{
+  if (is_destroyed) {
+    return;
+  }
+
+  trace("Destroying buffer of type: {}, size: {}",
+        to_string(buffer_type),
+        Core::human_readable_size(size));
+
   Allocator allocator{
     std::format("GPUBuffer::~GPUBuffer({}, {})", to_string(buffer_type), size),
   };
   allocator.deallocate_buffer(alloc_impl->allocation, buffer);
+
+  is_destroyed = true;
 }
 
 auto
@@ -129,7 +153,8 @@ GPUBuffer::write(const void* write_data, const Core::usize write_size) -> void
     std::memcpy(
       alloc_impl->allocation_info.pMappedData, write_data, write_size);
   } else {
-    auto* mapped = allocator.map_memory(alloc_impl->allocation);
+    auto* mapped =
+      std::bit_cast<void*>(allocator.map_memory(alloc_impl->allocation));
     std::memcpy(mapped, write_data, write_size);
     allocator.unmap_memory(alloc_impl->allocation);
   }

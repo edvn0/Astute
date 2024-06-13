@@ -89,7 +89,7 @@ struct AllocationProperties
 {
   Usage usage{ Usage::AUTO };
   Creation creation{ Creation::HOST_ACCESS_RANDOM_BIT };
-  RequiredFlags flags{ RequiredFlags::FLAG_BITS_MAX_ENUM };
+  RequiredFlags flags{ RequiredFlags::DEVICE_LOCAL_BIT };
   float priority{ 0.1f };
 };
 
@@ -115,9 +115,8 @@ public:
                        VmaAllocationInfo&,
                        VkBufferCreateInfo&,
                        const AllocationProperties&) -> VmaAllocation;
-  auto allocate_image(VkImage&,
-                      VkImageCreateInfo&,
-                      const AllocationProperties&) -> VmaAllocation;
+  auto allocate_image(VkImage&, VkImageCreateInfo&, const AllocationProperties&)
+    -> VmaAllocation;
   auto allocate_image(VkImage&,
                       VmaAllocationInfo&,
                       VkImageCreateInfo&,

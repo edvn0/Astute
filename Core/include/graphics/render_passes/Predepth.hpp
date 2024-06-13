@@ -12,10 +12,10 @@ public:
   {
   }
   ~PredepthRenderPass() override = default;
-  auto construct() -> void override;
   auto on_resize(const Core::Extent&) -> void override;
 
 protected:
+  auto construct_impl() -> void override;
   auto destruct_impl() -> void override;
   auto execute_impl(CommandBuffer&) -> void override;
 };

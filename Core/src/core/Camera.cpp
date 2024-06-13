@@ -134,16 +134,27 @@ EditorCamera::init(const EditorCamera* previous_camera)
     glm::translate(glm::mat4(1.0F), position) * glm::mat4(orientation);
 }
 
-void
-EditorCamera::on_update(const float time_step)
+auto
+EditorCamera::on_update(const float time_step) -> void
 {
   auto&& [x, y] = Input::mouse_position();
   const glm::vec2 mouse{ x, y };
   const glm::vec2 delta = (mouse - initial_mouse_position) * 0.002F;
 
-  if (!is_active())
+  if (!is_active()) {
     return;
+  }
 
+  // Gamepad input
+  constexpr int gamepad_id = GLFW_JOYSTICK_1;
+  static std::array<Core::u8, 15> buttons{};
+  static std::array<float, 6> axes{};
+
+  if (Input::is_gamepad_present(gamepad_id)) {
+    handle_gamepad_input(gamepad_id, buttons, axes, time_step);
+  }
+
+  // Existing mouse and keyboard input handling
   if (Input::pressed(MouseCode::MOUSE_BUTTON_RIGHT) &&
       !Input::pressed(KeyCode::KEY_LEFT_CONTROL)) {
     camera_mode = CameraMode::Flycam;
@@ -170,7 +181,7 @@ EditorCamera::on_update(const float time_step)
       position_delta += time_step * speed * right_direction;
     }
 
-    constexpr float max_rate{ 0.12f };
+    constexpr float max_rate{ 0.12F };
     yaw_delta +=
       glm::clamp(yaw_sign * delta.x * rotation_speed(), -max_rate, max_rate);
     pitch_delta += glm::clamp(delta.y * rotation_speed(), -max_rate, max_rate);
@@ -209,6 +220,43 @@ EditorCamera::on_update(const float time_step)
   }
 
   update_camera_view();
+}
+
+void
+EditorCamera::handle_gamepad_input(const Core::i32 gamepad_id,
+                                   std::array<Engine::Core::u8, 15>& buttons,
+                                   std::array<float, 6>& axes,
+                                   const Core::f32 time_step)
+{
+  static constexpr auto close_to_zero = [](const auto value) {
+    return glm::abs(value) < 0.1;
+  };
+
+  Input::get_gamepad_buttons(gamepad_id, buttons);
+  Input::get_gamepad_axes(gamepad_id, axes);
+
+  const auto& left_axis_x = axes[GLFW_GAMEPAD_AXIS_LEFT_X];
+  const auto& left_axis_y = axes[GLFW_GAMEPAD_AXIS_LEFT_Y];
+
+  if (!close_to_zero(left_axis_x) || !close_to_zero(left_axis_y)) {
+    const float speed = get_camera_speed();
+    position_delta += time_step * speed *
+                      glm::vec3(axes[GLFW_GAMEPAD_AXIS_LEFT_X],
+                                0.0F,
+                                -axes[GLFW_GAMEPAD_AXIS_LEFT_Y]);
+  }
+
+  // Camera rotation
+  const auto& right_axis_x = axes[GLFW_GAMEPAD_AXIS_RIGHT_X];
+  const auto& right_axis_y = axes[GLFW_GAMEPAD_AXIS_RIGHT_Y];
+
+  if (close_to_zero(right_axis_x) || close_to_zero(right_axis_y)) {
+    return;
+  }
+
+  const float yaw_sign = get_up_direction().y < 0 ? -1.0F : 1.0F;
+  yaw_delta += yaw_sign * right_axis_x * rotation_speed();
+  pitch_delta += right_axis_y * rotation_speed();
 }
 
 auto

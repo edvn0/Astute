@@ -40,7 +40,7 @@ Framebuffer::Framebuffer(const FramebufferSpecification& specification)
     return;
   }
 
-  Core::u32 attachment_index = 0;
+  Core::u32 attachment_index{ 0 };
   for (auto& attachment_specification : config.attachments) {
     if (config.existing_image && config.existing_image->get_layer_count() > 1) {
       if (Utils::is_depth_format(attachment_specification.format)) {
@@ -152,10 +152,8 @@ Framebuffer::on_resize(const Core::Extent& new_size, bool force)
 
   if (!config.no_resize) {
     size = {
-      static_cast<Core::u32>(static_cast<Core::f32>(new_size.width) *
-                             config.scale),
-      static_cast<Core::u32>(static_cast<Core::f32>(new_size.height) *
-                             config.scale),
+      scaled_width(),
+      scaled_height(),
     };
   }
 
@@ -208,8 +206,10 @@ Framebuffer::invalidate() -> void
           config.existing_images.at(attachment_index);
         depth_attachment_image = existing_image;
       } else {
-        depth_attachment_image =
-          create_depth_attachment_image(attachment_specification.format);
+        auto& depth_image_config = depth_attachment_image->configuration;
+        depth_image_config.width = scaled_width();
+        depth_image_config.height = scaled_height();
+        depth_attachment_image->invalidate();
       }
 
       VkAttachmentDescription& attachment_description =
@@ -256,6 +256,7 @@ Framebuffer::invalidate() -> void
         spec.width = scaled_width();
         spec.height = scaled_height();
         colour_attachment = image;
+        colour_attachment->invalidate();
         if (colour_attachment->get_layer_count() == 1) {
           colour_attachment->invalidate();
         } else if (attachment_index == 0 &&
@@ -373,13 +374,11 @@ Framebuffer::invalidate() -> void
 
   VK_CHECK(vkCreateRenderPass(
     Device::the().device(), &render_pass_info, nullptr, &renderpass));
-  // VKUtils::SetDebugUtilsObjectName(
-  //   device, VK_OBJECT_TYPE_RENDER_PASS, config.debug_name, renderpass);
 
   std::vector<VkImageView> attachments(attachment_images.size());
   for (Core::u32 i = 0; i < attachment_images.size(); i++) {
-    const auto& image = attachment_images.at(i);
-    if (image->get_layer_count() > 1) {
+    if (const auto& image = attachment_images.at(i);
+        image->get_layer_count() > 1) {
       attachments[i] =
         image->get_layer_image_view(config.existing_image_layers.at(i));
     } else {
@@ -432,6 +431,9 @@ Framebuffer::create_depth_attachment_image(VkFormat format) -> Core::Ref<Image>
     .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
     .usage = usage,
     .additional_name_data = name,
+    .address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+    .address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+    .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
     .transition_directly = true,
   });
 
@@ -484,7 +486,7 @@ Framebuffer::construct_blend_states() const
         blend_attachment_states[i].srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
         blend_attachment_states[i].dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
         break;
-      case FramebufferBlendMode::Zero_SrcColor:
+      case FramebufferBlendMode::ZeroSrcColor:
         blend_attachment_states[i].srcColorBlendFactor = VK_BLEND_FACTOR_ZERO;
         blend_attachment_states[i].dstColorBlendFactor =
           VK_BLEND_FACTOR_SRC_COLOR;

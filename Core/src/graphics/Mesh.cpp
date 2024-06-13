@@ -1,3 +1,4 @@
+#include "graphics/CommandBuffer.hpp"
 #include "pch/CorePCH.hpp"
 
 #include "graphics/Mesh.hpp"
@@ -158,6 +159,13 @@ mat4_from_assimp_matrix4(const aiMatrix4x4& matrix) -> glm::mat4
 }
 
 MeshAsset::MeshAsset(const std::string& file_name)
+  : command_buffer{
+    Core::make_scope<CommandBuffer>(CommandBuffer::Properties{
+      .queue_type = QueueType::Graphics,
+      .primary = true,
+      .image_count = 1,
+    }),
+  }, dispatcher(*command_buffer)
 {
   deferred_pbr_shader = Shader::compile_graphics_scoped(
     "Assets/shaders/main_geometry.vert", "Assets/shaders/main_geometry.frag");

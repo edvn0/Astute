@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/DebugBreak.hpp"
+
 #include <array>
 #include <concepts>
 #include <cstddef>

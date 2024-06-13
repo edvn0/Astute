@@ -6,13 +6,76 @@
 
 #include "core/Scene.hpp"
 #include "graphics/Window.hpp"
+#include <ImGuizmo/ImGuizmo.h>
 
-static constexpr auto for_each_in_tuple = [](auto&& tuple, auto&& func) {
-  std::apply([&func](auto&&... args) { (func(args), ...); }, tuple);
-};
+namespace Utilities {
+
+constexpr auto
+convert_to_imguizmo(GizmoState state) -> ImGuizmo::OPERATION
+{
+  switch (state) {
+    using enum GizmoState;
+    case Rotate:
+      return ImGuizmo::OPERATION::ROTATE;
+    case Scale:
+      return ImGuizmo::OPERATION::SCALE;
+    case Translate:
+      return ImGuizmo::OPERATION::TRANSLATE;
+    default:
+      debug_break();
+  }
+  return ImGuizmo::OPERATION::TRANSLATE;
+}
+
+constexpr auto
+convert_to_bits(GizmoState state) -> u8
+{
+  switch (state) {
+    case GizmoState::Translate:
+      return 0x0;
+    case GizmoState::Rotate:
+      return 0x1;
+    case GizmoState::Scale:
+      return 0x2;
+    default:
+      debug_break();
+  }
+}
 
 auto
-map_to_renderer_config(Application::Configuration config)
+calculate_ray(const glm::vec2& mouse_pos,
+              const glm::mat4& view_matrix,
+              const glm::mat4& projection_matrix,
+              const glm::vec2& viewport_size) -> glm::vec3
+{
+  auto normalized_coords =
+    glm::vec2((2.0F * mouse_pos.x) / viewport_size.x - 1.0F,
+              (2.0F * mouse_pos.y) / viewport_size.y - 1.0F);
+
+  // Clip coordinates
+  auto clip_coords = glm::vec4(normalized_coords, -1.0F, 1.0F);
+
+  // Convert to eye coordinates
+  auto eye_coords = glm::inverse(projection_matrix) * clip_coords;
+  eye_coords = glm::vec4(eye_coords.x, eye_coords.y, -1.0F, 0.0F);
+
+  // Convert to world coordinates
+  auto ray_world =
+    glm::normalize(glm::vec3(glm::inverse(view_matrix) * eye_coords));
+
+  return ray_world;
+}
+
+} // namespace utilities
+namespace {
+
+constexpr auto for_each_in_tuple = []<class T>(T&& tuple, auto&& func) {
+  std::apply([&func](auto&&... args) { (func(args), ...); },
+             std::forward<T>(tuple));
+};
+
+constexpr auto
+map_to_renderer_config(const Application::Configuration& config)
   -> Renderer::Configuration
 {
   Renderer::Configuration renderer_config;
@@ -20,9 +83,13 @@ map_to_renderer_config(Application::Configuration config)
   return renderer_config;
 }
 
+u32 chosen_image{ 0 };
+
+}
+
 AstuteApplication::~AstuteApplication() = default;
 
-AstuteApplication::AstuteApplication(Application::Configuration config)
+AstuteApplication::AstuteApplication(const Application::Configuration& config)
   : Application(config)
   , renderer(new Renderer{ map_to_renderer_config(config), &get_window() })
   , camera(new EditorCamera{ 79.0F,
@@ -31,9 +98,14 @@ AstuteApplication::AstuteApplication(Application::Configuration config)
                              0.01F,
                              1000.0F })
   , scene(std::make_shared<Engine::Core::Scene>(config.scene_name))
+  , selected_entity(new entt::entity{ entt::null })
 {
   auto& scene_widget = std::get<0>(widgets);
   scene_widget = Engine::Core::make_scope<Widgets::SceneWidget>();
+  scene_widget->set_current_scene(scene);
+
+  auto& performance_widget = std::get<1>(widgets);
+  performance_widget = Engine::Core::make_scope<Widgets::PerformanceWidget>();
 };
 
 auto
@@ -42,18 +114,18 @@ AstuteApplication::update(f64 ts) -> void
   camera->on_update(static_cast<f32>(ts));
 
   switch (scene_state) {
-    using enum AstuteApplication::SceneState;
+    using enum SceneState;
     case Edit:
       scene->on_update_editor(ts);
       break;
     case Play:
-      // TODO: Implement play mode
+      // TODO(edvin): Implement play mode
       break;
     case Pause:
-      // TODO: Implement pause mode
+      // TODO(edvin): Implement pause mode
       break;
     case Simulate:
-      // TODO: Implement simulate mode
+      // TODO(edvin): Implement simulate mode
       break;
   }
 
@@ -69,7 +141,7 @@ auto
 AstuteApplication::render() -> void
 {
   switch (scene_state) {
-    using enum AstuteApplication::SceneState;
+    using enum SceneState;
     case Edit:
       scene->on_render_editor(*renderer, *camera);
       break;
@@ -85,22 +157,73 @@ AstuteApplication::interface() -> void
 
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0F, 0.0F));
 
-  UI::scope("Final Output", [&](f32 w, f32 h) {
-    UI::image<f32>(*renderer->get_final_output(),
-                   {
-                     .extent = { w, h },
-                   });
-  });
+  UI::scope(
+    "Final Output",
+    [&](f32 w, f32 h) {
+      UI::image<f32>(*renderer->get_final_output(),
+                     {
+                       .extent = { w, h, },
+                     });
+      viewport_size = {
+        w,
+        h,
+      };
+      const auto pos = ImGui::GetWindowPos();
+      viewport_position = { pos.x, pos.y };
+
+      if (*selected_entity == entt::null) {
+        return;
+      }
+
+      const auto& view_matrix = camera->get_view_matrix();
+      auto projection_matrix = camera->get_projection_matrix();
+      projection_matrix[1][1] *= -1.0F;
+
+      auto& transform =
+        scene->get_registry().get<TransformComponent>(*selected_entity);
+      ImGuizmo::SetOrthographic(false);
+      ImGuizmo::SetDrawlist();
+      ImGuizmo::SetRect(pos.x, pos.y, w, h);
+      auto computed = transform.compute();
+      const auto did_manipulate =
+        ImGuizmo::Manipulate(glm::value_ptr(view_matrix),
+                             glm::value_ptr(projection_matrix),
+                             Utilities::convert_to_imguizmo(current_mode),
+                             ImGuizmo::MODE::LOCAL,
+                             glm::value_ptr(computed));
+      if (!did_manipulate) {
+        return;
+      }
+
+      glm::vec3 scale{};
+      glm::quat rotation{};
+      glm::vec3 translation{};
+      glm::vec3 skew{};
+      glm::vec4 perspective{};
+      glm::decompose(computed, scale, rotation, translation, skew, perspective);
+
+      switch (current_mode) {
+        case GizmoState::Translate:
+          transform.translation = translation;
+        case GizmoState::Rotate:
+          transform.rotation = rotation;
+        case GizmoState::Scale:
+          transform.scale = scale;
+      }
+    },
+    {
+      .expandable = false,
+    });
 
   UI::scope("Output Depth", [&](f32 w, f32 h) {
     UI::image<f32>(*renderer->get_shadow_output_image(),
                    {
                      .extent = { w, h },
-                     .flipped = true,
+                     .image_array_index = chosen_image,
                    });
   });
 
-  UI::scope("Light Environment", [s = scene]() {
+  UI::scope("Light Environment", [s = scene, &r = renderer]() {
     auto& light_environment = s->get_light_environment();
     const std::string label =
       light_environment.is_perspective ? "Perspective" : "Ortho";
@@ -109,31 +232,34 @@ AstuteApplication::interface() -> void
     UI::coloured_text({ 0.1F, 0.9F, 0.6F, 1.0F }, "Current chosen: {}", label);
     ImGui::Checkbox(inverse_label.c_str(), &light_environment.is_perspective);
     if (!light_environment.is_perspective) {
-      static f32 left{ -10.0F };
-      static f32 right{ 10.0F };
-      static f32 bottom{ -10.0F };
-      static f32 top{ 10.0F };
-      static f32 near{ 3.0F };
-      static f32 far{ 90.0F };
-      ImGui::InputFloat("Left", &left);
-      ImGui::InputFloat("Right", &right);
-      ImGui::InputFloat("Bottom", &bottom);
-      ImGui::InputFloat("Top", &top);
+      static f32 scale{ 15.0F };
+      static f32 near{ 80.0F };
+      static f32 far{ 128.0F };
+      ImGui::InputFloat("Scale", &scale);
       ImGui::InputFloat("Near", &near);
       ImGui::InputFloat("Far", &far);
-      auto projection = glm::ortho(left, right, bottom, top, near, far);
+      auto projection = glm::ortho(-scale, scale, -scale, scale, near, far);
       light_environment.shadow_projection = projection;
     } else {
-      static f32 fov{ 45.0F };
-      static f32 aspect{ 1.0F };
+      static f32 fov{ 75.0F };
+      static f32 aspect{ 1.778F };
       static f32 near{ 0.1F };
-      static f32 far{ 100.0F };
+      static f32 far{ 90.0F };
       ImGui::InputFloat("FOV", &fov);
       ImGui::InputFloat("Aspect", &aspect);
       ImGui::InputFloat("Near", &near);
       ImGui::InputFloat("Far", &far);
       auto projection = glm::perspective(glm::radians(fov), aspect, near, far);
       light_environment.shadow_projection = projection;
+    }
+
+    auto config = r->get_shadow_cascade_configuration();
+    if (ImGui::DragFloat("Near Plane Offset",
+                         &config.cascade_near_plane_offset)) {
+    }
+
+    if (ImGui::DragFloat("Far Plane Offset",
+                         &config.cascade_far_plane_offset)) {
     }
 
     auto& light_colour = light_environment.colour_and_intensity;
@@ -156,6 +282,10 @@ AstuteApplication::interface() -> void
     }
   });
 
+  UI::begin("Render pass settings");
+  renderer->expose_settings_to_ui();
+  UI::end();
+
   ImGui::PopStyleVar();
 
   for_each_in_tuple(widgets, [](auto& widget) { widget->interface(); });
@@ -166,12 +296,48 @@ AstuteApplication::handle_events(Event& event) -> void
 {
   EventDispatcher dispatcher{ event };
   dispatcher.dispatch<KeyPressedEvent>([this](KeyPressedEvent& ev) {
-    if (ev.get_keycode() == KeyCode::KEY_ESCAPE) {
+    const auto keycode = ev.get_keycode();
+    if (keycode == KeyCode::KEY_ESCAPE) {
       get_window().close();
       return true;
     }
+
+    // screenshot
+    if (keycode == KeyCode::KEY_F12 || keycode == KeyCode::KEY_PRINT_SCREEN) {
+      renderer->screenshot();
+      return true;
+    }
+
+    if (keycode == KeyCode::KEY_9) {
+      chosen_image = chosen_image + 1;
+      chosen_image = chosen_image % 10;
+      return true;
+    }
+
     return false;
   });
+
+  if (!ImGuizmo::IsUsingAny()) {
+    dispatcher.dispatch<MouseButtonPressedEvent>(
+      [this](MouseButtonPressedEvent& ev) {
+        if (ev.get_button() == MouseCode::MOUSE_BUTTON_LEFT) {
+          ImGuiIO& io = ImGui::GetIO();
+          glm::vec2 imgui_mouse_pos((io.MousePos.x - viewport_position.x),
+                                    (io.MousePos.y - viewport_position.y));
+
+          auto found = perform_raycast(imgui_mouse_pos);
+
+          if (found != entt::null) {
+            *selected_entity = found;
+          }
+
+          auto& scene_widget = std::get<0>(widgets);
+          scene_widget->set_selected_entity(selected_entity);
+          return true;
+        }
+        return false;
+      });
+  }
 
   for_each_in_tuple(widgets,
                     [&event](auto& widget) { widget->handle_events(event); });
@@ -206,4 +372,14 @@ AstuteApplication::destruct() -> void
 
   scene.reset();
   renderer.reset();
+}
+
+auto
+AstuteApplication::perform_raycast(const glm::vec2& mouse_pos) -> entt::entity
+{
+  auto ray = Utilities::calculate_ray(mouse_pos,
+                                      camera->get_view_matrix(),
+                                      camera->get_projection_matrix(),
+                                      viewport_size);
+  return scene->find_intersected_entity(ray, camera->get_position());
 }
