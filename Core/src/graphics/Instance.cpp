@@ -3,16 +3,14 @@
 #include "graphics/Instance.hpp"
 #include "logging/Logger.hpp"
 
+#include "graphics/VulkanFunctionPointers.hpp"
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
 namespace Engine::Graphics {
 
-#ifdef ENABLE_VALIDATION_LAYERS
-constexpr auto enable_validation_layers = true;
-#else
 constexpr auto enable_validation_layers = false;
-#endif
 
 static auto
 create_debug_utils_messenger_ext(
@@ -21,13 +19,12 @@ create_debug_utils_messenger_ext(
   const VkAllocationCallbacks* allocator,
   VkDebugUtilsMessengerEXT* debug_messenger) -> VkResult
 {
-  auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-    instance, "vkCreateDebugUtilsMessengerEXT");
+  auto func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
+    vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
   if (func != nullptr) {
     return func(instance, create_info, allocator, debug_messenger);
-  } else {
-    return VK_ERROR_EXTENSION_NOT_PRESENT;
   }
+  return VK_ERROR_EXTENSION_NOT_PRESENT;
 }
 
 static auto
@@ -36,8 +33,8 @@ destroy_debug_utils_messenger_ext(VkInstance instance,
                                   const VkAllocationCallbacks* allocator)
   -> void
 {
-  auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-    instance, "vkDestroyDebugUtilsMessengerEXT");
+  auto func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+    vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
   if (func != nullptr) {
     func(instance, debug_messenger, allocator);
   }
@@ -118,6 +115,8 @@ Instance::create_instance() -> void
   if (vkCreateInstance(&create_info, nullptr, &vk_instance) != VK_SUCCESS) {
     throw std::runtime_error("Failed to create Vulkan instance!");
   }
+
+  VulkanFunctionPointers::initialise(vk_instance);
 }
 
 auto
@@ -220,6 +219,12 @@ Instance::initialise() -> void
     impl = Core::Scope<Instance>{ new Instance() };
     is_initialised = true;
   }
+}
+
+auto
+Instance::uses_validation_layers() -> bool
+{
+  return enable_validation_layers;
 }
 
 }

@@ -18,6 +18,7 @@ protected:
   auto construct_impl() -> void override;
   auto destruct_impl() -> void override {}
   auto execute_impl(CommandBuffer&) -> void override;
+  auto name() -> std::string_view override { return "Lights"; }
 
 private:
   StorageBuffer storage_buffer;

@@ -21,11 +21,12 @@ protected:
   auto construct_impl() -> void override;
   auto destruct_impl() -> void override;
   auto execute_impl(CommandBuffer&) -> void override;
-  auto is_valid() const -> bool override
+  [[nodiscard]] auto is_valid() const -> bool override
   {
     auto&& [_, shader, pipeline, material] = get_data();
     return shader && pipeline && material;
   }
+  auto name() -> std::string_view override { return "LightCulling"; }
 
 private:
   const glm::uvec3& workgroups;

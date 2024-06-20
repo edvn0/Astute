@@ -62,7 +62,6 @@ ChromaticAberrationRenderPass::execute_impl(CommandBuffer& command_buffer)
   -> void
 {
   ASTUTE_PROFILE_FUNCTION();
-
   auto&& [chromatic_aberration_framebuffer,
           chromatic_aberration_shader,
           chromatic_aberration_pipeline,

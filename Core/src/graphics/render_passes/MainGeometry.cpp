@@ -69,24 +69,9 @@ MainGeometryRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                main_geometry_shader,
                main_geometry_pipeline,
                main_geometry_material] = get_data();
-
   main_geometry_material->set("shadow_map", depth_attachment);
   auto* renderer_desc_set =
     generate_and_update_descriptor_write_sets(*main_geometry_material);
-
-  main_geometry_material->update_descriptor_write_sets(renderer_desc_set);
-  std::unordered_map<Core::u32, VkDescriptorSet> material_desc_sets;
-  for (const auto& [key, command] : get_renderer().draw_commands) {
-    const auto& [mesh, submesh_index, instance_count] = command;
-    const auto& submesh =
-      mesh->get_mesh_asset()->get_submeshes().at(submesh_index);
-    const auto& material = mesh->get_materials().at(submesh.material_index);
-    if (!material_desc_sets.contains(submesh.material_index)) {
-      auto* material_descriptor_set =
-        material->generate_and_update_descriptor_write_sets();
-      material_desc_sets[submesh.material_index] = material_descriptor_set;
-    }
-  }
 
   for (const auto& [key, command] : get_renderer().draw_commands) {
     ASTUTE_PROFILE_SCOPE("Main geometry draw command");
@@ -101,7 +86,7 @@ MainGeometryRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
     const auto& submesh = mesh_asset->get_submeshes().at(submesh_index);
     const auto& material = mesh->get_materials().at(submesh.material_index);
     auto* material_descriptor_set =
-      material_desc_sets.at(submesh.material_index);
+      material->generate_and_update_descriptor_write_sets();
 
     RendererExtensions::bind_vertex_buffer(
       command_buffer, mesh_asset->get_vertex_buffer(), 0);

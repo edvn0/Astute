@@ -1,5 +1,7 @@
+#include "graphics/Mesh.hpp"
 #include "pch/CorePCH.hpp"
 
+#include "core/Entity.hpp"
 #include "core/Maths.hpp"
 #include "core/Random.hpp"
 #include "core/Scene.hpp"
@@ -30,8 +32,8 @@ intersects(const Engine::Core::AABB& aabb,
   glm::vec3 tmins = glm::min(t0s, t1s);
   glm::vec3 tmaxs = glm::max(t0s, t1s);
 
-  float tmin = std::max(std::max(tmins.x, tmins.y), tmins.z);
-  float tmax = std::min(std::min(tmaxs.x, tmaxs.y), tmaxs.z);
+  float tmin = glm::max(glm::max(tmins.x, tmins.y), tmins.z);
+  float tmax = glm::min(glm::min(tmaxs.x, tmaxs.y), tmaxs.z);
 
   return tmax >= tmin;
 }
@@ -65,8 +67,6 @@ calculate_aabb(const TransformComponent& transform) -> Engine::Core::AABB
 }
 
 }
-
-static constexpr auto sun_radius = sqrt(30 * 30 + 70 * 70 + 30 * 30);
 
 template<typename Component, typename Light>
 void
@@ -134,28 +134,29 @@ Scene::Scene(const std::string_view name_view)
   auto cube_mesh = Core::make_ref<Graphics::StaticMesh>(
     Core::make_ref<Graphics::MeshAsset>("Assets/meshes/cube/cube.gltf"));
 
-  info("Creating scene: {}", name);
-  auto sponza_mesh =
-    Graphics::StaticMesh::construct("Assets/meshes/sponza_new/sponza.gltf");
-
+  std::optional<AABB> mesh_aabb;
   {
-    auto sponza = create_entity("Sponza");
-    registry.emplace<MeshComponent>(sponza, sponza_mesh);
-    auto& transform2 = registry.emplace<TransformComponent>(sponza);
-    transform2.translation = { 0, 5, 0 };
-    transform2.rotation = glm::rotate(
-      glm::mat4{ 1.0F }, glm::radians(180.0F), glm::vec3{ 1, 0, 0 });
-    transform2.scale *= 0.01;
+    auto entity = create_mesh_entity("Assets/meshes/formula1/formula1.gltf",
+                                     { 0, 0, 0, 0 });
+    mesh_aabb = entity.get_aabb();
   }
 
-  const auto& bounds = sponza_mesh->get_mesh_asset()->get_bounding_box();
-  const auto& scaled = bounds.scaled(0.01);
+  {
+    auto floor = create_entity("Floor");
+    floor.emplace<MeshComponent>(cube_mesh);
+    auto& floor_transform = floor.emplace<TransformComponent>();
+    floor_transform.translation.y += 2;
+    floor_transform.scale = { 100, 1, 100 };
+  }
+
+  const auto& bounds = *mesh_aabb;
+  const auto& scaled = bounds.scaled(1.0);
   for (auto i = 0; i < 127; i++) {
     auto light = create_entity(std::format("PointLight{}", i));
-    registry.emplace<MeshComponent>(light, cube_mesh);
-    auto& t = registry.emplace<TransformComponent>(light);
+    light.emplace<MeshComponent>(cube_mesh);
+    auto& t = light.emplace<TransformComponent>();
     t.scale *= 0.01;
-    auto& light_data = registry.emplace<PointLightComponent>(light);
+    auto& light_data = light.emplace<PointLightComponent>();
     t.translation = Random::random_in(scaled);
     light_data.radiance = Random::random_colour();
     light_data.intensity = Random::random<Core::f32>(0.5, 1.0);
@@ -167,12 +168,12 @@ Scene::Scene(const std::string_view name_view)
 
   for (auto i = 0; i < 127; i++) {
     auto light = create_entity(std::format("SpotLight{}", i));
-    auto& t = registry.emplace<TransformComponent>(light);
-    registry.emplace<MeshComponent>(light, cube_mesh);
+    auto& t = light.emplace<TransformComponent>();
+    light.emplace<MeshComponent>(cube_mesh);
     t.scale *= 0.01;
 
     t.translation = Random::random_in(scaled);
-    auto& light_data = registry.emplace<SpotLightComponent>(light);
+    auto& light_data = light.emplace<SpotLightComponent>();
     light_data.radiance = Random::random_colour();
     light_data.angle = Random::random<Core::f32>(30.0, 90.0);
     light_data.range = Random::random<Core::f32>(0.1, 1.0);
@@ -183,9 +184,9 @@ Scene::Scene(const std::string_view name_view)
 }
 
 auto
-Scene::on_update_editor(f64 ts) -> void
+Scene::on_update_editor(f64) -> void
 {
-  static f64 time = 0.0F;
+  /* static f64 time = 0.0F;
   time += ts;
 
   // Update sun position to orbit around the origin
@@ -194,7 +195,7 @@ Scene::on_update_editor(f64 ts) -> void
     -70.0F,
     sun_radius * glm::sin(time * 0.1F),
     1.0F,
-  };
+  }; */
 
   if (!scene_tasks.empty()) {
     auto& task = scene_tasks.front();
@@ -233,6 +234,9 @@ Scene::on_render_editor(Graphics::Renderer& renderer, const Camera& camera)
            entt::exclude<PointLightComponent, SpotLightComponent>)
          .each()) {
     renderer.submit_static_mesh(mesh.mesh, transform.compute());
+    Engine::Core::AABB aabb = Utilities::calculate_aabb(transform);
+    renderer.get_2d_renderer().submit_aabb(
+      aabb, transform.compute(), { 0.1, 0.9, 0.8, 1.0 });
   }
 
   for (auto&& [entity, light, mesh, transform] :
@@ -251,25 +255,20 @@ Scene::on_render_editor(Graphics::Renderer& renderer, const Camera& camera)
       mesh.mesh, transform.compute(), glm::vec4{ light_colour, 1.0F });
   }
 
-  for (auto&& [entity, transform] :
-       registry
-         .view<const TransformComponent>(
-           entt::exclude<SpotLightComponent, PointLightComponent>)
-         .each()) {
-    Engine::Core::AABB aabb = Utilities::calculate_aabb(transform);
-    renderer.get_2d_renderer().submit_aabb(
-      aabb, transform.compute(), { 0.1, 0.9, 0.8, 1.0 });
-  }
-
   renderer.end_scene();
 }
 
 auto
-Scene::create_entity(const std::string_view entity_name) -> entt::entity
+Scene::create_entity(const std::string_view entity_name) -> Entity
 {
-  auto created_entity = registry.create();
-  registry.emplace<IdentityComponent>(created_entity, entity_name);
-  return created_entity;
+  return Engine::Core::create_entity(&registry, entity_name);
+}
+
+auto
+Scene::create_mesh_entity(const std::string_view path,
+                          const glm::vec4& position) -> Entity
+{
+  return Engine::Core::create_mesh_entity(&registry, path, position);
 }
 
 auto

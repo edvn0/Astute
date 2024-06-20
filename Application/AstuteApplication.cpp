@@ -10,7 +10,7 @@
 
 namespace Utilities {
 
-constexpr auto
+static constexpr auto
 convert_to_imguizmo(GizmoState state) -> ImGuizmo::OPERATION
 {
   switch (state) {
@@ -27,7 +27,7 @@ convert_to_imguizmo(GizmoState state) -> ImGuizmo::OPERATION
   return ImGuizmo::OPERATION::TRANSLATE;
 }
 
-constexpr auto
+static constexpr auto
 convert_to_bits(GizmoState state) -> u8
 {
   switch (state) {

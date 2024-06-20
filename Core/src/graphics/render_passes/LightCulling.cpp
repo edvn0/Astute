@@ -2,22 +2,10 @@
 
 #include "graphics/render_passes/LightCulling.hpp"
 
-#include "core/Scene.hpp"
-#include "logging/Logger.hpp"
-
-#include "core/Application.hpp"
 #include "graphics/ComputePipeline.hpp"
-#include "graphics/DescriptorResource.hpp"
-#include "graphics/Framebuffer.hpp"
-#include "graphics/GPUBuffer.hpp"
-#include "graphics/Image.hpp"
 #include "graphics/Material.hpp"
 #include "graphics/Renderer.hpp"
 #include "graphics/Shader.hpp"
-#include "graphics/Swapchain.hpp"
-#include "graphics/Window.hpp"
-
-#include "graphics/RendererExtensions.hpp"
 
 namespace Engine::Graphics {
 
@@ -54,10 +42,10 @@ LightCullingRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
     "predepth_map",
     get_renderer().get_render_pass("Predepth").get_depth_attachment());
 
-  auto descriptor_set =
+  auto* descriptor_set =
     generate_and_update_descriptor_write_sets(*light_culling_material);
 
-  auto light_culling_descriptor_set =
+  auto* light_culling_descriptor_set =
     light_culling_material->generate_and_update_descriptor_write_sets();
 
   std::array descriptor_sets = { descriptor_set, light_culling_descriptor_set };

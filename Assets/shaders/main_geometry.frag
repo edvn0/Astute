@@ -63,8 +63,8 @@ main()
 
   fragment_position = vec4(world_space_fragment_position, 1.0);
   uint chosen_cascade_index = 0;
-  for (uint i = 0; i < 3; ++i) {
-    if (view_position.z < renderer.cascade_splits[i]) {
+  for (uint i = 0; i < 10; ++i) {
+    if (fragment_position.z < renderer.cascade_splits[i]) {
       chosen_cascade_index = i + 1;
     }
   }

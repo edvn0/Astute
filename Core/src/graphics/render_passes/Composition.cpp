@@ -66,7 +66,6 @@ CompositionRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
           composition_shader,
           composition_pipeline,
           composition_material] = get_data();
-
   get_settings()->apply_to_material(*composition_material);
 
   auto* renderer_desc_set =

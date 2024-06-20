@@ -20,7 +20,7 @@ layout(push_constant) uniform Uniforms
 uniforms;
 
 vec3
-UpsampleTent9(sampler2D tex, float lod, vec2 uv, vec2 texelSize, float radius)
+upsample_tent(sampler2D tex, float lod, vec2 uv, vec2 texelSize, float radius)
 {
   vec4 offset = texelSize.xyxy * vec4(1.0f, 1.0f, -1.0f, 0.0f) * radius;
 
@@ -87,15 +87,15 @@ main()
   ivec2 texSize = textureSize(bloom_texture, 0);
   vec2 fTexSize = vec2(float(texSize.x), float(texSize.y));
   vec3 bloom =
-    UpsampleTent9(bloom_texture, 0, tex_coords, 1.0f / fTexSize, sampleScale) *
+    upsample_tent(bloom_texture, 0, tex_coords, 1.0f / fTexSize, sampleScale) *
     uniforms.BloomIntensity;
-  vec3 bloomDirt =
+  vec3 bloom_dirt =
     texture(bloom_dirt_texture, tex_coords).rgb * uniforms.BloomDirtIntensity;
 
   float d = 0.0;
 
   color += bloom;
-  color += bloom * bloomDirt;
+  color += bloom * bloom_dirt;
   color *= uniforms.Exposure;
 
   color = ACESTonemap(color);

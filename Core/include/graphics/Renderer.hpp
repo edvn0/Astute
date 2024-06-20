@@ -85,6 +85,14 @@ enum class RendererTechnique : Core::u8
   ForwardPlus
 };
 
+struct PerformanceMarkerScope
+{
+  PerformanceMarkerScope(CommandBuffer&, std::string_view);
+  ~PerformanceMarkerScope();
+
+  CommandBuffer& command_buffer;
+};
+
 class Renderer
 {
 public:
@@ -134,10 +142,12 @@ public:
   }
 
   [[nodiscard]] auto get_size() const -> const Core::Extent& { return size; }
+
   auto get_render_pass(const std::string& name) -> RenderPass&
   {
     return *render_passes.at(name);
   }
+
   [[nodiscard]] auto get_render_pass(const std::string& name) const
     -> const RenderPass&
   {
@@ -169,17 +179,17 @@ public:
   {
     post_processing_steps.emplace(name, is_compute);
   }
-
-  auto deactivate_post_processing_step(const std::string& name,
-                                       const bool is_compute = false) -> void
-  {
-    if (name == "Composition") {
-      error("Cannot remove the composition pass.");
-      return;
-    }
-    PostProcessingStep step{ name, is_compute };
-    post_processing_steps.erase(step);
-  }
+  static auto insert_gpu_performance_marker(CommandBuffer&,
+                                            std::string_view,
+                                            const glm::vec4& = glm::vec4(1.0F))
+    -> void;
+  static auto begin_gpu_performance_marker(CommandBuffer&,
+                                           std::string_view,
+                                           const glm::vec4& = glm::vec4(1.0F))
+    -> void;
+  static auto end_gpu_performance_marker(CommandBuffer&) -> void;
+  static auto create_gpu_performance_scope(CommandBuffer&, std::string_view)
+    -> PerformanceMarkerScope;
 
   auto set_technique(RendererTechnique tech) -> void { technique = tech; }
   auto screenshot() const -> void;
@@ -240,7 +250,7 @@ private:
   std::unordered_set<PostProcessingStep, HasherPPStep> post_processing_steps;
 
   glm::uvec3 light_culling_work_groups{};
-  std::array<Core::f32, 10> cascade_splits{};
+  std::array<Core::f32, 10U> cascade_splits{};
   Core::f32 cascade_near_plane_offset{ -50.0F };
   Core::f32 cascade_far_plane_offset{ 50.0F };
 

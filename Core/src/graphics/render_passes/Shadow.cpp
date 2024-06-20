@@ -148,6 +148,9 @@ ShadowRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
   for (const auto i : std::views::iota(0ULL, other_framebuffers.size())) {
     ASTUTE_PROFILE_SCOPE("Shadow Render Pass Cascade Number: " +
                          std::to_string(i));
+    auto scope = Renderer::create_gpu_performance_scope(
+      command_buffer, std::format("Shadow-{}", i));
+
     current_cascade_buffer.write(&i, sizeof(Core::u32));
     RendererExtensions::begin_renderpass(command_buffer,
                                          *other_framebuffers.at(i));

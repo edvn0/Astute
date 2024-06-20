@@ -1,7 +1,5 @@
 #include "platform/Platform.hpp"
 
-#include <array>
-
 namespace ED::Platform {
 
 auto
@@ -14,7 +12,8 @@ get_system_name() -> std::string
 auto
 get_environment_variable(const std::string_view) -> std::string
 {
-  return std::string("Missing");
+  static constexpr std::string_view fallback = "default";
+  return std::string(fallback);
 }
 
 } // namespace Core::Platform

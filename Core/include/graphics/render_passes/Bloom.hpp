@@ -15,7 +15,7 @@ public:
   ~BloomRenderPass() override = default;
   auto on_resize(const Core::Extent&) -> void override;
 
-  auto get_bloom_texture_output() const -> const auto&
+  [[nodiscard]] auto get_bloom_texture_output() const -> const auto&
   {
     return bloom_chain.at(2);
   }
@@ -23,7 +23,8 @@ public:
 private:
   auto construct_impl() -> void override;
   auto execute_impl(CommandBuffer&) -> void override;
-  auto is_valid() const -> bool override
+  auto name() -> std::string_view override { return "Bloom"; }
+  [[nodiscard]] auto is_valid() const -> bool override
   {
     auto&& [_, shader, pipeline, material] = get_data();
     return shader && pipeline && material;
@@ -34,8 +35,8 @@ private:
   class BloomSettings : public RenderPassSettings
   {
   public:
-    Core::f32 Threshold = 1.0f;
-    Core::f32 Knee = 0.1f;
+    Core::f32 Threshold = 1.0F;
+    Core::f32 Knee = 0.1F;
     Core::u32 bloom_workgroup_size{ 4 };
 
     auto expose_to_ui(Material&) -> void override;

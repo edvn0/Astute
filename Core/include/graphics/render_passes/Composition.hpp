@@ -18,6 +18,7 @@ public:
 private:
   auto construct_impl() -> void override;
   auto execute_impl(CommandBuffer&) -> void override;
+  auto name() -> std::string_view override { return "Composition"; }
 
   class CompositionSettings : public RenderPassSettings
   {

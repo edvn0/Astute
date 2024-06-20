@@ -33,6 +33,7 @@ protected:
   auto execute_impl(CommandBuffer&) -> void override;
   auto bind(CommandBuffer&) -> void override {}
   auto unbind(CommandBuffer&) -> void override {}
+  auto name() -> std::string_view override { return "Shadow"; }
 
 private:
   Core::u32 size{ 0 };

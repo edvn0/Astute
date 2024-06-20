@@ -63,68 +63,39 @@ Renderer2D::submit_aabb(const Core::AABB& aabb,
                         const glm::vec4& colour) -> void
 {
   ASTUTE_PROFILE_FUNCTION();
+  const auto min_aabb = aabb.min;
+  const auto max_aabb = aabb.max;
+  const std::array corners = {
+    transform * glm::vec4{ min_aabb.x, min_aabb.y, max_aabb.z, 1.0F },
+    transform * glm::vec4{ min_aabb.x, max_aabb.y, max_aabb.z, 1.0F },
+    transform * glm::vec4{ max_aabb.x, max_aabb.y, max_aabb.z, 1.0F },
+    transform * glm::vec4{ max_aabb.x, min_aabb.y, max_aabb.z, 1.0F },
 
-  glm::vec4 min = { aabb.min.x, aabb.min.y, aabb.min.z, 1.0F };
-  glm::vec4 max = { aabb.max.x, aabb.max.y, aabb.max.z, 1.0F };
-
-  std::array<glm::vec4, 8> corners = {
-    transform * glm::vec4{ aabb.min.x, aabb.min.y, aabb.max.z, 1.0F },
-    transform * glm::vec4{ aabb.min.x, aabb.max.y, aabb.max.z, 1.0F },
-    transform * glm::vec4{ aabb.max.x, aabb.max.y, aabb.max.z, 1.0F },
-    transform * glm::vec4{ aabb.max.x, aabb.min.y, aabb.max.z, 1.0F },
-
-    transform * glm::vec4{ aabb.min.x, aabb.min.y, aabb.min.z, 1.0F },
-    transform * glm::vec4{ aabb.min.x, aabb.max.y, aabb.min.z, 1.0F },
-    transform * glm::vec4{ aabb.max.x, aabb.max.y, aabb.min.z, 1.0F },
-    transform * glm::vec4{ aabb.max.x, aabb.min.y, aabb.min.z, 1.0F }
+    transform * glm::vec4{ min_aabb.x, min_aabb.y, min_aabb.z, 1.0F },
+    transform * glm::vec4{ min_aabb.x, max_aabb.y, min_aabb.z, 1.0F },
+    transform * glm::vec4{ max_aabb.x, max_aabb.y, min_aabb.z, 1.0F },
+    transform * glm::vec4{ max_aabb.x, min_aabb.y, min_aabb.z, 1.0F }
   };
 
-  for (Core::u32 i = 0; i < 4; i++) {
-    const Line line{
-      .from =
-        LineVertex{
-          .position = corners[i],
-          .colour = colour,
-        },
-      .to =
-        LineVertex{
-          .position = corners[(i + 1) % 4],
-          .colour = colour,
-        },
-    };
-    submit_line(line);
-  }
+  static constexpr std::array<Core::u32, 24> indices = {
+    0, 1, 1, 2, 2, 3, 3, 0, // Top face
+    4, 5, 5, 6, 6, 7, 7, 4, // Bottom face
+    0, 4, 1, 5, 2, 6, 3, 7  // Sides
+  };
 
-  for (Core::u32 i = 0; i < 4; i++) {
-    const Line line{
-      .from =
-        LineVertex{
-          .position = corners[i + 4],
-          .colour = colour,
-        },
-      .to =
-        LineVertex{
-          .position = corners[((i + 1) % 4) + 4],
-          .colour = colour,
-        },
+  for (Core::u32 i = 0; i < indices.size(); i += 2) {
+    LineVertex from{
+      .position = corners[indices[i]],
+      .colour = colour,
     };
-    submit_line(line);
-  }
-
-  for (Core::u32 i = 0; i < 4; i++) {
-    const Line line{
-      .from =
-        LineVertex{
-          .position = corners[i],
-          .colour = colour,
-        },
-      .to =
-        LineVertex{
-          .position = corners[i + 4],
-          .colour = colour,
-        },
+    LineVertex to{
+      .position = corners[indices[i + 1]],
+      .colour = colour,
     };
-    submit_line(line);
+    submit_line({
+      .from = from,
+      .to = to,
+    });
   }
 }
 
@@ -144,8 +115,12 @@ Renderer2D::flush(CommandBuffer& buffer) -> void
     }
     line_indices = Core::make_scope<IndexBuffer>(std::span(new_indices));
   }
+  vkCmdBindPipeline(buffer.get_command_buffer(),
+                    line_pipeline->get_bind_point(),
+                    line_pipeline->get_pipeline());
 
-  line_vertices->write(vertices.data(), submitted_line_indices);
+  line_vertices->write(vertices.data(),
+                       submitted_line_indices * sizeof(LineVertex));
 
   static constexpr auto offsets = std::array<VkDeviceSize, 1>{ 0 };
   std::array buffers{ line_vertices->get_buffer() };
@@ -170,9 +145,7 @@ Renderer2D::flush(CommandBuffer& buffer) -> void
                        0,
                        VK_INDEX_TYPE_UINT32);
 
-  vkCmdBindPipeline(buffer.get_command_buffer(),
-                    line_pipeline->get_bind_point(),
-                    line_pipeline->get_pipeline());
+  vkCmdSetLineWidth(buffer.get_command_buffer(), 5.0F);
 
   vkCmdDrawIndexed(buffer.get_command_buffer(),
                    static_cast<Core::u32>(submitted_line_indices),

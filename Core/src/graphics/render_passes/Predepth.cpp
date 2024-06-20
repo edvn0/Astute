@@ -58,7 +58,6 @@ PredepthRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                predepth_shader,
                predepth_pipeline,
                predepth_material] = get_data();
-
   RendererExtensions::explicitly_clear_framebuffer(command_buffer,
                                                    *predepth_framebuffer);
 

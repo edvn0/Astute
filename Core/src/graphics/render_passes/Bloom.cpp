@@ -41,6 +41,7 @@ BloomRenderPass::construct_impl() -> void
     "predepth_map",
     get_renderer().get_render_pass("Predepth").get_depth_attachment());
 
+  auto i = 0U;
   for (auto& bloom_img : bloom_chain) {
     bloom_img = Core::make_ref<Image>(ImageConfiguration{
       .width = get_renderer().get_size().width,
@@ -52,6 +53,7 @@ BloomRenderPass::construct_impl() -> void
       .layout = VK_IMAGE_LAYOUT_GENERAL,
       .usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
                VK_IMAGE_USAGE_SAMPLED_BIT,
+      .additional_name_data = std::format("Bloom-{}", i++),
       .address_mode_u = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
       .address_mode_v = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
       .address_mode_w = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
@@ -87,19 +89,19 @@ BloomRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
   struct BloomComputePushConstants
   {
     glm::vec4 Params;
-    float LOD = 0.0f;
+    float LOD = 0.0F;
     int Mode = 0;
-  } bloomComputePushConstants;
+  } bloom_compute_push_constants;
   auto* casted_settings = static_cast<BloomSettings*>(get_settings());
-  bloomComputePushConstants.Params = {
+  bloom_compute_push_constants.Params = {
     casted_settings->Threshold,
     casted_settings->Threshold - casted_settings->Knee,
-    casted_settings->Knee * 2.0f,
-    0.25f / casted_settings->Knee,
+    casted_settings->Knee * 2.0F,
+    0.25F / casted_settings->Knee,
   };
-  bloomComputePushConstants.Mode = 0;
+  bloom_compute_push_constants.Mode = 0;
 
-  const auto& inputImage =
+  const auto& input_image =
     get_renderer().get_render_pass("Deferred").get_colour_attachment(0);
 
   // m_GPUTimeQueries.BloomComputePassQuery =
@@ -107,76 +109,75 @@ BloomRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 
   VkDevice device = Device::the().device();
 
-  auto descriptorImageInfo = bloom_chain.at(0)->get_descriptor_info();
-  descriptorImageInfo.imageView = bloom_chain.at(0)->get_mip_image_view(0);
+  auto descriptor_image_info = bloom_chain.at(0)->get_descriptor_info();
+  descriptor_image_info.imageView = bloom_chain.at(0)->get_mip_image_view(0);
 
   std::array<VkWriteDescriptorSet, 3> write_descriptors;
 
-  auto* descriptorSetLayout = shader->get_descriptor_set_layouts().at(0);
+  auto* descriptor_set_layout = shader->get_descriptor_set_layouts().at(0);
 
-  VkDescriptorSetAllocateInfo allocInfo = {};
-  allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-  allocInfo.descriptorSetCount = 1;
-  allocInfo.pSetLayouts = &descriptorSetLayout;
+  VkDescriptorSetAllocateInfo alloc_info = {};
+  alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  alloc_info.descriptorSetCount = 1;
+  alloc_info.pSetLayouts = &descriptor_set_layout;
 
   // Output image
-  VkDescriptorSet descriptorSet =
+  VkDescriptorSet descriptor_set =
     shader->allocate_descriptor_set(0).descriptor_sets.at(0);
   write_descriptors[0] = *shader->get_descriptor_set("output_image", 0);
-  write_descriptors[0].dstSet =
-    descriptorSet; // Should this be set inside the shader?
-  write_descriptors[0].pImageInfo = &descriptorImageInfo;
+  write_descriptors[0].dstSet = descriptor_set;
+  write_descriptors[0].pImageInfo = &descriptor_image_info;
 
   // Input image
   write_descriptors[1] = *shader->get_descriptor_set("input_texture");
-  write_descriptors[1].dstSet =
-    descriptorSet; // Should this be set inside the shader?
-  write_descriptors[1].pImageInfo = &inputImage->get_descriptor_info();
+  write_descriptors[1].dstSet = descriptor_set;
+  write_descriptors[1].pImageInfo = &input_image->get_descriptor_info();
 
   write_descriptors[2] = *shader->get_descriptor_set("input_bloom_texture");
-  write_descriptors[2].dstSet =
-    descriptorSet; // Should this be set inside the shader?
-  write_descriptors[2].pImageInfo = &inputImage->get_descriptor_info();
+  write_descriptors[2].dstSet = descriptor_set;
+  write_descriptors[2].pImageInfo = &input_image->get_descriptor_info();
 
   vkUpdateDescriptorSets(device,
-                         (uint32_t)write_descriptors.size(),
+                         static_cast<Core::u32>(write_descriptors.size()),
                          write_descriptors.data(),
                          0,
                          nullptr);
 
-  uint32_t workGroupsX = bloom_chain[0]->configuration.width / workgroup_size;
-  uint32_t workGroupsY = bloom_chain[0]->configuration.height / workgroup_size;
+  Core::u32 work_groups_x =
+    bloom_chain[0]->configuration.width / workgroup_size;
+  Core::u32 work_groups_y =
+    bloom_chain[0]->configuration.height / workgroup_size;
 
-  // Renderer::RT_BeginGPUPerfMarker(commandBuffer, "Bloom-Prefilter");
+  Renderer::begin_gpu_performance_marker(command_buffer, "Bloom-Prefilter");
   vkCmdPushConstants(command_buffer.get_command_buffer(),
                      pipeline->get_layout(),
                      VK_SHADER_STAGE_ALL,
                      0,
-                     sizeof(bloomComputePushConstants),
-                     &bloomComputePushConstants);
+                     sizeof(bloom_compute_push_constants),
+                     &bloom_compute_push_constants);
   vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
                           pipeline->get_bind_point(),
                           pipeline->get_layout(),
                           0,
                           1,
-                          &descriptorSet,
+                          &descriptor_set,
                           0,
                           nullptr);
   vkCmdDispatch(
-    command_buffer.get_command_buffer(), workGroupsX, workGroupsY, 1);
-  // Renderer::RT_EndGPUPerfMarker(commandBuffer);
+    command_buffer.get_command_buffer(), work_groups_x, work_groups_y, 1);
+  Renderer::end_gpu_performance_marker(command_buffer);
 
   {
-    VkImageMemoryBarrier imageMemoryBarrier = {};
-    imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    imageMemoryBarrier.image = bloom_chain[0]->image;
-    imageMemoryBarrier.subresourceRange = {
-      VK_IMAGE_ASPECT_COLOR_BIT, 0, bloom_chain[0]->get_mip_levels(), 0, 1
+    VkImageMemoryBarrier image_memory_barrier = {};
+    image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    image_memory_barrier.image = bloom_chain[0]->image;
+    image_memory_barrier.subresourceRange = {
+      VK_IMAGE_ASPECT_COLOR_BIT, 0, bloom_chain[0]->get_mip_levels(), 0, 1,
     };
-    imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    image_memory_barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    image_memory_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     vkCmdPipelineBarrier(command_buffer.get_command_buffer(),
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -186,77 +187,76 @@ BloomRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                          0,
                          nullptr,
                          1,
-                         &imageMemoryBarrier);
+                         &image_memory_barrier);
   }
 
-  bloomComputePushConstants.Mode = 1;
+  bloom_compute_push_constants.Mode = 1;
 
-  uint32_t mips = bloom_chain[0]->get_mip_levels() - 2;
-  // Renderer::RT_BeginGPUPerfMarker(commandBuffer, "Bloom-DownSample");
-  for (uint32_t i = 1; i < mips; i++) {
+  Core::u32 mips = bloom_chain[0]->get_mip_levels() - 2;
+  Renderer::begin_gpu_performance_marker(command_buffer, "Bloom-DownSample");
+  for (Core::u32 i = 1; i < mips; i++) {
     auto [mipWidth, mipHeight] = bloom_chain[0]->get_mip_size(i);
-    workGroupsX = (uint32_t)glm::ceil((float)mipWidth / (float)workgroup_size);
-    workGroupsY = (uint32_t)glm::ceil((float)mipHeight / (float)workgroup_size);
+    work_groups_x = static_cast<Core::u32>(glm::ceil(
+      static_cast<float>(mipWidth) / static_cast<float>(workgroup_size)));
+    work_groups_y = static_cast<Core::u32>(glm::ceil(
+      static_cast<float>(mipHeight) / static_cast<float>(workgroup_size)));
 
     {
       // Output image
-      descriptorImageInfo.imageView = bloom_chain[1]->get_mip_image_view(i);
+      descriptor_image_info.imageView = bloom_chain[1]->get_mip_image_view(i);
 
-      descriptorSet = shader->allocate_descriptor_set(0).descriptor_sets.at(0);
+      descriptor_set = shader->allocate_descriptor_set(0).descriptor_sets.at(0);
       write_descriptors[0] = *shader->get_descriptor_set("output_image");
-      write_descriptors[0].dstSet =
-        descriptorSet; // Should this be set inside the shader?
-      write_descriptors[0].pImageInfo = &descriptorImageInfo;
+      write_descriptors[0].dstSet = descriptor_set;
+      write_descriptors[0].pImageInfo = &descriptor_image_info;
 
       // Input image
       write_descriptors[1] = *shader->get_descriptor_set("input_texture");
-      write_descriptors[1].dstSet =
-        descriptorSet; // Should this be set inside the shader?
+      write_descriptors[1].dstSet = descriptor_set;
       const auto& descriptor = bloom_chain[0]->get_descriptor_info();
       // descriptor.sampler = samplerClamp;
       write_descriptors[1].pImageInfo = &descriptor;
 
       write_descriptors[2] = *shader->get_descriptor_set("input_bloom_texture");
-      write_descriptors[2].dstSet =
-        descriptorSet; // Should this be set inside the shader?
-      write_descriptors[2].pImageInfo = &inputImage->get_descriptor_info();
+      write_descriptors[2].dstSet = descriptor_set;
+      write_descriptors[2].pImageInfo = &input_image->get_descriptor_info();
 
       vkUpdateDescriptorSets(device,
-                             (uint32_t)write_descriptors.size(),
+                             static_cast<Core::u32>(write_descriptors.size()),
                              write_descriptors.data(),
                              0,
                              nullptr);
 
-      bloomComputePushConstants.LOD = i - 1.0f;
+      bloom_compute_push_constants.LOD = static_cast<Core::f32>(i) - 1.0F;
       vkCmdPushConstants(command_buffer.get_command_buffer(),
                          pipeline->get_layout(),
                          VK_SHADER_STAGE_ALL,
                          0,
-                         sizeof(bloomComputePushConstants),
-                         &bloomComputePushConstants);
+                         sizeof(bloom_compute_push_constants),
+                         &bloom_compute_push_constants);
       vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
                               pipeline->get_bind_point(),
                               pipeline->get_layout(),
                               0,
                               1,
-                              &descriptorSet,
+                              &descriptor_set,
                               0,
                               nullptr);
       vkCmdDispatch(
-        command_buffer.get_command_buffer(), workGroupsX, workGroupsY, 1);
+        command_buffer.get_command_buffer(), work_groups_x, work_groups_y, 1);
     }
 
     {
-      VkImageMemoryBarrier imageMemoryBarrier = {};
-      imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-      imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-      imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-      imageMemoryBarrier.image = bloom_chain[1]->image;
-      imageMemoryBarrier.subresourceRange = {
+      VkImageMemoryBarrier image_memory_barrier = {};
+      image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+      image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+      image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+      image_memory_barrier.image = bloom_chain[1]->image;
+      image_memory_barrier.subresourceRange = {
         VK_IMAGE_ASPECT_COLOR_BIT, 0, bloom_chain[1]->get_mip_levels(), 0, 1
       };
-      imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-      imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+      image_memory_barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+      image_memory_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
       vkCmdPipelineBarrier(command_buffer.get_command_buffer(),
                            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -266,68 +266,65 @@ BloomRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                            0,
                            nullptr,
                            1,
-                           &imageMemoryBarrier);
+                           &image_memory_barrier);
     }
 
     {
-      descriptorImageInfo.imageView = bloom_chain[0]->get_mip_image_view(i);
+      descriptor_image_info.imageView = bloom_chain[0]->get_mip_image_view(i);
 
       // Output image
-      descriptorSet = shader->allocate_descriptor_set(0).descriptor_sets.at(0);
+      descriptor_set = shader->allocate_descriptor_set(0).descriptor_sets.at(0);
       write_descriptors[0] = *shader->get_descriptor_set("output_image");
-      write_descriptors[0].dstSet =
-        descriptorSet; // Should this be set inside the shader?
-      write_descriptors[0].pImageInfo = &descriptorImageInfo;
+      write_descriptors[0].dstSet = descriptor_set;
+      write_descriptors[0].pImageInfo = &descriptor_image_info;
 
       // Input image
       write_descriptors[1] = *shader->get_descriptor_set("input_texture");
-      write_descriptors[1].dstSet =
-        descriptorSet; // Should this be set inside the shader?
+      write_descriptors[1].dstSet = descriptor_set;
       const auto& descriptor = bloom_chain[1]->get_descriptor_info();
       // descriptor.sampler = samplerClamp;
       write_descriptors[1].pImageInfo = &descriptor;
 
       write_descriptors[2] = *shader->get_descriptor_set("input_bloom_texture");
-      write_descriptors[2].dstSet =
-        descriptorSet; // Should this be set inside the shader?
-      write_descriptors[2].pImageInfo = &inputImage->get_descriptor_info();
+      write_descriptors[2].dstSet = descriptor_set;
+      write_descriptors[2].pImageInfo = &input_image->get_descriptor_info();
 
       vkUpdateDescriptorSets(device,
-                             (uint32_t)write_descriptors.size(),
+                             static_cast<Core::u32>(write_descriptors.size()),
                              write_descriptors.data(),
                              0,
                              nullptr);
 
-      bloomComputePushConstants.LOD = (float)i;
+      bloom_compute_push_constants.LOD = static_cast<float>(i);
       vkCmdPushConstants(command_buffer.get_command_buffer(),
                          pipeline->get_layout(),
                          VK_SHADER_STAGE_ALL,
                          0,
-                         sizeof(bloomComputePushConstants),
-                         &bloomComputePushConstants);
+                         sizeof(bloom_compute_push_constants),
+                         &bloom_compute_push_constants);
       vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
                               pipeline->get_bind_point(),
                               pipeline->get_layout(),
                               0,
                               1,
-                              &descriptorSet,
+                              &descriptor_set,
                               0,
                               nullptr);
       vkCmdDispatch(
-        command_buffer.get_command_buffer(), workGroupsX, workGroupsY, 1);
+        command_buffer.get_command_buffer(), work_groups_x, work_groups_y, 1);
     }
 
     {
-      VkImageMemoryBarrier imageMemoryBarrier = {};
-      imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-      imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-      imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-      imageMemoryBarrier.image = bloom_chain[0]->image;
-      imageMemoryBarrier.subresourceRange = {
+      VkImageMemoryBarrier image_memory_barrier = {};
+      image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+      image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+      image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+      image_memory_barrier.image = bloom_chain[0]->image;
+      image_memory_barrier.subresourceRange = {
         VK_IMAGE_ASPECT_COLOR_BIT, 0, bloom_chain[0]->get_mip_levels(), 0, 1
       };
-      imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-      imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+      image_memory_barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+      image_memory_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
       vkCmdPipelineBarrier(command_buffer.get_command_buffer(),
                            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -337,74 +334,74 @@ BloomRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                            0,
                            nullptr,
                            1,
-                           &imageMemoryBarrier);
+                           &image_memory_barrier);
     }
   }
-  // Renderer::RT_EndGPUPerfMarker(commandBuffer);
+  Renderer::end_gpu_performance_marker(command_buffer);
 
-  // Renderer::RT_BeginGPUPerfMarker(commandBuffer, "Bloom-FirstUpsamle");
-  bloomComputePushConstants.Mode = 2;
-  workGroupsX *= 2;
-  workGroupsY *= 2;
+  Renderer::begin_gpu_performance_marker(command_buffer, "Bloom-FirstUpsample");
+  bloom_compute_push_constants.Mode = 2;
+  work_groups_x *= 2;
+  work_groups_y *= 2;
 
   // Output image
-  descriptorSet = shader->allocate_descriptor_set(0).descriptor_sets.at(0);
-  descriptorImageInfo.imageView = bloom_chain[2]->get_mip_image_view(mips - 2);
+  descriptor_set = shader->allocate_descriptor_set(0).descriptor_sets.at(0);
+  descriptor_image_info.imageView =
+    bloom_chain[2]->get_mip_image_view(mips - 2);
 
   write_descriptors[0] = *shader->get_descriptor_set("output_image");
-  write_descriptors[0].dstSet =
-    descriptorSet; // Should this be set inside the shader?
-  write_descriptors[0].pImageInfo = &descriptorImageInfo;
+  write_descriptors[0].dstSet = descriptor_set;
+  write_descriptors[0].pImageInfo = &descriptor_image_info;
 
   // Input image
   write_descriptors[1] = *shader->get_descriptor_set("input_texture");
-  write_descriptors[1].dstSet =
-    descriptorSet; // Should this be set inside the shader?
+  write_descriptors[1].dstSet = descriptor_set;
   write_descriptors[1].pImageInfo = &bloom_chain[0]->get_descriptor_info();
 
   write_descriptors[2] = *shader->get_descriptor_set("input_bloom_texture");
-  write_descriptors[2].dstSet =
-    descriptorSet; // Should this be set inside the shader?
-  write_descriptors[2].pImageInfo = &inputImage->get_descriptor_info();
+  write_descriptors[2].dstSet = descriptor_set;
+  write_descriptors[2].pImageInfo = &input_image->get_descriptor_info();
 
   vkUpdateDescriptorSets(device,
-                         (uint32_t)write_descriptors.size(),
+                         static_cast<Core::u32>(write_descriptors.size()),
                          write_descriptors.data(),
                          0,
                          nullptr);
 
   auto [mipWidth, mipHeight] = bloom_chain[2]->get_mip_size(mips - 2);
-  workGroupsX = (uint32_t)glm::ceil((float)mipWidth / (float)workgroup_size);
-  workGroupsY = (uint32_t)glm::ceil((float)mipHeight / (float)workgroup_size);
-  bloomComputePushConstants.LOD--;
+  work_groups_x = static_cast<Core::u32>(glm::ceil(
+    static_cast<float>(mipWidth) / static_cast<float>(workgroup_size)));
+  work_groups_y = static_cast<Core::u32>(glm::ceil(
+    static_cast<float>(mipHeight) / static_cast<float>(workgroup_size)));
+  bloom_compute_push_constants.LOD--;
   vkCmdPushConstants(command_buffer.get_command_buffer(),
                      pipeline->get_layout(),
                      VK_SHADER_STAGE_ALL,
                      0,
-                     sizeof(bloomComputePushConstants),
-                     &bloomComputePushConstants);
+                     sizeof(bloom_compute_push_constants),
+                     &bloom_compute_push_constants);
   vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
                           pipeline->get_bind_point(),
                           pipeline->get_layout(),
                           0,
                           1,
-                          &descriptorSet,
+                          &descriptor_set,
                           0,
                           nullptr);
   vkCmdDispatch(
-    command_buffer.get_command_buffer(), workGroupsX, workGroupsY, 1);
+    command_buffer.get_command_buffer(), work_groups_x, work_groups_y, 1);
 
   {
-    VkImageMemoryBarrier imageMemoryBarrier = {};
-    imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    imageMemoryBarrier.image = bloom_chain[2]->image;
-    imageMemoryBarrier.subresourceRange = {
+    VkImageMemoryBarrier image_memory_barrier = {};
+    image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    image_memory_barrier.image = bloom_chain[2]->image;
+    image_memory_barrier.subresourceRange = {
       VK_IMAGE_ASPECT_COLOR_BIT, 0, bloom_chain[2]->get_mip_levels(), 0, 1
     };
-    imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    image_memory_barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    image_memory_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     vkCmdPipelineBarrier(command_buffer.get_command_buffer(),
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -414,56 +411,55 @@ BloomRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                          0,
                          nullptr,
                          1,
-                         &imageMemoryBarrier);
+                         &image_memory_barrier);
   }
 
-  // Renderer::RT_EndGPUPerfMarker(commandBuffer);
+  Renderer::end_gpu_performance_marker(command_buffer);
 
-  // Renderer::RT_BeginGPUPerfMarker(commandBuffer, "Bloom-Upsample");
-  bloomComputePushConstants.Mode = 3;
+  Renderer::begin_gpu_performance_marker(command_buffer, "Bloom-Upsample");
+  bloom_compute_push_constants.Mode = 3;
 
   // Upsample
-  for (int32_t mip = mips - 3; mip >= 0; mip--) {
+  for (auto mip = static_cast<Core::i32>(mips - 3); mip >= 0; mip--) {
     auto&& [current_mip_width, current_mip_height] =
       bloom_chain[2]->get_mip_size(mip);
-    workGroupsX =
-      (uint32_t)glm::ceil((float)current_mip_width / (float)workgroup_size);
-    workGroupsY =
-      (uint32_t)glm::ceil((float)current_mip_height / (float)workgroup_size);
+    work_groups_x =
+      static_cast<Core::u32>(glm::ceil(static_cast<float>(current_mip_width) /
+                                       static_cast<float>(workgroup_size)));
+    work_groups_y =
+      static_cast<Core::u32>(glm::ceil(static_cast<float>(current_mip_height) /
+                                       static_cast<float>(workgroup_size)));
 
     // Output image
-    descriptorImageInfo.imageView = bloom_chain[2]->get_mip_image_view(mip);
-    auto current_descriptor_set =
+    descriptor_image_info.imageView = bloom_chain[2]->get_mip_image_view(mip);
+    auto* current_descriptor_set =
       shader->allocate_descriptor_set(0).descriptor_sets.at(0);
     write_descriptors[0] = *shader->get_descriptor_set("output_image");
-    write_descriptors[0].dstSet =
-      current_descriptor_set; // Should this be set inside the shader?
-    write_descriptors[0].pImageInfo = &descriptorImageInfo;
+    write_descriptors[0].dstSet = current_descriptor_set;
+    write_descriptors[0].pImageInfo = &descriptor_image_info;
 
     // Input image
     write_descriptors[1] = *shader->get_descriptor_set("input_texture");
-    write_descriptors[1].dstSet =
-      current_descriptor_set; // Should this be set inside the shader?
+    write_descriptors[1].dstSet = current_descriptor_set;
     write_descriptors[1].pImageInfo = &bloom_chain[0]->get_descriptor_info();
 
     write_descriptors[2] = *shader->get_descriptor_set("input_bloom_texture");
-    write_descriptors[2].dstSet =
-      current_descriptor_set; // Should this be set inside the shader?
+    write_descriptors[2].dstSet = current_descriptor_set;
     write_descriptors[2].pImageInfo = &bloom_chain[2]->get_descriptor_info();
 
     vkUpdateDescriptorSets(device,
-                           (uint32_t)write_descriptors.size(),
+                           static_cast<Core::u32>(write_descriptors.size()),
                            write_descriptors.data(),
                            0,
                            nullptr);
 
-    bloomComputePushConstants.LOD = (float)mip;
+    bloom_compute_push_constants.LOD = static_cast<float>(mip);
     vkCmdPushConstants(command_buffer.get_command_buffer(),
                        pipeline->get_layout(),
                        VK_SHADER_STAGE_ALL,
                        0,
-                       sizeof(bloomComputePushConstants),
-                       &bloomComputePushConstants);
+                       sizeof(bloom_compute_push_constants),
+                       &bloom_compute_push_constants);
     vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
                             pipeline->get_bind_point(),
                             pipeline->get_layout(),
@@ -473,19 +469,19 @@ BloomRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                             0,
                             nullptr);
     vkCmdDispatch(
-      command_buffer.get_command_buffer(), workGroupsX, workGroupsY, 1);
+      command_buffer.get_command_buffer(), work_groups_x, work_groups_y, 1);
 
     {
-      VkImageMemoryBarrier imageMemoryBarrier = {};
-      imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-      imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-      imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-      imageMemoryBarrier.image = bloom_chain[2]->image;
-      imageMemoryBarrier.subresourceRange = {
+      VkImageMemoryBarrier image_memory_barrier = {};
+      image_memory_barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+      image_memory_barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+      image_memory_barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+      image_memory_barrier.image = bloom_chain[2]->image;
+      image_memory_barrier.subresourceRange = {
         VK_IMAGE_ASPECT_COLOR_BIT, 0, bloom_chain[2]->get_mip_levels(), 0, 1
       };
-      imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-      imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+      image_memory_barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+      image_memory_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
       vkCmdPipelineBarrier(command_buffer.get_command_buffer(),
                            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
@@ -495,10 +491,10 @@ BloomRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                            0,
                            nullptr,
                            1,
-                           &imageMemoryBarrier);
+                           &image_memory_barrier);
     }
   }
-  // Renderer::RT_EndGPUPerfMarker(commandBuffer);
+  Renderer::end_gpu_performance_marker(command_buffer);
 
   // pipeline->End();
   //  m_CommandBuffer->EndTimestampQuery(m_GPUTimeQueries.BloomComputePassQuery);
@@ -510,21 +506,19 @@ BloomRenderPass::on_resize(const Core::Extent& ext) -> void
   auto& [___, __, pipe, _] = get_data();
   pipe->on_resize(ext);
 
-  {
-    auto* current_settings = get_current_settings<BloomSettings>();
-    glm::uvec2 bloomSize = (glm::uvec2(ext.width, ext.height) + 1u) / 2u;
-    bloomSize += current_settings->bloom_workgroup_size -
-                 bloomSize % current_settings->bloom_workgroup_size;
-    bloom_chain[0]->configuration.width = ext.width;
-    bloom_chain[0]->configuration.height = ext.height;
-    bloom_chain[0]->invalidate();
-    bloom_chain[1]->configuration.width = ext.width;
-    bloom_chain[1]->configuration.height = ext.height;
-    bloom_chain[1]->invalidate();
-    bloom_chain[2]->configuration.width = ext.width;
-    bloom_chain[2]->configuration.height = ext.height;
-    bloom_chain[2]->invalidate();
-  }
+  auto* current_settings = get_current_settings<BloomSettings>();
+  glm::uvec2 bloom_size = (glm::uvec2(ext.width, ext.height) + 1U) / 2U;
+  bloom_size += current_settings->bloom_workgroup_size -
+                bloom_size % current_settings->bloom_workgroup_size;
+  bloom_chain[0]->configuration.width = ext.width;
+  bloom_chain[0]->configuration.height = ext.height;
+  bloom_chain[0]->invalidate();
+  bloom_chain[1]->configuration.width = ext.width;
+  bloom_chain[1]->configuration.height = ext.height;
+  bloom_chain[1]->invalidate();
+  bloom_chain[2]->configuration.width = ext.width;
+  bloom_chain[2]->configuration.height = ext.height;
+  bloom_chain[2]->invalidate();
 }
 
 auto

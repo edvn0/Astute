@@ -5,23 +5,25 @@
 
 namespace ED::Platform {
 
-std::string
-wchar_to_string(const WCHAR* wideCharArray)
+auto
+wchar_to_string(const WCHAR* write_char_array) -> std::string
 {
-  if (!wideCharArray)
+  if (write_char_array == nullptr) {
     return "";
+  }
 
   int length = WideCharToMultiByte(
-    CP_UTF8, 0, wideCharArray, -1, nullptr, 0, nullptr, nullptr);
-  if (length == 0)
+    CP_UTF8, 0, write_char_array, -1, nullptr, 0, nullptr, nullptr);
+  if (length == 0) {
     return "";
+  }
 
   std::string multibyte_string(length, 0);
   WideCharToMultiByte(CP_UTF8,
                       0,
-                      wideCharArray,
+                      write_char_array,
                       -1,
-                      &multibyte_string[0],
+                      multibyte_string.data(),
                       length,
                       nullptr,
                       nullptr);
@@ -34,12 +36,12 @@ wchar_to_string(const WCHAR* wideCharArray)
 auto
 get_system_name() -> std::string
 {
-  std::array<WCHAR, 256> wideBuffer{};
-  DWORD size = sizeof(wideBuffer) / sizeof(wideBuffer[0]);
-  if (!GetComputerNameW(wideBuffer.data(), &size)) {
+  std::array<WCHAR, 256> wide_buffer{};
+  DWORD size = sizeof(wide_buffer) / sizeof(wide_buffer[0]);
+  if (!GetComputerNameW(wide_buffer.data(), &size)) {
     return "default"; // Fallback name
   }
-  return wchar_to_string(wideBuffer.data());
+  return wchar_to_string(wide_buffer.data());
 }
 
 auto

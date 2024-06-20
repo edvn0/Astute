@@ -144,7 +144,7 @@ private:
       float distance = glm::length(corner - frustum_center);
       radius = glm::max(radius, distance);
     }
-    radius = std::ceil(radius * 16.0F) / 16.0F;
+    radius = glm::ceil(radius * 16.0F) / 16.0F;
 
     const auto max_extents = glm::vec3(radius);
     const auto min_extents = -max_extents;
@@ -161,7 +161,7 @@ private:
                                           const glm::vec3& min_extents)
     -> glm::mat4
   {
-    glm::vec3 light_dir = glm::normalize(light_direction);
+    glm::vec3 light_dir = -glm::normalize(light_direction);
     return glm::lookAt(frustum_center - light_dir * min_extents.z,
                        frustum_center,
                        glm::vec3(0.0F, 1.0F, 0.0F));

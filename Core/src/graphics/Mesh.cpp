@@ -129,7 +129,29 @@ struct AssimpLogStream : public Assimp::LogStream
 };
 
 static constexpr Core::u32 mesh_import_flags =
-  aiProcess_ConvertToLeftHanded | aiProcessPreset_TargetRealtime_Fast;
+  aiProcess_CalcTangentSpace | // Calculate tangents and bitangents if you use
+                               // normal mapping
+  aiProcess_JoinIdenticalVertices | // Join identical vertices to optimize mesh
+  aiProcess_Triangulate |           // Ensure all faces are triangles
+  aiProcess_GenSmoothNormals |      // Generate smooth normals if not present
+  aiProcess_SplitLargeMeshes | // Split large meshes into smaller sub-meshes
+  aiProcess_LimitBoneWeights | // Limit bone weights to 4 per vertex (typical
+                               // for GPU skinning)
+  aiProcess_ValidateDataStructure | // Ensure the data structure is valid
+  aiProcess_ImproveCacheLocality |  // Improve the cache locality of the vertex
+                                    // buffer
+  aiProcess_RemoveRedundantMaterials | // Remove redundant materials
+  aiProcess_FindDegenerates | // Convert degenerate primitives to proper
+                              // lines/points
+  aiProcess_FindInvalidData | // Detect and fix invalid data, such as
+                              // zero-length normals
+  aiProcess_GenUVCoords | // Convert non-UV mappings to proper UV coordinates
+  aiProcess_TransformUVCoords | // Pre-transform UV coordinates
+  aiProcess_OptimizeMeshes |    // Optimize the mesh for fewer draw calls
+  aiProcess_OptimizeGraph |     // Optimize the scene graph
+  aiProcess_FlipUVs |          // Flip UV coordinates for DirectX-style textures
+  aiProcess_FlipWindingOrder | // Ensure the face winding order is clockwise
+  aiProcess_Debone;            // Remove bones if they affect vertices minimally
 
 namespace Utils {
 
@@ -520,8 +542,8 @@ MeshAsset::traverse_nodes(aiNode* node,
     return;
   }
 
-  glm::mat4 local_transform =
-    Utils::mat4_from_assimp_matrix4(node->mTransformation);
+  auto local_transform = glm::identity<glm::mat4>();
+  local_transform[1][1] *= -1;
   glm::mat4 transform = parent_transform * local_transform;
   ai_node_map[node].resize(node->mNumMeshes);
   for (Core::u32 i = 0; i < node->mNumMeshes; i++) {

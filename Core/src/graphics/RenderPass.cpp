@@ -34,6 +34,8 @@ RenderPass::execute(CommandBuffer& command_buffer) -> void
     return;
   }
 #endif
+  auto performance_struct =
+    Renderer::create_gpu_performance_scope(command_buffer, name());
   bind(command_buffer);
   execute_impl(command_buffer);
   unbind(command_buffer);
@@ -87,9 +89,8 @@ RenderPass::generate_and_update_descriptor_write_sets(Material& material)
 }
 
 auto
-RenderPass::blit_to(const CommandBuffer&,
-                    const Framebuffer&,
-                    BlitProperties) -> void
+RenderPass::blit_to(const CommandBuffer&, const Framebuffer&, BlitProperties)
+  -> void
 {
 }
 

@@ -20,6 +20,7 @@ public:
 private:
   auto construct_impl() -> void override;
   auto execute_impl(CommandBuffer&) -> void override;
+  auto name() -> std::string_view override { return "Chromatic Aberration"; }
 
   class ChromaticAberrationSettings : public RenderPassSettings
   {

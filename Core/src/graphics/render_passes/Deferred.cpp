@@ -138,7 +138,6 @@ DeferredRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
           deferred_shader,
           deferred_pipeline,
           deferred_material] = get_data();
-
   auto* renderer_desc_set =
     get_renderer().generate_and_update_descriptor_write_sets(
       *deferred_material);

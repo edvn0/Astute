@@ -41,7 +41,6 @@ struct TransformComponent
   glm::quat rotation{ 1, 0, 0, 0 };
   glm::vec3 scale{ 1 };
 
-  // Axis-Aligned Bounding Box in local space
   glm::vec3 aabb_min = glm::vec3(-0.5F);
   glm::vec3 aabb_max = glm::vec3(0.5F);
 
@@ -55,11 +54,8 @@ struct TransformComponent
   [[nodiscard]] auto intersects(const glm::vec3& ray,
                                 const glm::vec3& origin) const -> bool
   {
-    // Transform the ray and origin to local space
-    glm::mat4 model_matrix = glm::translate(glm::mat4(1.0F), translation) *
-                             glm::mat4_cast(rotation) *
-                             glm::scale(glm::mat4(1.0F), scale);
-    glm::mat4 inv_model_matrix = glm::inverse(model_matrix);
+    const auto model_matrix = compute();
+    const auto inv_model_matrix = glm::inverse(model_matrix);
 
     glm::vec3 local_ray =
       glm::normalize(glm::vec3(inv_model_matrix * glm::vec4(ray, 0.0F)));
@@ -136,7 +132,7 @@ struct PointLightComponent
   glm::vec3 radiance{ 1.0F, 1.0F, 1.0F };
   float intensity{ 1.0F };
   float light_size{ 0.5F };
-  float min_radius{ 1.f };
+  float min_radius{ 1.0F };
   float radius{ 10.0F };
   bool casts_shadows{ true };
   bool soft_shadows{ true };
@@ -186,7 +182,8 @@ public:
     registry.clear<Ts...>();
   }
 
-  auto create_entity(std::string_view name) -> entt::entity;
+  auto create_entity(std::string_view name) -> Entity;
+  auto create_mesh_entity(std::string_view path, const glm::vec4&) -> Entity;
   [[nodiscard]] auto get_light_environment() const -> const LightEnvironment&
   {
     return light_environment;

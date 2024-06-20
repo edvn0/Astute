@@ -15,6 +15,8 @@ public:
   static auto initialise() -> void;
   auto instance() const -> const VkInstance& { return vk_instance; }
 
+  static auto uses_validation_layers() -> bool;
+
 private:
   auto deinitialise() -> void;
 

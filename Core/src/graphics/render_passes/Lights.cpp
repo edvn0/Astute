@@ -74,7 +74,6 @@ LightsRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
                lights_shader,
                lights_pipeline,
                lights_material] = get_data();
-
   storage_buffer.write(std::span(get_renderer().get_lights_data()));
 
   auto* renderer_desc_set =

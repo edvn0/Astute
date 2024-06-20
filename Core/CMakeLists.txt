@@ -18,6 +18,7 @@ add_library(Core STATIC
     include/core/Maths.hpp
     include/core/Random.hpp
     include/core/Scene.hpp
+    include/core/Entity.hpp
     include/core/Types.hpp
     include/core/Verify.hpp
     include/core/Profiler.hpp
@@ -39,6 +40,7 @@ add_library(Core STATIC
     include/graphics/RenderPass.hpp
     include/graphics/Renderer.hpp
     include/graphics/Renderer2D.hpp
+    include/graphics/VulkanFunctionPointers.hpp
     include/graphics/RendererExtensions.hpp
     include/graphics/TextureCube.hpp
     include/graphics/Shader.hpp
@@ -65,6 +67,7 @@ add_library(Core STATIC
     src/core/Input.cpp
     src/core/Random.cpp
     src/core/Scene.cpp
+    src/core/Entity.cpp
     src/core/Profiler.cpp
     src/graphics/Allocator.cpp
     src/graphics/CommandBuffer.cpp
@@ -84,6 +87,7 @@ add_library(Core STATIC
     src/graphics/Renderer.cpp
     src/graphics/Renderer2D.cpp
     src/graphics/RendererExtensions.cpp
+    src/graphics/VulkanFunctionPointers.cpp
     src/graphics/Shader.cpp
     src/graphics/Swapchain.cpp
     src/graphics/Vertex.cpp

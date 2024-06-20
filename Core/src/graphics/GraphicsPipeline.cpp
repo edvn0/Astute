@@ -264,10 +264,11 @@ GraphicsPipeline::create_pipeline() -> void
   VkPipelineDynamicStateCreateInfo dynamic_state_info{};
   dynamic_state_info.sType =
     VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-  std::array<VkDynamicState, 3> dynamic_states = {
+  std::array dynamic_states = {
     VK_DYNAMIC_STATE_VIEWPORT,
     VK_DYNAMIC_STATE_SCISSOR,
-    VK_DYNAMIC_STATE_DEPTH_BIAS
+    VK_DYNAMIC_STATE_DEPTH_BIAS,
+    VK_DYNAMIC_STATE_LINE_WIDTH,
   };
   dynamic_state_info.dynamicStateCount =
     static_cast<Core::u32>(dynamic_states.size());

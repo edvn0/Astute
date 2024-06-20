@@ -77,7 +77,7 @@ public:
 
   struct BlitProperties
   {
-    std::optional<Core::u32> colour_attachment_index{};
+    std::optional<Core::u32> colour_attachment_index{ std::nullopt };
     bool depth_attachment{ false };
   };
   auto blit_to(const CommandBuffer&, const Framebuffer&, BlitProperties)
@@ -92,6 +92,7 @@ protected:
            std::get<Core::Scope<IPipeline>>(pass) &&
            std::get<Core::Scope<Material>>(pass);
   }
+  virtual auto name() -> std::string_view = 0;
   virtual auto construct_impl() -> void = 0;
   virtual auto destruct_impl() -> void{};
   virtual auto execute_impl(CommandBuffer&) -> void{};
@@ -134,7 +135,7 @@ private:
                                  Core::Scope<Shader>,
                                  Core::Scope<IPipeline>,
                                  Core::Scope<Material>>;
-  RenderTuple pass{};
+  RenderTuple pass;
   bool is_compute{ false };
   Core::Scope<RenderPassSettings> settings{ nullptr };
 

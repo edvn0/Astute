@@ -4,6 +4,7 @@
 
 #include "core/Application.hpp"
 #include "core/Clock.hpp"
+#include "core/FrameBasedCollection.hpp"
 #include "core/Random.hpp"
 #include "core/Scene.hpp"
 #include "core/ShadowCascadeCalculator.hpp"
@@ -13,12 +14,8 @@
 #include "graphics/DescriptorResource.hpp"
 #include "graphics/GPUBuffer.hpp"
 #include "graphics/Swapchain.hpp"
+#include "graphics/VulkanFunctionPointers.hpp"
 #include "graphics/Window.hpp"
-
-#include "graphics/Framebuffer.hpp"
-
-#include "graphics/RendererExtensions.hpp"
-#include "graphics/TextureGenerator.hpp"
 
 #include "graphics/render_passes/Bloom.hpp"
 #include "graphics/render_passes/ChromaticAberration.hpp"
@@ -30,12 +27,34 @@
 #include "graphics/render_passes/Predepth.hpp"
 #include "graphics/render_passes/Shadow.hpp"
 
-#include <cstddef>
 #include <glm/gtc/quaternion.hpp>
 #include <ranges>
 #include <span>
 
 namespace Engine::Graphics {
+
+static constexpr auto emplace_transform = [](auto& transform_dict,
+                                             const auto& matrix) {
+  auto& mesh_transform = transform_dict.transforms.emplace_back();
+  mesh_transform.transform_rows[0] = {
+    matrix[0][0],
+    matrix[1][0],
+    matrix[2][0],
+    matrix[3][0],
+  };
+  mesh_transform.transform_rows[1] = {
+    matrix[0][1],
+    matrix[1][1],
+    matrix[2][1],
+    matrix[3][1],
+  };
+  mesh_transform.transform_rows[2] = {
+    matrix[0][2],
+    matrix[1][2],
+    matrix[2][2],
+    matrix[3][2],
+  };
+};
 
 static constexpr auto update_lights = []<class Light>(Light& light_ubo,
                                                       auto& env_lights) {
@@ -295,10 +314,14 @@ Renderer::begin_scene(Core::Scene& scene,
     vp_size += tile_size - viewport_size % tile_size;
     light_culling_work_groups = { vp_size / tile_size, 1 };
 
-    visible_point_lights_ssbo.resize(light_culling_work_groups.x *
-                                     light_culling_work_groups.y * 4 * 1024);
-    visible_spot_lights_ssbo.resize(light_culling_work_groups.x *
-                                    light_culling_work_groups.y * 4 * 1024);
+    visible_point_lights_ssbo.resize(
+      static_cast<Core::usize>(light_culling_work_groups.x *
+                               light_culling_work_groups.y * 4) *
+      1024);
+    visible_spot_lights_ssbo.resize(
+      static_cast<Core::usize>(light_culling_work_groups.x *
+                               light_culling_work_groups.y * 4) *
+      1024);
   }
 
   const auto& light_environment = scene.get_light_environment();
@@ -373,8 +396,8 @@ Renderer::compute_directional_shadow_projections(
   };
   auto cascades = cascade_calculator.compute_cascades(camera, light_direction);
   auto& [view_projections] = directional_shadow_projections_ubo.get_data();
-  for (auto i = 0ULL; i < 10; i++) {
-    cascade_splits[static_cast<Core::i32>(i)] = cascades[i].split_depth;
+  for (auto i = 0ULL; i < view_projections.size(); i++) {
+    cascade_splits[i] = cascades[i].split_depth;
     view_projections[i] = cascades[i].view_projection;
   }
   directional_shadow_projections_ubo.update();
@@ -398,25 +421,7 @@ Renderer::submit_static_mesh(Core::Ref<StaticMesh>& static_mesh,
     CommandKey key{
       &vertex_buffer, &index_buffer, material.get(), submesh_index
     };
-    auto& mesh_transform = mesh_transform_map[key].transforms.emplace_back();
-    mesh_transform.transform_rows[0] = {
-      submesh_transform[0][0],
-      submesh_transform[1][0],
-      submesh_transform[2][0],
-      submesh_transform[3][0],
-    };
-    mesh_transform.transform_rows[1] = {
-      submesh_transform[0][1],
-      submesh_transform[1][1],
-      submesh_transform[2][1],
-      submesh_transform[3][1],
-    };
-    mesh_transform.transform_rows[2] = {
-      submesh_transform[0][2],
-      submesh_transform[1][2],
-      submesh_transform[2][2],
-      submesh_transform[3][2],
-    };
+    emplace_transform(mesh_transform_map[key], submesh_transform);
 
     auto& command = draw_commands[key];
     command.static_mesh = static_mesh;
@@ -450,25 +455,7 @@ Renderer::submit_static_light(Core::Ref<StaticMesh>& static_mesh,
       source->get_materials().at(submesh_data[submesh_index].material_index);
 
     CommandKey key{ &vertex_buffer, &index_buffer, material.get(), 0 };
-    auto& mesh_transform = mesh_transform_map[key].transforms.emplace_back();
-    mesh_transform.transform_rows[0] = {
-      submesh_transform[0][0],
-      submesh_transform[1][0],
-      submesh_transform[2][0],
-      submesh_transform[3][0],
-    };
-    mesh_transform.transform_rows[1] = {
-      submesh_transform[0][1],
-      submesh_transform[1][1],
-      submesh_transform[2][1],
-      submesh_transform[3][1],
-    };
-    mesh_transform.transform_rows[2] = {
-      submesh_transform[0][2],
-      submesh_transform[1][2],
-      submesh_transform[2][2],
-      submesh_transform[3][2],
-    };
+    emplace_transform(mesh_transform_map[key], submesh_transform);
 
     auto& command = lights_draw_commands[key];
     command.static_mesh = static_mesh;
@@ -592,6 +579,51 @@ Renderer::get_final_output() const -> const Image*
     ->get_framebuffer()
     ->get_colour_attachment(0)
     .get();
+}
+
+auto
+Renderer::insert_gpu_performance_marker(CommandBuffer& command_buffer,
+                                        const std::string_view label,
+                                        const glm::vec4& marker_colour) -> void
+{
+  VulkanFunctionPointers::insert_gpu_performance_marker(
+    command_buffer.get_command_buffer(), label, marker_colour);
+}
+
+auto
+Renderer::begin_gpu_performance_marker(CommandBuffer& command_buffer,
+                                       const std::string_view label,
+                                       const glm::vec4& marker_colour) -> void
+{
+  VulkanFunctionPointers::begin_gpu_performance_marker(
+    command_buffer.get_command_buffer(), label, marker_colour);
+}
+
+auto
+Renderer::end_gpu_performance_marker(CommandBuffer& command_buffer) -> void
+{
+  VulkanFunctionPointers::end_gpu_performance_marker(
+    command_buffer.get_command_buffer());
+}
+
+PerformanceMarkerScope::PerformanceMarkerScope(CommandBuffer& buf,
+                                               const std::string_view label)
+  : command_buffer(buf)
+{
+  Renderer::begin_gpu_performance_marker(command_buffer, label);
+}
+
+PerformanceMarkerScope::~PerformanceMarkerScope()
+{
+  Renderer::end_gpu_performance_marker(command_buffer);
+}
+
+auto
+Renderer::create_gpu_performance_scope(CommandBuffer& command_buffer,
+                                       const std::string_view label)
+  -> PerformanceMarkerScope
+{
+  return { command_buffer, label };
 }
 
 } // namespace Engine::Graphics
