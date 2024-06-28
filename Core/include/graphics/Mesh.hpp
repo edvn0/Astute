@@ -57,6 +57,7 @@ public:
   Core::u32 material_index;
   Core::u32 index_count;
   Core::u32 vertex_count;
+  bool is_transparent{ false };
 
   glm::mat4 transform{ 1.0F };
   glm::mat4 local_transform{ 1.0F };

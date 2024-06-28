@@ -136,9 +136,17 @@ Scene::Scene(const std::string_view name_view)
 
   std::optional<AABB> mesh_aabb;
   {
-    auto entity = create_mesh_entity("Assets/meshes/formula1/formula1.gltf",
+    create_mesh_entity("Assets/meshes/formula1/formula1.gltf", { 0, 0, 0, 0 });
+  }
+  {
+    auto entity = create_mesh_entity("Assets/meshes/sponza_new/sponza.gltf",
                                      { 0, 0, 0, 0 });
+    entity.get<TransformComponent>().scale *= 0.01;
+    entity.get<TransformComponent>().rotation =
+      glm::rotate(glm::radians(180.0F), glm::vec3{ 1, 0, 0 });
+    entity.get<TransformComponent>().translation.y += 7.0F;
     mesh_aabb = entity.get_aabb();
+    mesh_aabb->scale_to(0.01);
   }
 
   {
@@ -155,7 +163,7 @@ Scene::Scene(const std::string_view name_view)
     auto light = create_entity(std::format("PointLight{}", i));
     light.emplace<MeshComponent>(cube_mesh);
     auto& t = light.emplace<TransformComponent>();
-    t.scale *= 0.01;
+    t.scale *= 0.1;
     auto& light_data = light.emplace<PointLightComponent>();
     t.translation = Random::random_in(scaled);
     light_data.radiance = Random::random_colour();
@@ -170,7 +178,7 @@ Scene::Scene(const std::string_view name_view)
     auto light = create_entity(std::format("SpotLight{}", i));
     auto& t = light.emplace<TransformComponent>();
     light.emplace<MeshComponent>(cube_mesh);
-    t.scale *= 0.01;
+    t.scale *= 0.1;
 
     t.translation = Random::random_in(scaled);
     auto& light_data = light.emplace<SpotLightComponent>();
@@ -184,18 +192,19 @@ Scene::Scene(const std::string_view name_view)
 }
 
 auto
-Scene::on_update_editor(f64) -> void
+Scene::on_update_editor(f64 ts) -> void
 {
-  /* static f64 time = 0.0F;
+  static f64 time = 0.0F;
   time += ts;
 
   // Update sun position to orbit around the origin
+  static constexpr auto sun_radius = sqrt(-30 * 30 + -70 * -70 + 30 * 30);
   light_environment.sun_position = glm::vec4{
     sun_radius * glm::cos(time * 0.1F),
     -70.0F,
     sun_radius * glm::sin(time * 0.1F),
     1.0F,
-  }; */
+  };
 
   if (!scene_tasks.empty()) {
     auto& task = scene_tasks.front();

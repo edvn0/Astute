@@ -3,7 +3,6 @@
 #include "core/Types.hpp"
 
 #include <glm/glm.hpp>
-#include <type_traits>
 
 namespace Engine::Core {
 
@@ -33,8 +32,16 @@ struct AABB
 
   constexpr auto scaled(std::floating_point auto value) const -> Core::AABB
   {
-    return AABB(min * static_cast<Core::f32>(value),
-                max * static_cast<Core::f32>(value));
+    return {
+      min * static_cast<Core::f32>(value),
+      max * static_cast<Core::f32>(value),
+    };
+  }
+
+  auto scale_to(std::floating_point auto value) -> void
+  {
+    min *= value;
+    max *= value;
   }
 };
 

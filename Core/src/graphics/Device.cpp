@@ -9,8 +9,8 @@
 namespace Engine::Graphics {
 
 auto
-Device::is_device_suitable(VkPhysicalDevice device,
-                           VkSurfaceKHR surface) -> bool
+Device::is_device_suitable(VkPhysicalDevice device, VkSurfaceKHR surface)
+  -> bool
 {
   Core::i32 graphics_family_index = -1;
   Core::i32 present_family_index = -1;
@@ -118,8 +118,8 @@ Device::is_device_suitable(VkPhysicalDevice device,
   return is_suitable;
 }
 
-bool
-check_memory_priority_support(VkPhysicalDevice device)
+auto
+check_memory_priority_support(VkPhysicalDevice device) -> bool
 {
   VkPhysicalDeviceFeatures2 base_features{};
   VkPhysicalDeviceMemoryPriorityFeaturesEXT memory_priority_features{};
@@ -157,7 +157,7 @@ create_queue_info_create_structures(
     create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     create_info.queueFamilyIndex = info.family_index;
     create_info.queueCount = 1;
-    static float prio = 1.0f;
+    static float prio = 1.0F;
     create_info.pQueuePriorities = &prio;
     result.push_back(create_info);
     unique_indices.insert(info.family_index);
@@ -170,7 +170,7 @@ create_queue_info_create_structures(
 auto
 Device::create_device(VkSurfaceKHR surface) -> void
 {
-  auto& instance = Instance::the().instance();
+  const auto& instance = Instance::the().instance();
   Core::u32 device_count = 0;
   vkEnumeratePhysicalDevices(instance, &device_count, nullptr);
 
@@ -201,15 +201,15 @@ Device::create_device(VkSurfaceKHR surface) -> void
   vkEnumerateDeviceExtensionProperties(
     physical(), nullptr, &extension_count, nullptr);
 
-  std::vector<VkExtensionProperties> availableExtensions(extension_count);
+  std::vector<VkExtensionProperties> available_extensions(extension_count);
   vkEnumerateDeviceExtensionProperties(
-    physical(), nullptr, &extension_count, availableExtensions.data());
+    physical(), nullptr, &extension_count, available_extensions.data());
 
-  for (const auto& ext : availableExtensions) {
+  for (const auto& ext : available_extensions) {
     extension_support.emplace(std::string{ ext.extensionName });
   }
 
-  if (!vk_physical_device) {
+  if (vk_physical_device == nullptr) {
     throw Core::CouldNotSelectPhysicalException{
       "Failed to find a suitable GPU",
     };
@@ -370,7 +370,7 @@ Device::execute_immediate(QueueType type,
   static constexpr auto default_fence_timeout = 100000000000;
   vkWaitForFences(device(), 1, &to_use, VK_TRUE, default_fence_timeout);
 
-  if (!fence) {
+  if (fence == nullptr) {
     vkDestroyFence(device(), to_use, nullptr);
   }
   vkFreeCommandBuffers(

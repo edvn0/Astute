@@ -2,6 +2,7 @@
 
 #include "core/Camera.hpp"
 #include "core/Types.hpp"
+
 #include <array>
 #include <cmath>
 #include <glm/glm.hpp>
@@ -19,9 +20,12 @@ struct CascadeData
 
 class ShadowCascadeCalculator
 {
-  static constexpr auto shadow_map_cascade_count = 10ULL;
+public:
+  static constexpr auto shadow_map_cascade_count = 4ULL;
   static constexpr float cascade_split_lambda = 0.95F;
   static constexpr float shadow_resolution = 4096.0F;
+
+private:
   static constexpr std::array<glm::vec3, 8> frustum_corners = {
     glm::vec3(-1.0F, 1.0F, -1.0F), glm::vec3(1.0F, 1.0F, -1.0F),
     glm::vec3(1.0F, -1.0F, -1.0F), glm::vec3(-1.0F, -1.0F, -1.0F),
@@ -63,15 +67,15 @@ public:
       auto [min_extents, max_extents, frustum_center] =
         calculate_frustum_bounds(frustum_corners_world);
 
-      glm::mat4 light_view_matrix = calculate_light_view_matrix(
-        frustum_center, light_direction, min_extents);
+      glm::mat4 light_view_matrix =
+        calculate_light_view_matrix(frustum_center, light_direction);
       glm::mat4 light_orthographic_matrix =
         calculate_light_orthographic_matrix(min_extents, max_extents);
       light_orthographic_matrix =
         adjust_shadow_matrix(light_orthographic_matrix, shadow_resolution);
 
       output[i].split_depth =
-        (camera.near + split_dist * (camera.far - camera.near)) * -1.0F;
+        (camera.near + split_dist * (camera.far - camera.near));
       output[i].view = light_view_matrix;
       output[i].view_projection = light_orthographic_matrix * light_view_matrix;
 
@@ -149,20 +153,15 @@ private:
     const auto max_extents = glm::vec3(radius);
     const auto min_extents = -max_extents;
 
-    return {
-      min_extents,
-      max_extents,
-      frustum_center,
-    };
+    return { min_extents, max_extents, frustum_center };
   }
 
   static auto calculate_light_view_matrix(const glm::vec3& frustum_center,
-                                          const glm::vec3& light_direction,
-                                          const glm::vec3& min_extents)
+                                          const glm::vec3& light_direction)
     -> glm::mat4
   {
     glm::vec3 light_dir = -glm::normalize(light_direction);
-    return glm::lookAt(frustum_center - light_dir * min_extents.z,
+    return glm::lookAt(frustum_center - light_dir * glm::length(frustum_center),
                        frustum_center,
                        glm::vec3(0.0F, 1.0F, 0.0F));
   }

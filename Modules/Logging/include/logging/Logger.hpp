@@ -37,7 +37,7 @@ public:
   auto get_level() const -> LogLevel;
 
   Logger(const Logger&) = delete;
-  Logger& operator=(const Logger&) = delete;
+  auto operator=(const Logger&) -> Logger& = delete;
 
   template<typename... Args>
   void info(std::format_string<Args...> format, Args&&... args) noexcept;
@@ -64,7 +64,7 @@ private:
 
   LogLevel current_level{ LogLevel::None };
   static void process_single(const BackgroundLogMessage& message);
-  static LogLevel get_log_level_from_environment();
+  static auto get_log_level_from_environment() -> LogLevel;
 
   std::queue<BackgroundLogMessage> log_queue;
   std::mutex queue_mutex;
@@ -111,6 +111,12 @@ error(std::format_string<Args...> format, Args&&... args) noexcept
 {
   ED::Logging::Logger::get_instance().error(format,
                                             std::forward<Args>(args)...);
+}
+
+inline void
+error(const std::exception& exc) noexcept
+{
+  ED::Logging::Logger::get_instance().error("Exception: {}", exc.what());
 }
 
 #include "logging/Logger.inl"

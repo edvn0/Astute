@@ -85,14 +85,6 @@ enum class RendererTechnique : Core::u8
   ForwardPlus
 };
 
-struct PerformanceMarkerScope
-{
-  PerformanceMarkerScope(CommandBuffer&, std::string_view);
-  ~PerformanceMarkerScope();
-
-  CommandBuffer& command_buffer;
-};
-
 class Renderer
 {
 public:
@@ -212,6 +204,7 @@ private:
 
   auto flush_draw_lists() -> void;
 
+  auto setup_transform_buffers_for_flush() -> void;
   auto generate_and_update_descriptor_write_sets(Material&) -> VkDescriptorSet;
 
   // UBOs
@@ -250,7 +243,7 @@ private:
   std::unordered_set<PostProcessingStep, HasherPPStep> post_processing_steps;
 
   glm::uvec3 light_culling_work_groups{};
-  std::array<Core::f32, 10U> cascade_splits{};
+  std::array<Core::f32, 4U> cascade_splits{};
   Core::f32 cascade_near_plane_offset{ -50.0F };
   Core::f32 cascade_far_plane_offset{ 50.0F };
 

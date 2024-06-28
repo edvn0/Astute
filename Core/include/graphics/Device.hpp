@@ -27,7 +27,7 @@ public:
   static auto the() -> Device&;
   static auto destroy() -> void;
   static auto initialise(VkSurfaceKHR = nullptr) -> void;
-  auto device() const -> const VkDevice&
+  [[nodiscard]] auto device() const -> const VkDevice&
   {
 #ifdef ASTUTE_USE_MUTEX_ACCESS
     static std::mutex mutex;
@@ -44,16 +44,19 @@ public:
     return vk_device;
   }
   auto physical() -> VkPhysicalDevice { return vk_physical_device; }
-  auto physical() const -> const VkPhysicalDevice&
+  [[nodiscard]] auto physical() const -> const VkPhysicalDevice&
   {
     return vk_physical_device;
   }
   auto wait() -> void;
 
   auto get_queue(QueueType t) { return queue_support.at(t).queue; }
-  auto get_queue(QueueType t) const { return queue_support.at(t).queue; }
+  [[nodiscard]] auto get_queue(QueueType t) const
+  {
+    return queue_support.at(t).queue;
+  }
   auto get_family(QueueType t) { return queue_support.at(t).family_index; }
-  auto get_family(QueueType t) const
+  [[nodiscard]] auto get_family(QueueType t) const
   {
     return queue_support.at(t).family_index;
   }
@@ -74,17 +77,18 @@ public:
   auto create_secondary_command_buffer() -> VkCommandBuffer;
   auto reset_command_pools() -> void;
 
-  auto supports(std::string_view extension) const -> bool
+  [[nodiscard]] auto supports(std::string_view extension) const -> bool
   {
     return extension_support.contains(extension.data());
   }
+
+  Device(const Device&) = delete;
+  auto operator=(const Device&) -> Device& = delete;
 
 private:
   auto deinitialise() -> void;
 
   explicit Device(VkSurfaceKHR);
-  Device(const Device&) = delete;
-  Device& operator=(const Device&) = delete;
 
   auto create_device(VkSurfaceKHR) -> void;
   auto is_device_suitable(VkPhysicalDevice, VkSurfaceKHR) -> bool;

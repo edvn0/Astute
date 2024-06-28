@@ -12,10 +12,10 @@ layout(set = 1, binding = 7) uniform sampler2D bloom_dirt_texture;
 
 layout(push_constant) uniform Uniforms
 {
-  float Exposure;
-  float BloomIntensity;
-  float BloomDirtIntensity;
-  float Opacity;
+  float exposure;
+  float bloom_intensity;
+  float dirt_intensity;
+  float opacity;
 }
 uniforms;
 
@@ -88,20 +88,20 @@ main()
   vec2 fTexSize = vec2(float(texSize.x), float(texSize.y));
   vec3 bloom =
     upsample_tent(bloom_texture, 0, tex_coords, 1.0f / fTexSize, sampleScale) *
-    uniforms.BloomIntensity;
+    uniforms.bloom_intensity;
   vec3 bloom_dirt =
-    texture(bloom_dirt_texture, tex_coords).rgb * uniforms.BloomDirtIntensity;
+    texture(bloom_dirt_texture, tex_coords).rgb * uniforms.dirt_intensity;
 
   float d = 0.0;
 
   color += bloom;
   color += bloom * bloom_dirt;
-  color *= uniforms.Exposure;
+  color *= uniforms.exposure;
 
   color = ACESTonemap(color);
   color = GammaCorrect(color.rgb, gamma);
 
-  color *= uniforms.Opacity;
+  color *= uniforms.opacity;
 
   colour = vec4(color, 1.0);
 }

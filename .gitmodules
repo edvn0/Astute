@@ -35,3 +35,9 @@
 [submodule "Library/KTX-Software"]
 	path = Library/KTX-Software
 	url = git@github.com:KhronosGroup/KTX-Software.git
+[submodule "Library/yaml-cpp"]
+	path = Library/yaml-cpp
+	url = git@github.com:jbeder/yaml-cpp.git
+[submodule "Library/magic_enum"]
+	path = Library/magic_enum
+	url = git@github.com:Neargye/magic_enum.git

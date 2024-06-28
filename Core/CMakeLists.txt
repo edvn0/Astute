@@ -20,6 +20,7 @@ add_library(Core STATIC
     include/core/Scene.hpp
     include/core/Entity.hpp
     include/core/Types.hpp
+    include/core/YAMLFile.hpp
     include/core/Verify.hpp
     include/core/Profiler.hpp
     include/graphics/Allocator.hpp
@@ -69,6 +70,7 @@ add_library(Core STATIC
     src/core/Scene.cpp
     src/core/Entity.cpp
     src/core/Profiler.cpp
+    src/core/YAMLFile.cpp
     src/graphics/Allocator.cpp
     src/graphics/CommandBuffer.cpp
     src/graphics/DescriptorResource.cpp
@@ -115,9 +117,11 @@ target_include_directories(Core PUBLIC include
 )
 target_include_directories(Core SYSTEM PRIVATE
     ${CMAKE_SOURCE_DIR}/Library/VulkanMemoryAllocator/include
+    ${CMAKE_SOURCE_DIR}/Library/yaml-cpp/include
+    ${CMAKE_SOURCE_DIR}/Library/magic_enum/include
     ${CMAKE_SOURCE_DIR}/Library/filewatch)
 
-target_link_libraries(Core PUBLIC ThreadPool ktx glfw Vulkan::Vulkan PRIVATE VulkanMemoryAllocator imguizmo imgui glm EnTT::EnTT stbimage::stbimage assimp FastNoise2 ShaderCompilation Logging Platform)
+target_link_libraries(Core PUBLIC ThreadPool ktx glfw Vulkan::Vulkan PRIVATE magic_enum::magic_enum yaml-cpp::yaml-cpp VulkanMemoryAllocator imguizmo imgui glm EnTT::EnTT stbimage::stbimage assimp FastNoise2 ShaderCompilation Logging Platform)
 target_precompile_headers(Core PRIVATE include/pch/CorePCH.hpp)
 target_compile_definitions(Core PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE -DImTextureID=ImU64)
 

@@ -22,6 +22,36 @@
 #include <utility>
 namespace Engine::Graphics {
 
+template<class Container, class Comparison>
+auto
+linear_search(Container& container, Comparison&& func) ->
+  typename Container::value_type*
+{
+  using Out = typename Container::value_type*;
+  for (auto& value : container) {
+    if (func(value)) {
+      return Out{ &value };
+    }
+  }
+
+  return Out(nullptr);
+}
+
+template<class Container, class Comparison>
+auto
+linear_search(const Container& container, Comparison&& func) -> const
+  typename Container::value_type*
+{
+  using Out = const typename Container::value_type*;
+  for (const auto& value : container) {
+    if (func(value)) {
+      return Out{ &value };
+    }
+  }
+
+  return Out(nullptr);
+}
+
 static constexpr auto maybe_load_embedded_texture =
   [](auto& dispatcher,
      auto index,
@@ -132,26 +162,13 @@ static constexpr Core::u32 mesh_import_flags =
   aiProcess_CalcTangentSpace | // Calculate tangents and bitangents if you use
                                // normal mapping
   aiProcess_JoinIdenticalVertices | // Join identical vertices to optimize mesh
-  aiProcess_Triangulate |           // Ensure all faces are triangles
-  aiProcess_GenSmoothNormals |      // Generate smooth normals if not present
-  aiProcess_SplitLargeMeshes | // Split large meshes into smaller sub-meshes
-  aiProcess_LimitBoneWeights | // Limit bone weights to 4 per vertex (typical
-                               // for GPU skinning)
-  aiProcess_ValidateDataStructure | // Ensure the data structure is valid
-  aiProcess_ImproveCacheLocality |  // Improve the cache locality of the vertex
-                                    // buffer
-  aiProcess_RemoveRedundantMaterials | // Remove redundant materials
+  aiProcess_OptimizeMeshes |
+  aiProcess_Triangulate |     // Ensure all faces are triangles
+  aiProcess_GenNormals |      // Generate smooth normals if not present
   aiProcess_FindDegenerates | // Convert degenerate primitives to proper
                               // lines/points
-  aiProcess_FindInvalidData | // Detect and fix invalid data, such as
-                              // zero-length normals
   aiProcess_GenUVCoords | // Convert non-UV mappings to proper UV coordinates
-  aiProcess_TransformUVCoords | // Pre-transform UV coordinates
-  aiProcess_OptimizeMeshes |    // Optimize the mesh for fewer draw calls
-  aiProcess_OptimizeGraph |     // Optimize the scene graph
-  aiProcess_FlipUVs |          // Flip UV coordinates for DirectX-style textures
-  aiProcess_FlipWindingOrder | // Ensure the face winding order is clockwise
-  aiProcess_Debone;            // Remove bones if they affect vertices minimally
+  aiProcess_FlipUVs;      // Flip UV coordinates for DirectX-style textures
 
 namespace Utils {
 
@@ -342,8 +359,9 @@ MeshAsset::MeshAsset(const std::string& file_name)
     });
     aiString ai_tex_path;
 
-    float shininess{};
-    float metalness{};
+    Core::f32 shininess{};
+    Core::f32 metalness{};
+
     if (ai_material->Get(AI_MATKEY_SHININESS, shininess) != aiReturn_SUCCESS) {
       shininess = 80.0F;
     }
@@ -352,14 +370,23 @@ MeshAsset::MeshAsset(const std::string& file_name)
         aiReturn_SUCCESS) {
       metalness = 0.0F;
     }
-    auto roughness = 1.0F - glm::sqrt(shininess / 100.0F);
 
+    auto roughness = glm::sqrt(2.0F / (shininess + 2.0F));
+
+    roughness = glm::clamp(roughness, 0.0F, 1.0F);
+
+    if (shininess == 0.0F) {
+      roughness = 1.0F;
+    } else if (shininess >= 1000.0F) {
+      roughness = 0.0F;
+    }
     materials.at(i)->set("mat_pc.albedo_colour", glm::vec3(1.0F));
     materials.at(i)->set("mat_pc.emission", 1.0F);
 
     materials.at(i)->set("mat_pc.use_normal_map", false);
 
     materials.at(i)->set("mat_pc.roughness", roughness);
+    materials.at(i)->set("mat_pc.transparency", 1.0F);
 
     const auto casted_index = static_cast<Core::u32>(i);
 
@@ -367,6 +394,24 @@ MeshAsset::MeshAsset(const std::string& file_name)
       ai_material->GetTexture(aiTextureType_DIFFUSE, 0, &ai_tex_path) ==
       AI_SUCCESS;
     if (has_albedo_map) {
+      Core::f32 transparency{ -1 };
+      auto has_transparency =
+        ai_material->Get(AI_MATKEY_TRANSPARENCYFACTOR, transparency);
+      has_transparency = has_transparency == AI_FAILURE
+                           ? ai_material->Get(AI_MATKEY_OPACITY, transparency)
+                           : AI_FAILURE;
+
+      if (has_transparency == AI_SUCCESS && transparency > 0.0F) {
+        auto* found = linear_search(submeshes, [i](const Submesh& submesh) {
+          return submesh.material_index == i;
+        });
+
+        if (found != nullptr) {
+          found->is_transparent = true;
+          materials.at(i)->set("mat_pc.transparency", 0.0F);
+        }
+      }
+
       if (const auto* embedded_texture =
             scene->GetEmbeddedTexture(ai_tex_path.C_Str())) {
         maybe_load_embedded_texture(dispatcher,
@@ -542,8 +587,7 @@ MeshAsset::traverse_nodes(aiNode* node,
     return;
   }
 
-  auto local_transform = glm::identity<glm::mat4>();
-  local_transform[1][1] *= -1;
+  auto local_transform = Utils::mat4_from_assimp_matrix4(node->mTransformation);
   glm::mat4 transform = parent_transform * local_transform;
   ai_node_map[node].resize(node->mNumMeshes);
   for (Core::u32 i = 0; i < node->mNumMeshes; i++) {

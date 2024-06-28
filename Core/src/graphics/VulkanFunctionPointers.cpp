@@ -1,6 +1,7 @@
 #include "graphics/VulkanFunctionPointers.hpp"
 
 #include "graphics/Instance.hpp"
+#include "logging/Logger.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
 

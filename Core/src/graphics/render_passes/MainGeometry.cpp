@@ -56,20 +56,20 @@ MainGeometryRenderPass::construct_impl() -> void
   main_geometry_material = Core::make_scope<Material>(Material::Configuration{
     .shader = main_geometry_shader.get(),
   });
+
+  depth_attachment =
+    get_renderer().get_render_pass("Shadow").get_depth_attachment();
 }
 
 auto
 MainGeometryRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 {
-  ASTUTE_PROFILE_FUNCTION();
-  const auto& depth_attachment =
-    get_renderer().get_render_pass("Shadow").get_depth_attachment();
 
+  ASTUTE_PROFILE_FUNCTION();
   const auto& [main_geometry_framebuffer,
                main_geometry_shader,
                main_geometry_pipeline,
                main_geometry_material] = get_data();
-  main_geometry_material->set("shadow_map", depth_attachment);
   auto* renderer_desc_set =
     generate_and_update_descriptor_write_sets(*main_geometry_material);
 
@@ -85,6 +85,7 @@ MainGeometryRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
     auto offset = get_renderer().mesh_transform_map.at(key).offset;
     const auto& submesh = mesh_asset->get_submeshes().at(submesh_index);
     const auto& material = mesh->get_materials().at(submesh.material_index);
+    material->set("shadow_map", depth_attachment);
     auto* material_descriptor_set =
       material->generate_and_update_descriptor_write_sets();
 

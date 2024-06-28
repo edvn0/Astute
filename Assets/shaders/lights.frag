@@ -17,6 +17,7 @@ layout(set = 1, binding = 5) uniform sampler2D normal_map;
 layout(set = 1, binding = 6) uniform sampler2D albedo_map;
 layout(set = 1, binding = 7) uniform sampler2D specular_map;
 layout(set = 1, binding = 8) uniform sampler2D roughness_map;
+layout(set = 1, binding = 9) uniform sampler2DArray shadow_map;
 
 layout(push_constant) uniform Material
 {
@@ -24,7 +25,6 @@ layout(push_constant) uniform Material
   float transparency;
   float roughness;
   float emission;
-
   uint use_normal_map;
 }
 mat_pc;

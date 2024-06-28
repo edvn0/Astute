@@ -8,6 +8,7 @@
 #include "graphics/Framebuffer.hpp"
 #include "graphics/GPUBuffer.hpp"
 #include "graphics/RendererExtensions.hpp"
+#include "graphics/VulkanFunctionPointers.hpp"
 
 #include <ranges>
 #include <span>
@@ -18,12 +19,6 @@
 
 namespace Engine::Graphics {
 
-static constexpr auto shadow_map_count = 10ULL;
-static constexpr auto create_layer_views = [](auto& image) {
-  auto sequence = Core::monotone_sequence<shadow_map_count>();
-  image->create_specific_layer_image_views(std::span{ sequence });
-};
-
 auto
 ShadowRenderPass::construct_impl() -> void
 {
@@ -32,7 +27,7 @@ ShadowRenderPass::construct_impl() -> void
     .width = size,
     .height = size,
     .mip_levels = 1,
-    .layers = shadow_map_count,
+    .layers = Core::ShadowCascadeCalculator::shadow_map_cascade_count,
     .format = VK_FORMAT_D32_SFLOAT,
     .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
     .usage =
@@ -58,7 +53,8 @@ ShadowRenderPass::construct_impl() -> void
     .shader = shadow_shader.get(),
   });
 
-  for (const auto i : std::views::iota(0ULL, shadow_map_count)) {
+  for (const auto i : std::views::iota(
+         0ULL, Core::ShadowCascadeCalculator::shadow_map_cascade_count)) {
     spec.existing_image_layers.clear();
     spec.existing_image_layers.push_back(static_cast<Core::i32>(i));
     other_framebuffers.push_back(Core::make_scope<Framebuffer>(spec));

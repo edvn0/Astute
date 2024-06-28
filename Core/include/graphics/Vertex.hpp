@@ -34,34 +34,42 @@ struct Vertex
 
   constexpr auto operator<=>(const Vertex& other) const -> std::partial_ordering
   {
-    if (auto cmp = compare(position, other.position); cmp != 0)
+    if (auto cmp = compare(position, other.position); cmp != 0) {
       return cmp;
-    if (auto cmp = compare(uvs, other.uvs); cmp != 0)
+    }
+    if (auto cmp = compare(uvs, other.uvs); cmp != 0) {
       return cmp;
-    if (auto cmp = compare(normals, other.normals); cmp != 0)
+    }
+    if (auto cmp = compare(normals, other.normals); cmp != 0) {
       return cmp;
-    if (auto cmp = compare(tangent, other.tangent); cmp != 0)
+    }
+    if (auto cmp = compare(tangent, other.tangent); cmp != 0) {
       return cmp;
+    }
     return compare(bitangent, other.bitangent);
   }
 
 private:
-  constexpr std::partial_ordering compare(const glm::vec3& a,
-                                          const glm::vec3& b) const
+  [[nodiscard]] static constexpr auto compare(const glm::vec3& a,
+                                              const glm::vec3& b)
+    -> std::partial_ordering
   {
-    if (auto cmp = a.x <=> b.x; cmp != 0)
+    if (auto cmp = a.x <=> b.x; cmp != 0) {
       return cmp;
-    if (auto cmp = a.y <=> b.y; cmp != 0)
+    }
+    if (auto cmp = a.y <=> b.y; cmp != 0) {
       return cmp;
+    }
     return a.z <=> b.z;
   }
 
-  // Comparison for glm::vec2
-  constexpr std::partial_ordering compare(const glm::vec2& a,
-                                          const glm::vec2& b) const
+  [[nodiscard]] static constexpr auto compare(const glm::vec2& a,
+                                              const glm::vec2& b)
+    -> std::partial_ordering
   {
-    if (auto cmp = a.x <=> b.x; cmp != 0)
+    if (auto cmp = a.x <=> b.x; cmp != 0) {
       return cmp;
+    }
     return a.y <=> b.y;
   }
 };

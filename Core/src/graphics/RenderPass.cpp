@@ -5,6 +5,7 @@
 #include "graphics/Framebuffer.hpp"
 #include "graphics/Renderer.hpp"
 #include "graphics/RendererExtensions.hpp"
+#include "graphics/VulkanFunctionPointers.hpp"
 
 namespace Engine::Graphics {
 
@@ -27,18 +28,25 @@ RenderPass::construct() -> void
 }
 
 auto
-RenderPass::execute(CommandBuffer& command_buffer) -> void
+RenderPass::execute(CommandBuffer& command_buffer, const bool gpu_perf_tags)
+  -> void
 {
 #ifdef ASTUTE_DEBUG
   if (!is_valid()) {
     return;
   }
 #endif
-  auto performance_struct =
-    Renderer::create_gpu_performance_scope(command_buffer, name());
-  bind(command_buffer);
-  execute_impl(command_buffer);
-  unbind(command_buffer);
+  if (gpu_perf_tags) {
+    auto performance_struct =
+      Renderer::create_gpu_performance_scope(command_buffer, name());
+    bind(command_buffer);
+    execute_impl(command_buffer);
+    unbind(command_buffer);
+  } else {
+    bind(command_buffer);
+    execute_impl(command_buffer);
+    unbind(command_buffer);
+  }
 }
 
 auto

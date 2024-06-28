@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/Forward.hpp"
+#include "core/Serialisation.hpp"
 #include "graphics/Forward.hpp"
 
 #include "graphics/Pipeline.hpp"
@@ -53,6 +55,8 @@ public:
     return VK_PIPELINE_BIND_POINT_GRAPHICS;
   }
 
+  ASTUTE_MAKE_SERIALISABLE(GraphicsPipeline);
+
 private:
   VkPipeline pipeline{ VK_NULL_HANDLE };
   VkPipelineLayout layout{ VK_NULL_HANDLE };
@@ -63,9 +67,9 @@ private:
   const Topology topology{ Topology::TriangleList };
   const Core::f32 clear_depth_value{ 0.0F };
   const std::optional<std::vector<VkVertexInputAttributeDescription>>
-    override_vertex_attributes{};
+    override_vertex_attributes;
   const std::optional<std::vector<VkVertexInputAttributeDescription>>
-    override_instance_attributes{};
+    override_instance_attributes;
 
   const IFramebuffer* framebuffer{ nullptr };
   const Shader* shader{ nullptr };

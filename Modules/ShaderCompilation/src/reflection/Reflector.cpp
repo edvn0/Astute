@@ -82,8 +82,9 @@ Reflector::Reflector(Graphics::Shader& shader)
     output;
   for (const auto& type : potential_types) {
     const auto code_or = shader.get_code(type);
-    if (!code_or)
+    if (!code_or) {
       continue;
+    }
 
     const auto& data = code_or.value();
     const auto size = data.size();
@@ -102,8 +103,9 @@ Reflector::Reflector(Graphics::Shader& shader)
 Reflector::~Reflector() = default;
 
 static constexpr auto check_for_gaps = [](const auto& unordered_map) {
-  if (unordered_map.empty())
+  if (unordered_map.empty()) {
     return false;
+  }
 
   std::int32_t max_index = 0;
   for (const auto& key : unordered_map | std::views::keys) {
@@ -262,7 +264,7 @@ reflect_specialization_constants(const spirv_cross::Compiler& compiler,
         break;
       default:
         error("Unknown specialization constant type: {}",
-              (Core::u32)constant_type.basetype);
+              static_cast<Core::u32>(constant_type.basetype));
         throw std::runtime_error("Unknown specialization constant type");
     }
 

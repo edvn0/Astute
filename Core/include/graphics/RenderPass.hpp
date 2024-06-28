@@ -29,8 +29,8 @@ public:
   virtual ~RenderPass() = default;
 
   virtual auto on_resize(const Core::Extent& new_size) -> void = 0;
-  auto execute(CommandBuffer& command_buffer) -> void;
-
+  auto execute(CommandBuffer& command_buffer, bool gpu_perf_tags = true)
+    -> void;
   auto destruct() -> void
   {
     destruct_impl();

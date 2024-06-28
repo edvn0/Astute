@@ -9,13 +9,13 @@
 #include "core/Scene.hpp"
 #include "core/ShadowCascadeCalculator.hpp"
 
-#include "logging/Logger.hpp"
-
 #include "graphics/DescriptorResource.hpp"
 #include "graphics/GPUBuffer.hpp"
+#include "graphics/RendererExtensions.hpp"
 #include "graphics/Swapchain.hpp"
 #include "graphics/VulkanFunctionPointers.hpp"
 #include "graphics/Window.hpp"
+#include "logging/Logger.hpp"
 
 #include "graphics/render_passes/Bloom.hpp"
 #include "graphics/render_passes/ChromaticAberration.hpp"
@@ -32,41 +32,6 @@
 #include <span>
 
 namespace Engine::Graphics {
-
-static constexpr auto emplace_transform = [](auto& transform_dict,
-                                             const auto& matrix) {
-  auto& mesh_transform = transform_dict.transforms.emplace_back();
-  mesh_transform.transform_rows[0] = {
-    matrix[0][0],
-    matrix[1][0],
-    matrix[2][0],
-    matrix[3][0],
-  };
-  mesh_transform.transform_rows[1] = {
-    matrix[0][1],
-    matrix[1][1],
-    matrix[2][1],
-    matrix[3][1],
-  };
-  mesh_transform.transform_rows[2] = {
-    matrix[0][2],
-    matrix[1][2],
-    matrix[2][2],
-    matrix[3][2],
-  };
-};
-
-static constexpr auto update_lights = []<class Light>(Light& light_ubo,
-                                                      auto& env_lights) {
-  auto i = 0ULL;
-  auto& [ubo_count, ubo_lights] = light_ubo.get_data();
-  ubo_count = static_cast<Core::i32>(env_lights.size());
-  for (const auto& light : env_lights) {
-    ubo_lights.at(i) = light;
-    i++;
-  }
-  light_ubo.update();
-};
 
 auto
 Renderer::generate_and_update_descriptor_write_sets(Material& material)
@@ -359,8 +324,10 @@ Renderer::begin_scene(Core::Scene& scene,
   light_dir = glm::normalize(-light_environment.sun_position);
   shadow_ubo.update();
 
-  update_lights(point_light_ubo, light_environment.point_lights);
-  update_lights(spot_light_ubo, light_environment.spot_lights);
+  RendererExtensions::update_lights(point_light_ubo,
+                                    light_environment.point_lights);
+  RendererExtensions::update_lights(spot_light_ubo,
+                                    light_environment.spot_lights);
 
   // Visible spot lights
   auto& screen_data = screen_data_ubo.get_data();
@@ -410,6 +377,10 @@ Renderer::submit_static_mesh(Core::Ref<StaticMesh>& static_mesh,
   const auto& source = static_mesh->get_mesh_asset();
   const auto& submesh_data = source->get_submeshes();
   for (const auto submesh_index : static_mesh->get_submeshes()) {
+    if (submesh_data.at(submesh_index).is_transparent) {
+      continue;
+    }
+
     glm::mat4 submesh_transform =
       transform * submesh_data[submesh_index].transform;
 
@@ -421,7 +392,8 @@ Renderer::submit_static_mesh(Core::Ref<StaticMesh>& static_mesh,
     CommandKey key{
       &vertex_buffer, &index_buffer, material.get(), submesh_index
     };
-    emplace_transform(mesh_transform_map[key], submesh_transform);
+    RendererExtensions::emplace_transform(mesh_transform_map[key],
+                                          submesh_transform);
 
     auto& command = draw_commands[key];
     command.static_mesh = static_mesh;
@@ -455,7 +427,8 @@ Renderer::submit_static_light(Core::Ref<StaticMesh>& static_mesh,
       source->get_materials().at(submesh_data[submesh_index].material_index);
 
     CommandKey key{ &vertex_buffer, &index_buffer, material.get(), 0 };
-    emplace_transform(mesh_transform_map[key], submesh_transform);
+    RendererExtensions::emplace_transform(mesh_transform_map[key],
+                                          submesh_transform);
 
     auto& command = lights_draw_commands[key];
     command.static_mesh = static_mesh;
@@ -480,24 +453,7 @@ Renderer::on_resize(const Core::Extent& new_size) -> void
 auto
 Renderer::flush_draw_lists() -> void
 {
-  Core::u32 offset = 0;
-  const auto& [vb, tb] =
-    transform_buffers.at(Core::Application::the().current_frame_index());
-
-  for (auto& transform_data : mesh_transform_map | std::views::values) {
-    transform_data.offset = offset * sizeof(TransformVertexData);
-    for (const auto& transform : transform_data.transforms) {
-      tb->write(&transform,
-                sizeof(TransformVertexData),
-                offset * sizeof(TransformVertexData));
-      offset++;
-    }
-  }
-  std::vector<TransformVertexData> output;
-  output.resize(offset);
-
-  tb->read(std::span{ output });
-  vb->write(std::span{ output });
+  setup_transform_buffers_for_flush();
 
   command_buffer->begin();
 
@@ -507,7 +463,11 @@ Renderer::flush_draw_lists() -> void
   render_passes.at("Predepth")->execute(*command_buffer);
   {
     compute_command_buffer->begin();
-    render_passes.at("LightCulling")->execute(*compute_command_buffer);
+    {
+      auto performance_struct = Renderer::create_gpu_performance_scope(
+        *compute_command_buffer, "LightCulling");
+      render_passes.at("LightCulling")->execute(*compute_command_buffer, false);
+    }
     compute_command_buffer->end();
     compute_command_buffer->submit();
   }
@@ -539,6 +499,30 @@ Renderer::flush_draw_lists() -> void
   lights_draw_commands.clear();
   mesh_transform_map.clear();
   lights_instance_data.clear();
+}
+
+auto
+Renderer::setup_transform_buffers_for_flush() -> void
+{
+  ASTUTE_PROFILE_FUNCTION();
+  Core::u32 offset = 0;
+  const auto& [vb, tb] =
+    transform_buffers.at(Core::Application::the().current_frame_index());
+
+  for (auto& transform_data : mesh_transform_map | std::views::values) {
+    transform_data.offset = offset * sizeof(TransformVertexData);
+    for (const auto& transform : transform_data.transforms) {
+      tb->write(&transform,
+                sizeof(TransformVertexData),
+                offset * sizeof(TransformVertexData));
+      offset++;
+    }
+  }
+  std::vector<TransformVertexData> output;
+  output.resize(offset);
+
+  tb->read(std::span{ output });
+  vb->write(std::span{ output });
 }
 
 auto
@@ -606,16 +590,16 @@ Renderer::end_gpu_performance_marker(CommandBuffer& command_buffer) -> void
     command_buffer.get_command_buffer());
 }
 
-PerformanceMarkerScope::PerformanceMarkerScope(CommandBuffer& buf,
+PerformanceMarkerScope::PerformanceMarkerScope(CommandBuffer* buf,
                                                const std::string_view label)
   : command_buffer(buf)
 {
-  Renderer::begin_gpu_performance_marker(command_buffer, label);
+  Renderer::begin_gpu_performance_marker(*command_buffer, label);
 }
 
 PerformanceMarkerScope::~PerformanceMarkerScope()
 {
-  Renderer::end_gpu_performance_marker(command_buffer);
+  Renderer::end_gpu_performance_marker(*command_buffer);
 }
 
 auto
@@ -623,7 +607,7 @@ Renderer::create_gpu_performance_scope(CommandBuffer& command_buffer,
                                        const std::string_view label)
   -> PerformanceMarkerScope
 {
-  return { command_buffer, label };
+  return { &command_buffer, label };
 }
 
 } // namespace Engine::Graphics

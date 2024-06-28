@@ -79,3 +79,15 @@ function(add_ktx)
 endfunction()
 
 add_ktx()
+
+function(add_yaml)
+    add_subdirectory(yaml-cpp)
+endfunction()
+
+add_yaml()
+
+function(add_magic_enum)
+    add_subdirectory(magic_enum)
+endfunction(add_magic_enum)
+
+add_magic_enum()

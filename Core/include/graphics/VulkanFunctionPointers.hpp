@@ -1,11 +1,22 @@
 #pragma once
 
+#include "graphics/Forward.hpp"
+
 #include <vulkan/vulkan.h>
 
 #include <glm/glm.hpp>
 #include <string_view>
 
 namespace Engine::Graphics {
+
+struct PerformanceMarkerScope
+{
+  PerformanceMarkerScope(CommandBuffer*, std::string_view);
+  PerformanceMarkerScope() = default;
+  ~PerformanceMarkerScope();
+
+  CommandBuffer* command_buffer{ nullptr };
+};
 
 class VulkanFunctionPointers
 {

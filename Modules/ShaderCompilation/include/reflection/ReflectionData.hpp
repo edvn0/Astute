@@ -186,17 +186,17 @@ struct ShaderInOut
 
 struct ReflectionData
 {
-  std::vector<ShaderDescriptorSet> shader_descriptor_sets{};
-  std::vector<PushConstantRange> push_constant_ranges{};
-  std::unordered_map<std::string, ShaderBuffer> constant_buffers{};
-  std::unordered_map<std::string, ShaderResourceDeclaration> resources{};
+  std::vector<ShaderDescriptorSet> shader_descriptor_sets;
+  std::vector<PushConstantRange> push_constant_ranges;
+  std::unordered_map<std::string, ShaderBuffer> constant_buffers;
+  std::unordered_map<std::string, ShaderResourceDeclaration> resources;
   std::unordered_map<std::string, SpecialisationConstant>
-    specialisation_constants{};
+    specialisation_constants;
 };
 
 struct MaterialDescriptorSet
 {
-  std::vector<VkDescriptorSet> descriptor_sets{};
+  std::vector<VkDescriptorSet> descriptor_sets;
 };
 
 } // namespace Reflection

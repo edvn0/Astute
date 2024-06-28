@@ -96,6 +96,9 @@ LightsRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
     const auto& submesh = mesh_asset->get_submeshes().at(submesh_index);
 
     const auto& material = mesh->get_materials().at(submesh.material_index);
+    material->set(
+      "shadow_map",
+      get_renderer().get_render_pass("Shadow").get_depth_attachment());
     auto* material_descriptor_set =
       material->generate_and_update_descriptor_write_sets();
 

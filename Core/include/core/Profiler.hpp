@@ -13,7 +13,7 @@ namespace Engine::Core {
 class Profiler
 {
 public:
-  static Profiler& the();
+  static auto the() -> Profiler&;
 
   void begin_session(const std::string& name);
   void end_session();
@@ -45,7 +45,7 @@ private:
 class ProfileScope
 {
 public:
-  ProfileScope(const std::string_view name);
+  explicit ProfileScope(std::string_view name);
   ~ProfileScope();
 
 private:
@@ -55,6 +55,8 @@ private:
 
 }
 
+#ifdef ASTUTE_DEBUG
+
 #define CONCATENATE_DETAIL(x, y) x##y
 #define CONCATENATE(x, y) CONCATENATE_DETAIL(x, y)
 #define ASTUTE_PROFILE_FUNCTION()                                              \
@@ -62,3 +64,10 @@ private:
 
 #define ASTUTE_PROFILE_SCOPE(name)                                             \
   Engine::Core::ProfileScope CONCATENATE(profile_scope_, __LINE__)(name)
+
+#else
+
+#define ASTUTE_PROFILE_FUNCTION()
+#define ASTUTE_PROFILE_SCOPE(name)
+
+#endif

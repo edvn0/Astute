@@ -63,7 +63,7 @@ Material::set(const std::string_view name, const Core::Ref<Image>& image)
       desc.dstArrayElement = 0;
       desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
       desc.dstBinding = resource->get_register();
-      desc.pImageInfo = &imgs.at(as_string)->descriptor_info;
+      desc.pImageInfo = &imgs.at(as_string)->get_descriptor_info();
     });
 
   return true;

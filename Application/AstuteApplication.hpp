@@ -48,6 +48,8 @@ private:
   glm::vec2 viewport_position{ 0, 0 };
   Ref<entt::entity> selected_entity{ nullptr };
   auto perform_raycast(const glm::vec2&) -> entt::entity;
+  auto handle_transform_mode(const KeyPressedEvent&) -> void;
+  auto has_valid_entity() -> bool;
 
   using WidgetTuple =
     std::tuple<Scope<Widgets::SceneWidget>, Scope<Widgets::PerformanceWidget>>;

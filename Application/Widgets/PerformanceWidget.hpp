@@ -18,8 +18,8 @@ public:
   PerformanceWidget()
   {
     statistics.fill({
-      .frame_time = 1.0 / 60.0,
-      .fps = 60.0,
+      .frame_time = 1.0 / 150.0,
+      .fps = 150.0,
     });
   }
   ~PerformanceWidget() override = default;

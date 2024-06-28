@@ -125,10 +125,10 @@ auto
 CompositionRenderPass::CompositionSettings::apply_to_material(
   Material& material) -> void
 {
-  material.set("uniforms.Exposure", 0.8F);
-  material.set("uniforms.Opacity", 1.0F);
-  material.set("uniforms.BloomIntensity", Intensity);
-  material.set("uniforms.BloomDirtIntensity", DirtIntensity);
+  material.set("uniforms.exposure", 0.8F);
+  material.set("uniforms.opacity", 1.0F);
+  material.set("uniforms.bloom_intensity", Intensity);
+  material.set("uniforms.dirt_intensity", DirtIntensity);
   material.set("bloom_dirt_texture", dirt_texture);
 }
 

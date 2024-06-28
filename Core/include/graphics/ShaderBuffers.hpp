@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/Types.hpp"
+#include "graphics/render_passes/Shadow.hpp"
 
 #include <glm/glm.hpp>
 
@@ -19,7 +20,9 @@ struct RendererUBO
   glm::vec4 specular_colour_and_intensity{ 0.5F, 0.5F, 0.5F, 2.0F };
   glm::vec3 camera_pos{};
   float padding{};
-  std::array<Core::Padded<Core::f32, 12>, 10> cascade_splits{};
+  std::array<Core::Padded<Core::f32, 12>,
+             Core::ShadowCascadeCalculator::shadow_map_cascade_count>
+    cascade_splits{};
 
   static constexpr std::string_view name = "RendererUBO";
 };
@@ -104,7 +107,8 @@ struct ScreenDataUBO
 
 struct DirectionalShadowProjectionUBO
 {
-  std::array<glm::mat4, 10> view_projections;
+  std::array<glm::mat4, Core::ShadowCascadeCalculator::shadow_map_cascade_count>
+    view_projections;
   static constexpr std::string_view name = "DirectionalShadowProjectionUBO";
 };
 

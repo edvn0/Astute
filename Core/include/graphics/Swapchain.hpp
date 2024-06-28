@@ -24,43 +24,59 @@ public:
 
   auto on_resize(const Core::Extent&) -> void;
 
-  auto get_surface() const -> VkSurfaceKHR { return surface; }
-  auto get_swapchain() const -> VkSwapchainKHR { return swapchain; }
-  auto get_image(Core::u32 index) const -> VkImage
+  [[nodiscard]] auto get_surface() const -> VkSurfaceKHR { return surface; }
+  [[nodiscard]] auto get_swapchain() const -> VkSwapchainKHR
+  {
+    return swapchain;
+  }
+  [[nodiscard]] auto get_image(Core::u32 index) const -> VkImage
   {
     return images[index].image;
   }
-  auto get_image_view(Core::u32 index) const -> VkImageView
+  [[nodiscard]] auto get_image_view(Core::u32 index) const -> VkImageView
   {
     return images[index].view;
   }
-  auto get_renderpass() const -> VkRenderPass { return render_pass; }
-  auto get_command_buffer(Core::u32 index) const -> VkCommandBuffer
+  [[nodiscard]] auto get_renderpass() const -> VkRenderPass
+  {
+    return render_pass;
+  }
+  [[nodiscard]] auto get_command_buffer(Core::u32 index) const
+    -> VkCommandBuffer
   {
     return command_buffers[index].command_buffer;
   }
-  auto get_current_buffer_index() const -> Core::u32
+  [[nodiscard]] auto get_current_buffer_index() const -> Core::u32
   {
     return current_buffer_index;
   }
-  auto get_current_image_index() const -> Core::u32
+  [[nodiscard]] auto get_current_image_index() const -> Core::u32
   {
     return current_image_index;
   }
-  auto get_size() const -> const Core::Extent& { return size; }
-  auto get_colour_format() const -> VkFormat { return colour_format; }
-  auto get_colour_space() const -> VkColorSpaceKHR { return colour_space; }
-  auto get_image_count() const -> Core::u32 { return image_count; }
+  [[nodiscard]] auto get_size() const -> const Core::Extent& { return size; }
+  [[nodiscard]] auto get_colour_format() const -> VkFormat
+  {
+    return colour_format;
+  }
+  [[nodiscard]] auto get_colour_space() const -> VkColorSpaceKHR
+  {
+    return colour_space;
+  }
+  [[nodiscard]] auto get_image_count() const -> Core::u32
+  {
+    return image_count;
+  }
 
-  auto get_framebuffer(Core::u32 index) const -> VkFramebuffer
+  [[nodiscard]] auto get_framebuffer(Core::u32 index) const -> VkFramebuffer
   {
     return framebuffers[index];
   }
-  auto get_framebuffer() const -> VkFramebuffer
+  [[nodiscard]] auto get_framebuffer() const -> VkFramebuffer
   {
     return framebuffers[current_image_index];
   }
-  auto get_drawbuffer() const
+  [[nodiscard]] auto get_drawbuffer() const
   {
     return command_buffers[get_current_buffer_index()].command_buffer;
   }

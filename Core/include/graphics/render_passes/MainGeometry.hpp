@@ -19,6 +19,9 @@ protected:
   auto destruct_impl() -> void override;
   auto execute_impl(CommandBuffer&) -> void override;
   auto name() -> std::string_view override { return "MainGeometry"; }
+
+private:
+  Core::Ref<Image> depth_attachment;
 };
 
 } // namespace Engine::Graphics

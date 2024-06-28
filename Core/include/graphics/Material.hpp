@@ -45,8 +45,6 @@ public:
     set(name, &padded, sizeof(padded));
   }
 
-  auto get_descriptor_set() -> decltype(auto) { return descriptor_sets.get(); }
-
   [[nodiscard]] auto get_shader() const -> const auto* { return shader; }
   auto update_descriptor_write_sets(VkDescriptorSet) -> void;
   auto generate_and_update_descriptor_write_sets() -> VkDescriptorSet;
@@ -68,7 +66,7 @@ public:
 
 private:
   const Shader* shader{ nullptr };
-  std::unordered_map<std::string, Core::Ref<Image>> images{};
+  std::unordered_map<std::string, Core::Ref<Image>> images;
   std::unordered_map<std::string, const StorageBuffer*> storage_buffers;
 
   Core::FrameBasedCollection<

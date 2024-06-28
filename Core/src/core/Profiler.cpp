@@ -8,8 +8,8 @@
 
 namespace Engine::Core {
 
-Profiler&
-Profiler::the()
+auto
+Profiler::the() -> Profiler&
 {
   static Profiler instance;
   return instance;
@@ -18,16 +18,21 @@ Profiler::the()
 void
 Profiler::begin_session(const std::string& name)
 {
+  (void)name;
+#ifdef ASTUTE_DEBUG
   std::lock_guard<std::mutex> lock(profiler_mutex);
   session_name = name;
   intermediate_buffer.clear();
+#endif
 }
 
 void
 Profiler::end_session()
 {
+#ifdef ASTUTE_DEBUG
   std::lock_guard<std::mutex> lock(profiler_mutex);
   write_to_file();
+#endif
 }
 
 void
@@ -80,15 +85,18 @@ Profiler::write_to_file()
   for (size_t i = 0; i < intermediate_buffer.size(); ++i) {
     const auto& entry = intermediate_buffer[i];
     file << (i > 0 ? "," : "") << "{\"name\":\"" << entry.name << "\","
-         << "\"ph\":\"X\"," << "\"ts\":"
+         << "\"ph\":\"X\","
+         << "\"ts\":"
          << std::chrono::duration_cast<std::chrono::microseconds>(
               entry.start.time_since_epoch())
               .count()
-         << "," << "\"dur\":"
+         << ","
+         << "\"dur\":"
          << std::chrono::duration_cast<std::chrono::microseconds>(entry.end -
                                                                   entry.start)
               .count()
-         << "," << "\"pid\":0,\"tid\":0}";
+         << ","
+         << "\"pid\":0,\"tid\":0}";
   }
   file << "]}";
   file.close();

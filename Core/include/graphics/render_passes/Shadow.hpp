@@ -1,8 +1,19 @@
 #pragma once
 
+#include "core/Maths.hpp"
+
+#include "core/ShadowCascadeCalculator.hpp"
 #include "graphics/RenderPass.hpp"
 
+#include <span>
+
 namespace Engine::Graphics {
+
+static constexpr auto create_layer_views = [](auto& image) {
+  auto sequence = Core::monotone_sequence<
+    Core::ShadowCascadeCalculator::shadow_map_cascade_count>();
+  image->create_specific_layer_image_views(std::span{ sequence });
+};
 
 class ShadowRenderPass final : public RenderPass
 {

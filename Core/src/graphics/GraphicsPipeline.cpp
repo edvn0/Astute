@@ -7,9 +7,13 @@
 #include "graphics/Image.hpp"
 #include "graphics/Shader.hpp"
 
+#include "core/Serialisation.hpp"
+#include "core/YAMLFile.hpp"
+
 #include "graphics/Vertex.hpp"
 
 #include <glm/glm.hpp>
+#include <magic_enum/magic_enum.hpp>
 
 namespace Engine::Graphics {
 
@@ -64,11 +68,101 @@ GraphicsPipeline::GraphicsPipeline(const Configuration& config)
   create_pipeline();
   trace("Created graphics pipeline for framebuffer: {}",
         framebuffer->get_name());
+
+  Core::SerialWriter::write(*this);
 }
 
 GraphicsPipeline::~GraphicsPipeline()
 {
   destroy();
+}
+
+auto
+GraphicsPipeline::construct_file_path(const GraphicsPipeline& instance)
+  -> std::string
+{
+  std::stringstream ss;
+  ss << "sample_count_" << instance.sample_count << "_cull_mode_"
+     << instance.cull_mode << "_face_mode_" << instance.face_mode
+     << "_depth_comparator_" << instance.depth_comparator << "_topology_"
+     << static_cast<int>(instance.topology) << "_clear_depth_value_"
+     << instance.clear_depth_value;
+
+  if (instance.override_vertex_attributes.has_value()) {
+    ss << "_vertex_attributes_" << instance.override_vertex_attributes->size();
+  }
+
+  if (instance.override_instance_attributes.has_value()) {
+    ss << "_instance_attributes_"
+       << instance.override_instance_attributes->size();
+  }
+
+  // Hash the combined string to create a pseudo-unique identifier
+  std::string combined = ss.str();
+  static std::hash<std::string> hasher;
+  auto hash = hasher(combined);
+
+  // Create the final file path
+  std::stringstream file_path;
+  static constexpr auto base = std::string_view{ "Assets/pipelines" };
+  file_path << std::format(
+    "{}/graphics_pipeline_{}_{}.yaml", base, instance.shader->get_name(), hash);
+  return file_path.str();
+}
+
+auto
+GraphicsPipeline::write(const GraphicsPipeline& instance,
+                        std::ostream& output_file) -> bool
+{
+  YAML::Node node;
+  node["sample_count"] = static_cast<Core::u32>(instance.sample_count);
+  node["cull_mode"] = static_cast<Core::u32>(instance.cull_mode);
+  node["face_mode"] = magic_enum::enum_name(instance.face_mode);
+  node["depth_comparator"] = magic_enum::enum_name(instance.depth_comparator);
+  node["topology"] = magic_enum::enum_name(instance.topology);
+  node["clear_depth_value"] =
+    static_cast<Core::f32>(instance.clear_depth_value);
+
+  if (instance.override_vertex_attributes.has_value()) {
+    YAML::Node vertex_attributes = YAML::Node(YAML::NodeType::Sequence);
+    for (const auto& attribute : *instance.override_vertex_attributes) {
+      YAML::Node attr_node;
+      attr_node["location"] = attribute.location;
+      attr_node["binding"] = attribute.binding;
+      attr_node["format"] = magic_enum::enum_name(attribute.format);
+      attr_node["offset"] = attribute.offset;
+      vertex_attributes.push_back(attr_node);
+    }
+    node["override_vertex_attributes"] = vertex_attributes;
+  }
+
+  if (instance.override_instance_attributes.has_value()) {
+    YAML::Node instance_attributes = YAML::Node(YAML::NodeType::Sequence);
+    for (const auto& attribute : *instance.override_instance_attributes) {
+      YAML::Node attr_node;
+      attr_node["location"] = attribute.location;
+      attr_node["binding"] = attribute.binding;
+      attr_node["format"] = magic_enum::enum_name(attribute.format);
+      attr_node["offset"] = attribute.offset;
+      instance_attributes.push_back(attr_node);
+    }
+    node["override_instance_attributes"] = instance_attributes;
+  }
+
+  try {
+    output_file << node;
+  } catch (const std::ios_base::failure& e) {
+    error(e);
+    return false;
+  }
+
+  return true;
+}
+
+auto
+GraphicsPipeline::read(GraphicsPipeline&, const std::istream&) -> bool
+{
+  return true;
 }
 
 auto
@@ -208,7 +302,7 @@ GraphicsPipeline::create_pipeline() -> void
   VkPipelineRasterizationStateCreateInfo rasterization_info{};
   rasterization_info.sType =
     VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-  rasterization_info.depthClampEnable = VK_FALSE;
+  rasterization_info.depthClampEnable = VK_TRUE;
   rasterization_info.rasterizerDiscardEnable = VK_FALSE;
   rasterization_info.polygonMode = to_vulkan_polygon_mode(topology);
   rasterization_info.lineWidth = 1.0F;

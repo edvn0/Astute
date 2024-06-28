@@ -2,11 +2,12 @@
 
 #include "AstuteApplication.hpp"
 
-#include <imgui.h>
-
 #include "core/Scene.hpp"
 #include "graphics/Window.hpp"
+#include "graphics/render_passes/Shadow.hpp"
+
 #include <ImGuizmo/ImGuizmo.h>
+#include <imgui.h>
 
 namespace Utilities {
 
@@ -25,21 +26,6 @@ convert_to_imguizmo(GizmoState state) -> ImGuizmo::OPERATION
       debug_break();
   }
   return ImGuizmo::OPERATION::TRANSLATE;
-}
-
-static constexpr auto
-convert_to_bits(GizmoState state) -> u8
-{
-  switch (state) {
-    case GizmoState::Translate:
-      return 0x0;
-    case GizmoState::Rotate:
-      return 0x1;
-    case GizmoState::Scale:
-      return 0x2;
-    default:
-      debug_break();
-  }
 }
 
 auto
@@ -292,6 +278,30 @@ AstuteApplication::interface() -> void
 }
 
 auto
+AstuteApplication::has_valid_entity() -> bool
+{
+  return selected_entity != nullptr &&
+         scene->get_registry().valid(*selected_entity);
+}
+
+auto
+AstuteApplication::handle_transform_mode(const KeyPressedEvent& event) -> void
+{
+  const auto code = event.get_keycode();
+  if (!has_valid_entity()) {
+    return;
+  }
+
+  if (code == KeyCode::KEY_T) {
+    current_mode = GizmoState::Translate;
+  } else if (code == KeyCode::KEY_R) {
+    current_mode = GizmoState::Rotate;
+  } else if (code == KeyCode::KEY_S) {
+    current_mode = GizmoState::Scale;
+  }
+}
+
+auto
 AstuteApplication::handle_events(Event& event) -> void
 {
   EventDispatcher dispatcher{ event };
@@ -310,9 +320,12 @@ AstuteApplication::handle_events(Event& event) -> void
 
     if (keycode == KeyCode::KEY_9) {
       chosen_image = chosen_image + 1;
-      chosen_image = chosen_image % 10;
+      chosen_image =
+        chosen_image % ShadowCascadeCalculator::shadow_map_cascade_count;
       return true;
     }
+
+    handle_transform_mode(ev);
 
     return false;
   });

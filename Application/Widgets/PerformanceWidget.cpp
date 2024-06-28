@@ -10,11 +10,10 @@ PerformanceWidget::interface() -> void
   using namespace Engine::Core;
 
   UI::scope("Scene", [&]() {
-    // Extract frame_time and fps data into separate arrays for plotting
-    std::array<float, buffer_size> frame_times;
-    std::array<float, buffer_size> fps_values;
+    static std::array<float, buffer_size> frame_times;
+    static std::array<float, buffer_size> fps_values;
 
-    for (size_t i = 0; i < buffer_size; ++i) {
+    for (auto i = 0U; i < buffer_size; ++i) {
       frame_times[i] = static_cast<float>(statistics[i].frame_time);
       fps_values[i] = static_cast<float>(statistics[i].fps);
     }
@@ -22,7 +21,6 @@ PerformanceWidget::interface() -> void
     const auto as_i32 = static_cast<Engine::Core::i32>(current_index);
 
     UI::coloured_text({ 1.0, 0.0, 0.0, 1.0 }, "FPS: {:.2F}", mean(fps_values));
-    // Display the frame times as a scrolling plot
     ImGui::PlotLines("Frame Times (ms)",
                      frame_times.data(),
                      buffer_size,

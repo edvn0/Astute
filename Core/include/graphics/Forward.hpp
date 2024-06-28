@@ -21,6 +21,8 @@ class GraphicsPipeline;
 class Material;
 class RenderPass;
 
+struct PerformanceMarkerScope;
+
 enum class QueueType : Core::u8;
 
 }
