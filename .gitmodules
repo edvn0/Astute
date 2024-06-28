@@ -17,9 +17,6 @@
 [submodule "Library/SPIRV-Cross"]
 	path = Library/SPIRV-Cross
 	url = git@github.com:KhronosGroup/SPIRV-Cross.git
-[submodule "Library/assimp"]
-	path = Library/assimp
-	url = git@github.com:assimp/assimp.git
 [submodule "Library/filewatch"]
 	path = Library/filewatch
 	url = git@github.com:ThomasMonkman/filewatch.git
@@ -35,6 +32,9 @@
 [submodule "Library/KTX-Software"]
 	path = Library/KTX-Software
 	url = git@github.com:KhronosGroup/KTX-Software.git
+[submodule "Library/assimp"]
+	path = Library/assimp
+	url = git@github.com:assimp/assimp.git
 [submodule "Library/yaml-cpp"]
 	path = Library/yaml-cpp
 	url = git@github.com:jbeder/yaml-cpp.git
