@@ -55,6 +55,7 @@ add_library(Core STATIC
     include/graphics/render_passes/Shadow.hpp
     include/graphics/render_passes/LightCulling.hpp
     include/graphics/render_passes/Predepth.hpp
+    include/graphics/render_passes/Transparent.hpp
     include/graphics/render_passes/Lights.hpp
     include/graphics/render_passes/ChromaticAberration.hpp
     include/graphics/render_passes/Composition.hpp
@@ -93,6 +94,7 @@ add_library(Core STATIC
     src/graphics/Shader.cpp
     src/graphics/Swapchain.cpp
     src/graphics/Vertex.cpp
+    src/graphics/Pipeline.cpp
     src/graphics/TextureCube.cpp
     src/graphics/TextureGenerator.cpp
     src/graphics/Window.cpp
@@ -103,6 +105,7 @@ add_library(Core STATIC
     src/graphics/render_passes/Predepth.cpp
     src/graphics/render_passes/Lights.cpp
     src/graphics/render_passes/ChromaticAberration.cpp
+    src/graphics/render_passes/Transparent.cpp
     src/graphics/render_passes/Composition.cpp
     src/graphics/render_passes/Bloom.cpp
     src/ui/UI.cpp
@@ -127,6 +130,12 @@ target_compile_definitions(Core PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE -DImTextureI
 
 if("Clang" IN_LIST CMAKE_CXX_COMPILER_ID)
     target_compile_options(Core PRIVATE -Wno-unused-local-typedef)
+endif()
+
+if(ENABLE_VALIDATION_LAYERS)
+    target_compile_definitions(Core PRIVATE ENABLE_VALIDATION_LAYERS=1)
+else()
+    target_compile_definitions(Core PRIVATE ENABLE_VALIDATION_LAYERS=0)
 endif()
 
 # Add ASTUTE_PERFORMANCE as a preprocessor definition to enable performance tracking IF ASTUTE_PERFORMANCE is defined

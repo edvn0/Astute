@@ -1,6 +1,8 @@
 #include "graphics/Mesh.hpp"
 #include "pch/CorePCH.hpp"
 
+#include "core/StandardPaths.hpp"
+
 #include "core/Entity.hpp"
 #include "core/Maths.hpp"
 #include "core/Random.hpp"
@@ -13,6 +15,7 @@
 
 #include "graphics/Renderer.hpp"
 
+#include <glm/gtc/random.hpp>
 #include <limits>
 #include <ranges>
 
@@ -41,29 +44,31 @@ intersects(const Engine::Core::AABB& aabb,
 auto
 calculate_aabb(const TransformComponent& transform) -> Engine::Core::AABB
 {
-  glm::vec3 aabb_min = glm::vec3(-0.5F) * transform.scale;
-  glm::vec3 aabb_max = glm::vec3(0.5F) * transform.scale;
+  glm::vec3 center = (transform.aabb_min + transform.aabb_max) * 0.5F;
+  glm::vec3 extents = (transform.aabb_max - transform.aabb_min) * 0.5F;
 
-  std::array vertices = {
-    aabb_min,
-    glm::vec3(aabb_min.x, aabb_min.y, aabb_max.z),
-    glm::vec3(aabb_min.x, aabb_max.y, aabb_min.z),
-    glm::vec3(aabb_min.x, aabb_max.y, aabb_max.z),
-    glm::vec3(aabb_max.x, aabb_min.y, aabb_min.z),
-    glm::vec3(aabb_max.x, aabb_min.y, aabb_max.z),
-    glm::vec3(aabb_max.x, aabb_max.y, aabb_min.z),
-    aabb_max,
-  };
+  // Apply scale
+  extents *= transform.scale;
 
-  glm::mat4 model_matrix = transform.compute();
+  if (transform.rotation == glm::quat(1, 0, 0, 0)) {
+    // No rotation, simply offset the center and adjust extents
+    center = transform.translation +
+             glm::vec3(transform.compute() * glm::vec4(center, 1.0F));
+    return { center - extents, center + extents };
+  } // With rotation, calculate new AABB
+  glm::mat3 rotation_matrix = glm::mat3_cast(transform.rotation);
+  glm::vec3 new_extents(0);
 
-  Engine::Core::AABB aabb;
-  for (const auto& vertex : vertices) {
-    auto transformed_vertex = glm::vec3(model_matrix * glm::vec4(vertex, 1.0F));
-    aabb.update_min_max(transformed_vertex);
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      new_extents[i] += std::abs(rotation_matrix[i][j] * extents[j]);
+    }
   }
 
-  return aabb;
+  glm::vec3 new_center =
+    transform.translation +
+    glm::vec3(transform.compute() * glm::vec4(center, 1.0F));
+  return { new_center - new_extents, new_center + new_extents };
 }
 
 }
@@ -132,21 +137,22 @@ Scene::Scene(const std::string_view name_view)
 {
 
   auto cube_mesh = Core::make_ref<Graphics::StaticMesh>(
-    Core::make_ref<Graphics::MeshAsset>("Assets/meshes/cube/cube.gltf"));
+    Core::make_ref<Graphics::MeshAsset>(meshes_file("cube/cube.gltf")));
 
   std::optional<AABB> mesh_aabb;
   {
-    create_mesh_entity("Assets/meshes/formula1/formula1.gltf", { 0, 0, 0, 0 });
+    create_mesh_entity(meshes_file("formula1/formula1.gltf"), { 0, 0, 0, 0 });
   }
   {
-    auto entity = create_mesh_entity("Assets/meshes/sponza_new/sponza.gltf",
-                                     { 0, 0, 0, 0 });
+    auto entity =
+      create_mesh_entity(meshes_file("sponza_new/sponza.gltf"), { 0, 0, 0, 0 });
     entity.get<TransformComponent>().scale *= 0.01;
     entity.get<TransformComponent>().rotation =
       glm::rotate(glm::radians(180.0F), glm::vec3{ 1, 0, 0 });
     entity.get<TransformComponent>().translation.y += 7.0F;
     mesh_aabb = entity.get_aabb();
     mesh_aabb->scale_to(0.01);
+    mesh_aabb->rotate(glm::rotate(glm::radians(180.0F), glm::vec3{ 1, 0, 0 }));
   }
 
   {
@@ -159,10 +165,42 @@ Scene::Scene(const std::string_view name_view)
 
   const auto& bounds = *mesh_aabb;
   const auto& scaled = bounds.scaled(1.0);
+
+  auto move_light = [s = scaled](Entity& entity, Core::f64 ts) {
+    auto& transform = entity.get<TransformComponent>();
+    auto& velocity = entity.get<VelocityComponent>();
+    auto& direction = velocity.direction;
+    auto& speed = velocity.speed;
+
+    transform.translation += direction * speed * static_cast<float>(ts);
+
+    if (transform.translation.x >= s.max.x) {
+      direction.x *= -1;
+    }
+    if (transform.translation.x <= s.min.x) {
+      direction.x *= -1;
+    }
+    if (transform.translation.y >= s.max.y) {
+      direction.y *= -1;
+    }
+    if (transform.translation.y <= s.min.y) {
+      direction.y *= -1;
+    }
+    if (transform.translation.z >= s.max.z) {
+      direction.z *= -1;
+    }
+    if (transform.translation.z <= s.min.z) {
+      direction.z *= -1;
+    }
+  };
+
   for (auto i = 0; i < 127; i++) {
     auto light = create_entity(std::format("PointLight{}", i));
     light.emplace<MeshComponent>(cube_mesh);
     auto& t = light.emplace<TransformComponent>();
+    light.emplace<ScriptComponent>(move_light);
+    glm::vec3 random_direction = glm::sphericalRand(1.0F);
+    light.emplace<VelocityComponent>(random_direction);
     t.scale *= 0.1;
     auto& light_data = light.emplace<PointLightComponent>();
     t.translation = Random::random_in(scaled);
@@ -178,6 +216,9 @@ Scene::Scene(const std::string_view name_view)
     auto light = create_entity(std::format("SpotLight{}", i));
     auto& t = light.emplace<TransformComponent>();
     light.emplace<MeshComponent>(cube_mesh);
+    light.emplace<ScriptComponent>(move_light);
+    glm::vec3 random_direction = glm::sphericalRand(1.0F);
+    light.emplace<VelocityComponent>(random_direction);
     t.scale *= 0.1;
 
     t.translation = Random::random_in(scaled);
@@ -223,6 +264,14 @@ Scene::on_update_editor(f64 ts) -> void
     registry, light_environment.point_lights, prev_point_light_count);
   update_lights<SpotLightComponent, Graphics::SpotLight>(
     registry, light_environment.spot_lights, prev_spot_light_count);
+
+  for (auto&& [entt_handle, script] : registry.view<ScriptComponent>().each()) {
+    if (!script.is_valid()) {
+      continue;
+    }
+    Entity entity{ &registry, entt_handle };
+    script.on_update(entity, ts);
+  }
 }
 
 auto
@@ -278,6 +327,13 @@ Scene::create_mesh_entity(const std::string_view path,
                           const glm::vec4& position) -> Entity
 {
   return Engine::Core::create_mesh_entity(&registry, path, position);
+}
+
+auto
+Scene::create_mesh_entity(const std::filesystem::path& path,
+                          const glm::vec4& position) -> Entity
+{
+  return Engine::Core::create_mesh_entity(&registry, path.string(), position);
 }
 
 auto

@@ -97,10 +97,8 @@ public:
   template<typename T>
   auto write(const T* input_data,
              std::integral auto input_size,
-             std::integral auto offset) -> void
+             std::unsigned_integral auto offset = 0I) -> void
   {
-    static_assert(std::is_unsigned_v<decltype(offset)>);
-
     // Check if input_size plus offset exceeds the buffer_size
     if (offset + input_size > buffer_size) {
       throw WriteRangeException{
@@ -119,8 +117,8 @@ public:
   }
 
   template<typename T>
-  auto write(const std::vector<T>& input_data,
-             std::integral auto input_size) -> void
+  auto write(const std::vector<T>& input_data, std::integral auto input_size)
+    -> void
   {
     write(input_data.data(), input_size);
   }
@@ -144,8 +142,8 @@ public:
   }
 
   template<typename T, std::size_t Extent = std::dynamic_extent>
-  auto read(std::span<T, Extent> output,
-            std::integral auto input_size) const -> void
+  auto read(std::span<T, Extent> output, std::integral auto input_size) const
+    -> void
   {
     if (input_size > buffer_size) {
       throw WriteRangeException{ "DataBuffer::read: input_size > size" };
@@ -176,8 +174,8 @@ public:
    * @param input_count The number of elements to read
    */
   template<typename T>
-  auto read(std::vector<T>& output,
-            std::integral auto input_count) const -> void
+  auto read(std::vector<T>& output, std::integral auto input_count) const
+    -> void
   {
     const auto actual_size = input_count * sizeof(T);
     // check vector size too

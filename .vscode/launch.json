@@ -12,6 +12,27 @@
       "cwd": "${workspaceRoot}",
       "args": [
         "-b",
+        "2560",
+        "-d",
+        "1440",
+        "-s",
+        "4096"
+      ],
+      "environment": [
+        {
+          "name": "LOG_LEVEL",
+          "value": "Debug"
+        },
+      ],
+    },
+    {
+      "type": "cppvsdbg",
+      "request": "launch",
+      "name": "Debug (RelWithDebInfo)",
+      "program": "${workspaceRoot}/build/Application/RelWithDebInfo/App",
+      "cwd": "${workspaceRoot}",
+      "args": [
+        "-b",
         "1920",
         "-d",
         "1080",
@@ -29,7 +50,8 @@
       "type": "cppvsdbg",
       "request": "launch",
       "name": "Test",
-      "program": "${workspaceRoot}/build/Modules/ThreadPool/Tests/Debug/ThreadPoolTests",
+      "program":
+        "${workspaceRoot}/build/Modules/ThreadPool/Tests/Debug/ThreadPoolTests",
       "cwd": "${workspaceRoot}"
     }
   ]

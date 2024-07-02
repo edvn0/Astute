@@ -44,8 +44,9 @@ MainGeometryRenderPass::construct_impl() -> void
       .existing_images = { {4, get_renderer().get_render_pass("Predepth").get_depth_attachment(), }, },
       .debug_name = "MainGeometry",
     });
-  main_geometry_shader = Shader::compile_graphics_scoped(
-    "Assets/shaders/main_geometry.vert", "Assets/shaders/main_geometry.frag");
+  main_geometry_shader =
+    Shader::compile_graphics_scoped(Core::shaders_file("main_geometry.vert"),
+                                    Core::shaders_file("main_geometry.frag"));
   main_geometry_pipeline =
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
       .framebuffer = main_geometry_framebuffer.get(),
@@ -84,6 +85,10 @@ MainGeometryRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
         .transform_buffer;
     auto offset = get_renderer().mesh_transform_map.at(key).offset;
     const auto& submesh = mesh_asset->get_submeshes().at(submesh_index);
+    if (submesh.is_transparent) {
+      continue;
+    }
+
     const auto& material = mesh->get_materials().at(submesh.material_index);
     material->set("shadow_map", depth_attachment);
     auto* material_descriptor_set =

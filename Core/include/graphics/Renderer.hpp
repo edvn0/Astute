@@ -16,6 +16,7 @@
 #include "graphics/TextureCube.hpp"
 
 #include "graphics/ShaderBuffers.hpp"
+#include "render_passes/Transparent.hpp"
 
 #include <glm/glm.hpp>
 #include <string_view>
@@ -260,8 +261,8 @@ private:
   };
 
   std::unordered_map<CommandKey, DrawCommand> draw_commands;
+  std::unordered_map<CommandKey, DrawCommand> transparent_draw_commands;
   std::unordered_map<CommandKey, DrawCommand> shadow_draw_commands;
-
   std::unordered_map<CommandKey, DrawCommand> lights_draw_commands;
   struct LightInstanceData
   {
@@ -287,6 +288,7 @@ private:
   friend class LightsRenderPass;
   friend class MainGeometryRenderPass;
   friend class PredepthRenderPass;
+  friend class TransparentRenderPass;
   friend class ShadowRenderPass;
   friend class Renderer2D;
 };

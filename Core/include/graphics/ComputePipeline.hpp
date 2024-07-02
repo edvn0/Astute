@@ -19,9 +19,15 @@ public:
 
   auto on_resize(const Core::Extent&) -> void override;
 
-  auto get_pipeline() const -> VkPipeline override { return pipeline; }
-  auto get_layout() const -> VkPipelineLayout override { return layout; }
-  auto get_bind_point() const -> VkPipelineBindPoint override
+  [[nodiscard]] auto get_pipeline() const -> VkPipeline override
+  {
+    return pipeline;
+  }
+  [[nodiscard]] auto get_layout() const -> VkPipelineLayout override
+  {
+    return layout;
+  }
+  [[nodiscard]] auto get_bind_point() const -> VkPipelineBindPoint override
   {
     return VK_PIPELINE_BIND_POINT_COMPUTE;
   }

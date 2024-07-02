@@ -26,21 +26,16 @@ namespace Engine::Graphics {
 auto
 BloomRenderPass::construct_impl() -> void
 {
-  auto&& [_, shader, light_culling_pipeline, light_culling_material] =
-    get_data();
-  shader = Shader::compile_compute_scoped("Assets/shaders/bloom.comp");
+  auto&& [_, shader, bloom_pipeline, bloom_material] = get_data();
+  shader = Shader::compile_compute_scoped(Core::shaders_file("bloom.comp"));
 
-  light_culling_pipeline =
+  bloom_pipeline =
     Core::make_scope<ComputePipeline>(ComputePipeline::Configuration{
       .shader = shader.get(),
     });
-  light_culling_material = Core::make_scope<Material>(Material::Configuration{
+  bloom_material = Core::make_scope<Material>(Material::Configuration{
     .shader = shader.get(),
   });
-  light_culling_material->set(
-    "predepth_map",
-    get_renderer().get_render_pass("Predepth").get_depth_attachment());
-
   auto i = 0U;
   for (auto& bloom_img : bloom_chain) {
     bloom_img = Core::make_ref<Image>(ImageConfiguration{
@@ -84,7 +79,7 @@ BloomRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
   auto workgroup_size =
     get_current_settings<BloomSettings>()->bloom_workgroup_size;
 
-  auto& [_, shader, pipeline, light_culling_material] = get_data();
+  auto& [_, shader, pipeline, bloom_material] = get_data();
 
   struct BloomComputePushConstants
   {
@@ -102,7 +97,7 @@ BloomRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
   bloom_compute_push_constants.Mode = 0;
 
   const auto& input_image =
-    get_renderer().get_render_pass("Deferred").get_colour_attachment(0);
+    get_renderer().get_render_pass("Transparent").get_colour_attachment(0);
 
   // m_GPUTimeQueries.BloomComputePassQuery =
   //   m_CommandBuffer->BeginTimestampQuery();

@@ -70,7 +70,8 @@ struct FramebufferSpecification
   bool no_resize = false;
 
   bool blend = true;
-  FramebufferBlendMode blend_mode = FramebufferBlendMode::None;
+  FramebufferBlendMode blend_mode =
+    FramebufferBlendMode::SrcAlphaOneMinusSrcAlpha;
 
   bool transfer = false;
 

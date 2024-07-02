@@ -35,6 +35,19 @@ struct MeshComponent
   Core::Ref<Graphics::StaticMesh> mesh;
 };
 
+struct ScriptComponent
+{
+  std::function<void(Entity&, Core::f64)> on_update;
+
+  [[nodiscard]] auto is_valid() const { return on_update.operator bool(); }
+};
+
+struct VelocityComponent
+{
+  glm::vec3 direction{ 0 };
+  Core::f32 speed{ 1.0F };
+};
+
 struct TransformComponent
 {
   glm::vec3 translation{ 0 };
@@ -184,6 +197,8 @@ public:
 
   auto create_entity(std::string_view name) -> Entity;
   auto create_mesh_entity(std::string_view path, const glm::vec4&) -> Entity;
+  auto create_mesh_entity(const std::filesystem::path&, const glm::vec4&)
+    -> Entity;
   [[nodiscard]] auto get_light_environment() const -> const LightEnvironment&
   {
     return light_environment;

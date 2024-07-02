@@ -33,7 +33,7 @@ PredepthRenderPass::construct_impl() -> void
   });
 
   predepth_shader = Shader::compile_graphics_scoped(
-    "Assets/shaders/predepth.vert", "Assets/shaders/empty.frag");
+    Core::shaders_file("predepth.vert"), Core::shaders_file("empty.frag"));
   predepth_pipeline =
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
       .framebuffer = predepth_framebuffer.get(),

@@ -37,14 +37,16 @@ public:
   static auto write(const T& instance) -> bool
   {
     auto path = T::construct_file_path(instance);
-    std::ofstream output_file{ path };
+    std::ofstream output_file{ std::format("{}.yml", path) };
     output_file.exceptions(std::ofstream::failbit | std::ofstream::badbit);
     if (!output_file) {
       return false;
     }
 
     try {
-      return T::write(instance, output_file);
+      auto could = T::write(instance, output_file);
+      output_file << "\n";
+      return could;
     } catch (const std::exception& exc) {
       error(exc);
       return false;

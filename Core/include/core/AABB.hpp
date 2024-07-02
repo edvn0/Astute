@@ -43,6 +43,12 @@ struct AABB
     min *= value;
     max *= value;
   }
+
+  auto rotate(const glm::mat4& rotation_matrix) -> void
+  {
+    min = glm::vec4{ min, 0.0F } * rotation_matrix;
+    max = glm::vec4{ max, 0.0F } * rotation_matrix;
+  }
 };
 
 } // namespace Engine::Core

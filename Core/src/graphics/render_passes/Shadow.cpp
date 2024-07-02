@@ -47,8 +47,8 @@ ShadowRenderPass::construct_impl() -> void
     .existing_image_layers = { 0 },
     .debug_name = "Shadow",
   };
-  shadow_shader = Shader::compile_graphics_scoped("Assets/shaders/shadow.vert",
-                                                  "Assets/shaders/empty.frag");
+  shadow_shader = Shader::compile_graphics_scoped(
+    Core::shaders_file("shadow.vert"), Core::shaders_file("empty.frag"));
   shadow_material = Core::make_scope<Material>(Material::Configuration{
     .shader = shadow_shader.get(),
   });

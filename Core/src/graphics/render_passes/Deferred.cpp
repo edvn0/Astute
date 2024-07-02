@@ -58,62 +58,117 @@ struct Impl
 };
 
 auto
-DeferredRenderPass::construct_impl() -> void
+DeferredRenderPass::create_noise_map() -> void
 {
   noise_map = TextureGenerator::simplex_noise(100, 100);
+}
+
+auto
+DeferredRenderPass::create_framebuffer() -> void
+{
   const auto& ext = get_renderer().get_size();
+  auto&& [deferred_framebuffer, _, __, ___] = get_data();
+  deferred_framebuffer = Core::make_scope<Framebuffer>(FramebufferSpecification{
+        .width = ext.width,
+        .height = ext.height,
+        .clear_colour_on_load = false,
+        .attachments = {
+            { .format = VK_FORMAT_R32G32B32A32_SFLOAT },
+            { .format = VK_FORMAT_R32_UINT, .blend = false },
+        },
+        .debug_name = "Deferred",
+    });
+}
+
+auto
+DeferredRenderPass::create_deferred_pass() -> void
+{
   auto&& [deferred_framebuffer,
           deferred_shader,
           deferred_pipeline,
           deferred_material] = get_data();
-  deferred_framebuffer = Core::make_scope<Framebuffer>(FramebufferSpecification{
-    .width = ext.width,
-    .height = ext.height,
-    .attachments = {
-      {
-                       .format = VK_FORMAT_R32G32B32A32_SFLOAT,
-                     },
-
-                     {
-                       .format = VK_FORMAT_R32_UINT,
-                       .blend = false,
-                     }, },
-    .debug_name = "Deferred",
-  });
 
   deferred_shader = Shader::compile_graphics_scoped(
-    "Assets/shaders/deferred.vert", "Assets/shaders/deferred.frag");
+    Core::shaders_file("deferred.vert"), Core::shaders_file("deferred.frag"));
+
   deferred_pipeline =
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
       .framebuffer = deferred_framebuffer.get(),
       .shader = deferred_shader.get(),
       .sample_count = VK_SAMPLE_COUNT_1_BIT,
-      .depth_comparator = VK_COMPARE_OP_LESS,
-      .override_vertex_attributes = {
-          {  },
-        },
-      .override_instance_attributes = {
-          {  },
-        },
+      .depth_comparator = VK_COMPARE_OP_GREATER_OR_EQUAL,
+      .override_vertex_attributes = { {} },
+      .override_instance_attributes = { {} },
     });
 
   deferred_material = Core::make_scope<Material>(Material::Configuration{
     .shader = deferred_shader.get(),
   });
+}
 
+auto
+DeferredRenderPass::create_cubemap_pass() -> void
+{
+  auto&& [deferred_framebuffer, _, __, ___] = get_data();
+
+  cubemap_shader = Shader::compile_graphics_scoped(
+    Core::shaders_file("cubemap.vert"), Core::shaders_file("cubemap.frag"));
+
+  cubemap_pipeline =
+    Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
+      .framebuffer = deferred_framebuffer.get(),
+      .shader = cubemap_shader.get(),
+      .sample_count = VK_SAMPLE_COUNT_1_BIT,
+      .depth_comparator = VK_COMPARE_OP_LESS,
+      .override_vertex_attributes = { {} },
+      .override_instance_attributes = { {} },
+      .test_depth = false,
+      .write_depth = false,
+    });
+
+  cubemap_material = Core::make_scope<Material>(Material::Configuration{
+    .shader = cubemap_shader.get(),
+  });
+}
+
+auto
+DeferredRenderPass::set_material_uniforms() -> void
+{
+  auto&& [_, __, ___, deferred_material] = get_data();
   auto& input_render_pass = get_renderer().get_render_pass("MainGeometry");
-  deferred_material->set("cubemap", cubemap);
-  deferred_material->set("position_map",
-                         input_render_pass.get_colour_attachment(0));
-  deferred_material->set("normal_map",
-                         input_render_pass.get_colour_attachment(1));
-  deferred_material->set("albedo_specular_map",
-                         input_render_pass.get_colour_attachment(2));
-  deferred_material->set("shadow_position_map",
-                         input_render_pass.get_colour_attachment(3));
-  deferred_material->set("noise_map", noise_map);
 
-  setup_file_watcher("Assets/shaders/deferred.frag");
+  bool could = true;
+  could &= deferred_material->set("position_map",
+                                  input_render_pass.get_colour_attachment(0));
+  could &= deferred_material->set("normal_map",
+                                  input_render_pass.get_colour_attachment(1));
+  could &= deferred_material->set("albedo_specular_map",
+                                  input_render_pass.get_colour_attachment(2));
+  could &= deferred_material->set("shadow_position_map",
+                                  input_render_pass.get_colour_attachment(3));
+  could &= deferred_material->set("noise_map", noise_map);
+  could &= cubemap_material->set("cubemap", cubemap);
+
+  assert(could &&
+         "Could set all (including cubemap for cubemap pass) uniforms.");
+}
+
+auto
+DeferredRenderPass::setup_file_watchers() -> void
+{
+  setup_file_watcher(Core::shaders_file("cubemap.frag").string(), true);
+  setup_file_watcher(Core::shaders_file("deferred.frag").string());
+}
+
+auto
+DeferredRenderPass::construct_impl() -> void
+{
+  create_noise_map();
+  create_framebuffer();
+  create_deferred_pass();
+  create_cubemap_pass();
+  set_material_uniforms();
+  setup_file_watchers();
 }
 
 DeferredRenderPass::DeferredRenderPass(Renderer& ren,
@@ -132,30 +187,49 @@ DeferredRenderPass::~DeferredRenderPass()
 auto
 DeferredRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
 {
-  ASTUTE_PROFILE_FUNCTION();
-
   auto&& [deferred_framebuffer,
           deferred_shader,
           deferred_pipeline,
           deferred_material] = get_data();
-  auto* renderer_desc_set =
-    get_renderer().generate_and_update_descriptor_write_sets(
-      *deferred_material);
+  ASTUTE_PROFILE_FUNCTION();
+  RendererExtensions::explicitly_clear_framebuffer(command_buffer,
+                                                   *deferred_framebuffer);
 
-  auto* material_set =
-    deferred_material->generate_and_update_descriptor_write_sets();
+  {
+    ASTUTE_PROFILE_SCOPE("Cubemap");
 
-  std::array desc_sets{ renderer_desc_set, material_set };
-  vkCmdBindDescriptorSets(command_buffer.get_command_buffer(),
-                          deferred_pipeline->get_bind_point(),
-                          deferred_pipeline->get_layout(),
-                          0,
-                          static_cast<Core::u32>(desc_sets.size()),
-                          desc_sets.data(),
-                          0,
-                          nullptr);
+    RendererExtensions::bind_pipeline(command_buffer, *cubemap_pipeline);
+    auto* cubemap_renderer_desc_set =
+      get_renderer().generate_and_update_descriptor_write_sets(
+        *cubemap_material);
+    auto* cubemap_material_set =
+      cubemap_material->generate_and_update_descriptor_write_sets();
 
-  vkCmdDraw(command_buffer.get_command_buffer(), 3, 1, 0, 0);
+    std::array cubemap_desc_sets{ cubemap_renderer_desc_set,
+                                  cubemap_material_set };
+    RendererExtensions::bind_descriptor_sets(
+      command_buffer, *cubemap_pipeline, std::span{ cubemap_desc_sets });
+
+    vkCmdDraw(command_buffer.get_command_buffer(), 36, 1, 0, 0);
+  }
+
+  {
+    ASTUTE_PROFILE_SCOPE("Deferred");
+    RendererExtensions::bind_pipeline(command_buffer, *deferred_pipeline);
+
+    auto* renderer_desc_set =
+      get_renderer().generate_and_update_descriptor_write_sets(
+        *deferred_material);
+
+    auto* material_set =
+      deferred_material->generate_and_update_descriptor_write_sets();
+
+    std::array desc_sets{ renderer_desc_set, material_set };
+    RendererExtensions::bind_descriptor_sets(
+      command_buffer, *deferred_pipeline, std::span{ desc_sets });
+
+    vkCmdDraw(command_buffer.get_command_buffer(), 3, 1, 0, 0);
+  }
 }
 
 auto
@@ -171,25 +245,28 @@ DeferredRenderPass::on_resize(const Core::Extent& ext) -> void
 
   fb->on_resize(ext);
   pipe->on_resize(ext);
+  cubemap_pipeline->on_resize(ext);
 }
 
 void
-DeferredRenderPass::setup_file_watcher(const std::string& shader_path)
+DeferredRenderPass::setup_file_watcher(const std::string& shader_path,
+                                       const bool is_cubemap)
 {
   watch->watch = Core::make_scope<filewatch::FileWatch<std::string>>(
-    shader_path, [this](const auto& path, filewatch::Event change_type) {
-      handle_file_change(path, change_type);
+    shader_path, [=, this](const auto& path, filewatch::Event change_type) {
+      handle_file_change(path, change_type, is_cubemap);
     });
 }
 
 void
 DeferredRenderPass::handle_file_change(const std::string& path,
-                                       filewatch::Event change_type)
+                                       filewatch::Event change_type,
+                                       const bool is_cubemap)
 {
-  Core::Application::submit_post_frame_function([this, path, change_type]() {
+  Core::Application::submit_post_frame_function([=, this]() {
     log_shader_change(path, change_type);
     if (change_type == filewatch::Event::modified) {
-      reload_shader();
+      reload_shader(is_cubemap);
     }
   });
 }
@@ -202,38 +279,64 @@ DeferredRenderPass::log_shader_change(const std::string& path,
 }
 
 void
-DeferredRenderPass::reload_shader()
+DeferredRenderPass::reload_shader(const bool is_cubemap)
 {
   auto&& [deferred_framebuffer,
           deferred_shader,
           deferred_pipeline,
           deferred_material] = get_data();
 
-  if (auto maybe_shader = Shader::compile_graphics_scoped(
-        "Assets/shaders/deferred.vert", "Assets/shaders/deferred.frag", true)) {
-    std::unique_lock<std::mutex> lock(RenderPass::get_mutex());
-    deferred_shader = std::move(maybe_shader);
-    recreate_pipeline();
+  if (!is_cubemap) {
+
+    if (auto maybe_shader =
+          Shader::compile_graphics_scoped(Core::shaders_file("deferred.vert"),
+                                          Core::shaders_file("deferred.frag"),
+                                          true)) {
+      std::unique_lock<std::mutex> lock(RenderPass::get_mutex());
+      deferred_shader = std::move(maybe_shader);
+      recreate_pipeline();
+    }
+  } else {
+    if (auto maybe_shader =
+          Shader::compile_graphics_scoped(Core::shaders_file("cubemap.vert"),
+                                          Core::shaders_file("cubemap.frag"),
+                                          true)) {
+      std::unique_lock<std::mutex> lock(RenderPass::get_mutex());
+      cubemap_shader = std::move(maybe_shader);
+      recreate_pipeline(true);
+    }
   }
 }
 
 void
-DeferredRenderPass::recreate_pipeline()
+DeferredRenderPass::recreate_pipeline(const bool is_cubemap)
 {
   auto&& [deferred_framebuffer,
           deferred_shader,
           deferred_pipeline,
           deferred_material] = get_data();
 
-  deferred_pipeline =
-    Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
-      .framebuffer = deferred_framebuffer.get(),
-      .shader = deferred_shader.get(),
-      .sample_count = VK_SAMPLE_COUNT_1_BIT,
-      .depth_comparator = VK_COMPARE_OP_LESS,
-      .override_vertex_attributes = {},
-      .override_instance_attributes = {},
-    });
+  if (is_cubemap) {
+    cubemap_pipeline =
+      Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
+        .framebuffer = deferred_framebuffer.get(),
+        .shader = cubemap_shader.get(),
+        .sample_count = VK_SAMPLE_COUNT_1_BIT,
+        .depth_comparator = VK_COMPARE_OP_LESS,
+        .override_vertex_attributes = {},
+        .override_instance_attributes = {},
+      });
+  } else {
+    deferred_pipeline =
+      Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
+        .framebuffer = deferred_framebuffer.get(),
+        .shader = deferred_shader.get(),
+        .sample_count = VK_SAMPLE_COUNT_1_BIT,
+        .depth_comparator = VK_COMPARE_OP_LESS,
+        .override_vertex_attributes = {},
+        .override_instance_attributes = {},
+      });
+  }
 }
 
 } // namespace Engine::Graphics

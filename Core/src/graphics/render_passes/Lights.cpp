@@ -37,7 +37,7 @@ LightsRenderPass::construct_impl() -> void
     .existing_images = { {
                            0,
                            get_renderer()
-                             .get_render_pass("Deferred")
+                             .get_render_pass("Transparent")
                              .get_colour_attachment(0),
                          },
                          {
@@ -48,8 +48,8 @@ LightsRenderPass::construct_impl() -> void
                          } },
     .debug_name = "Lights",
   });
-  lights_shader = Shader::compile_graphics_scoped("Assets/shaders/lights.vert",
-                                                  "Assets/shaders/lights.frag");
+  lights_shader = Shader::compile_graphics_scoped(
+    Core::shaders_file("lights.vert"), Core::shaders_file("lights.frag"));
   lights_pipeline =
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
       .framebuffer = lights_framebuffer.get(),

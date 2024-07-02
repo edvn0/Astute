@@ -14,6 +14,7 @@ class Entity
 public:
   Entity(entt::registry* registry, entt::entity entity);
   Entity(const Entity&);
+  Entity() = default;
   Entity(Entity&& other) noexcept;
 
   auto operator=(const Entity& other) -> Entity&;

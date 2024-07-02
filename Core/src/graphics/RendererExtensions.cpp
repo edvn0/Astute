@@ -7,6 +7,7 @@
 #include "graphics/GPUBuffer.hpp"
 #include "graphics/GraphicsPipeline.hpp"
 #include "graphics/Image.hpp"
+#include "graphics/Instance.hpp"
 
 #include <array>
 
@@ -107,7 +108,8 @@ explicitly_clear_framebuffer(const CommandBuffer& command_buffer,
   }
 
   if (framebuffer.has_depth_attachment() && clear_depth) {
-    auto aspect_bits = framebuffer.get_depth_attachment()->get_aspect_flags();
+    const auto aspect_bits =
+      framebuffer.get_depth_attachment()->get_aspect_flags();
     attachments[color_attachment_count].aspectMask = aspect_bits;
     attachments[color_attachment_count].clearValue =
       fb_clear_values[color_attachment_count];
@@ -135,7 +137,7 @@ bind_vertex_buffer(const CommandBuffer& command,
   };
   auto* cmd_buffer = command.get_command_buffer();
 
-  std::array vk_buffers{
+  const std::array vk_buffers{
     buffer.get_buffer(),
   };
 
@@ -156,6 +158,21 @@ bind_index_buffer(const CommandBuffer& command,
                        buffer.get_buffer(),
                        offset,
                        VK_INDEX_TYPE_UINT32);
+}
+
+auto
+bind_descriptor_sets(const CommandBuffer& command,
+                     const IPipeline& pipeline,
+                     const std::span<const VkDescriptorSet> sets) -> void
+{
+  vkCmdBindDescriptorSets(command.get_command_buffer(),
+                          pipeline.get_bind_point(),
+                          pipeline.get_layout(),
+                          0,
+                          static_cast<Core::u32>(sets.size()),
+                          sets.data(),
+                          0,
+                          nullptr);
 }
 
 } // namespace Engine::Graphics

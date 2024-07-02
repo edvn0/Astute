@@ -35,6 +35,8 @@ public:
       override_vertex_attributes{ std::nullopt };
     const std::optional<std::vector<VkVertexInputAttributeDescription>>
       override_instance_attributes{ std::nullopt };
+    const bool test_depth{ true };
+    const bool write_depth{ true };
   };
 
   explicit GraphicsPipeline(const Configuration&);
@@ -70,6 +72,8 @@ private:
     override_vertex_attributes;
   const std::optional<std::vector<VkVertexInputAttributeDescription>>
     override_instance_attributes;
+  const bool test_depth{ true };
+  const bool write_depth{ true };
 
   const IFramebuffer* framebuffer{ nullptr };
   const Shader* shader{ nullptr };
@@ -77,6 +81,8 @@ private:
   auto create_pipeline() -> void;
   auto create_layout() -> void;
   auto destroy() -> void;
+
+  std::filesystem::path pipeline_cache_path;
 };
 
 } // namespace Engine::Graphics

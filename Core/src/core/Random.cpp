@@ -25,9 +25,12 @@ random_in_rectangle(Core::i32 min, Core::i32 max) -> glm::vec3
 auto
 random_in(const AABB& aabb) -> glm::vec3
 {
-  auto x = random(aabb.min.x, aabb.max.x);
-  auto y = random(aabb.min.y, aabb.max.y);
-  auto z = random(aabb.min.z, aabb.max.z);
+  auto x = aabb.min.x < aabb.max.x ? random(aabb.min.x, aabb.max.x)
+                                   : random(aabb.max.x, aabb.min.x);
+  auto y = aabb.min.y < aabb.max.y ? random(aabb.min.y, aabb.max.y)
+                                   : random(aabb.max.y, aabb.min.y);
+  auto z = aabb.min.z < aabb.max.z ? random(aabb.min.z, aabb.max.z)
+                                   : random(aabb.max.z, aabb.min.z);
   return { x, y, z };
 }
 

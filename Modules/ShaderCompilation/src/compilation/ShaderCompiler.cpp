@@ -99,16 +99,16 @@ struct ShaderIncluder : public shaderc::CompileOptions::IncluderInterface
   {
   }
 
-  ~ShaderIncluder() = default;
-  shaderc_include_result* GetInclude(const char* requested_source,
-                                     shaderc_include_type type,
-                                     const char* requesting_source,
-                                     size_t include_depth) override
+  ~ShaderIncluder() override = default;
+  auto GetInclude(const char* requested_source,
+                  shaderc_include_type,
+                  const char*,
+                  size_t) -> shaderc_include_result* override
   {
     // Find the requested source file
     const std::filesystem::path requested_path = requested_source;
     const auto absolute_requested_path =
-      std::filesystem::path{ "Assets/shaders/include" } / requested_path;
+      std::filesystem::path{ Core::shaders_file("include") } / requested_path;
 
     // Check if the requested source file exists
     if (!std::filesystem::exists(absolute_requested_path)) {

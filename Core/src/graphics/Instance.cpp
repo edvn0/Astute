@@ -10,7 +10,7 @@
 
 namespace Engine::Graphics {
 
-constexpr auto enable_validation_layers = false;
+constexpr auto enable_validation_layers = ENABLE_VALIDATION_LAYERS == 1;
 
 static auto
 create_debug_utils_messenger_ext(

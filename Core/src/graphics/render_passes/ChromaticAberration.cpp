@@ -30,9 +30,9 @@ ChromaticAberrationRenderPass::construct_impl() -> void
       .debug_name = "ChromaticAberration",
     });
 
-  chromatic_aberration_shader =
-    Shader::compile_graphics_scoped("Assets/shaders/chromatic_aberration.vert",
-                                    "Assets/shaders/chromatic_aberration.frag");
+  chromatic_aberration_shader = Shader::compile_graphics_scoped(
+    Core::shaders_file("chromatic_aberration.vert"),
+    Core::shaders_file("chromatic_aberration.frag"));
   chromatic_aberration_pipeline =
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
       .framebuffer = chromatic_aberration_framebuffer.get(),
@@ -51,7 +51,7 @@ ChromaticAberrationRenderPass::construct_impl() -> void
     Core::make_scope<Material>(Material::Configuration{
       .shader = chromatic_aberration_shader.get(),
     });
-  const auto& input_render_pass = get_renderer().get_render_pass("Deferred");
+  const auto& input_render_pass = get_renderer().get_render_pass("Transparent");
   chromatic_aberration_material->set(
     "fullscreen_texture", input_render_pass.get_colour_attachment(0));
   get_settings()->apply_to_material(*chromatic_aberration_material);
@@ -70,6 +70,10 @@ ChromaticAberrationRenderPass::execute_impl(CommandBuffer& command_buffer)
   auto* renderer_desc_set =
     get_renderer().generate_and_update_descriptor_write_sets(
       *chromatic_aberration_material);
+
+  const auto& input_render_pass = get_renderer().get_render_pass("Transparent");
+  chromatic_aberration_material->set(
+    "fullscreen_texture", input_render_pass.get_colour_attachment(0));
 
   auto* material_set =
     chromatic_aberration_material->generate_and_update_descriptor_write_sets();

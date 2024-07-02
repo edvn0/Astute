@@ -44,10 +44,6 @@ const float epsilon = 0.00005;
 void
 main()
 {
-  if (abs(mat_pc.transparency) < epsilon) {
-    discard;
-  }
-
   vec3 N = normalize(fragment_normal);
   vec3 T = normalize(fragment_tangents);
   vec3 B = normalize(fragment_bitangents);
@@ -63,7 +59,7 @@ main()
 
   float specular_strength = texture(specular_map, fragment_uvs).r;
   float roughness_value =
-    texture(roughness_map, fragment_uvs).r * mat_pc.roughness;
+    texture(roughness_map, fragment_uvs).b * mat_pc.roughness;
 
   fragment_position = vec4(world_space_fragment_position, 1.0);
   uint chosen_cascade_index = 0;
@@ -72,7 +68,7 @@ main()
       chosen_cascade_index = i + 1;
     }
   }
-  vec3 cascade_colour = vec3(1.0);
+  /* vec3 cascade_colour = vec3(1.0);
   switch (chosen_cascade_index) {
     case 0:
       cascade_colour *= vec3(0);
@@ -86,9 +82,9 @@ main()
     case 3:
       cascade_colour *= vec3(1.0F, 0.25f, 0.25f);
       break;
-  }
+  } */
 
-  fragment_albedo_spec.rgb = albedo_color * cascade_colour;
+  fragment_albedo_spec.rgb = albedo_color; // * cascade_colour;
   fragment_albedo_spec.a = specular_strength * roughness_value;
 
   vec4 shadow_space_fragment_position =

@@ -61,10 +61,15 @@ GraphicsPipeline::GraphicsPipeline(const Configuration& config)
   , clear_depth_value(config.clear_depth_value)
   , override_vertex_attributes(config.override_vertex_attributes)
   , override_instance_attributes(config.override_instance_attributes)
+  , test_depth(config.test_depth)
+  , write_depth(config.write_depth)
   , framebuffer(config.framebuffer)
   , shader(config.shader)
 {
+  pipeline_cache_path =
+    std::format("{}_pipeline_cache.dat", construct_file_path(*this));
   create_layout();
+  create_pipeline_cache(pipeline_cache_path.string());
   create_pipeline();
   trace("Created graphics pipeline for framebuffer: {}",
         framebuffer->get_name());
@@ -74,6 +79,7 @@ GraphicsPipeline::GraphicsPipeline(const Configuration& config)
 
 GraphicsPipeline::~GraphicsPipeline()
 {
+  save_pipeline_cache(pipeline_cache_path.string());
   destroy();
 }
 
@@ -106,7 +112,7 @@ GraphicsPipeline::construct_file_path(const GraphicsPipeline& instance)
   std::stringstream file_path;
   static constexpr auto base = std::string_view{ "Assets/pipelines" };
   file_path << std::format(
-    "{}/graphics_pipeline_{}_{}.yaml", base, instance.shader->get_name(), hash);
+    "{}/graphics_pipeline_{}_{}", base, instance.shader->get_name(), hash);
   return file_path.str();
 }
 
@@ -177,6 +183,7 @@ GraphicsPipeline::on_resize(const Core::Extent&) -> void
 {
   destroy();
   create_layout();
+  create_pipeline_cache(pipeline_cache_path.string());
   create_pipeline();
 }
 
@@ -332,8 +339,8 @@ GraphicsPipeline::create_pipeline() -> void
   VkPipelineDepthStencilStateCreateInfo depth_stencil_info{};
   depth_stencil_info.sType =
     VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-  depth_stencil_info.depthTestEnable = VK_TRUE;
-  depth_stencil_info.depthWriteEnable = VK_TRUE;
+  depth_stencil_info.depthTestEnable = static_cast<VkBool32>(test_depth);
+  depth_stencil_info.depthWriteEnable = static_cast<VkBool32>(write_depth);
   depth_stencil_info.depthCompareOp = depth_comparator;
   depth_stencil_info.depthBoundsTestEnable = VK_FALSE;
   depth_stencil_info.stencilTestEnable = VK_FALSE;
@@ -375,12 +382,9 @@ GraphicsPipeline::create_pipeline() -> void
   pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
   pipeline_info.basePipelineIndex = -1;
 
-  VK_CHECK(vkCreateGraphicsPipelines(Device::the().device(),
-                                     VK_NULL_HANDLE,
-                                     1,
-                                     &pipeline_info,
-                                     nullptr,
-                                     &pipeline));
+  auto* const cache = get_pipeline_cache();
+  VK_CHECK(vkCreateGraphicsPipelines(
+    Device::the().device(), cache, 1, &pipeline_info, nullptr, &pipeline));
 }
 
 auto

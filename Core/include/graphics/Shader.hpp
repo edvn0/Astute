@@ -122,13 +122,13 @@ public:
     const Compilation::ShaderCompilerConfiguration&) -> void;
 
 private:
-  std::string name{};
+  std::string name;
   Core::usize hash_value{ 0 };
-  std::vector<VkDescriptorSetLayout> descriptor_set_layouts{};
-  Reflection::ReflectionData reflection_data{};
-  std::unordered_map<Type, VkShaderModule> shader_modules{};
-  std::unordered_map<Type, std::string> parsed_spirv_per_stage{};
-  std::unordered_map<Type, std::vector<Core::u32>> parsed_spirv_per_stage_u32{};
+  std::vector<VkDescriptorSetLayout> descriptor_set_layouts;
+  Reflection::ReflectionData reflection_data;
+  std::unordered_map<Type, VkShaderModule> shader_modules;
+  std::unordered_map<Type, std::string> parsed_spirv_per_stage;
+  std::unordered_map<Type, std::vector<Core::u32>> parsed_spirv_per_stage_u32;
 
   void create_descriptor_set_layouts();
 

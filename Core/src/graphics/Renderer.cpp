@@ -1,3 +1,5 @@
+#include "core/Input.hpp"
+#include "core/InputCodes.hpp"
 #include "pch/CorePCH.hpp"
 
 #include "graphics/Renderer.hpp"
@@ -165,9 +167,9 @@ Renderer::Renderer(Configuration config, const Window* window)
   std::unordered_map<RendererTechnique, std::vector<std::string>>
     technique_construction_order;
   technique_construction_order[RendererTechnique::Deferred] = {
-    "Shadow",   "Predepth",    "MainGeometry",
-    "Deferred", "Lights",      "ChromaticAberration",
-    "Bloom",    "Composition",
+    "Shadow",      "Predepth", "MainGeometry",        "Deferred",
+    "Transparent", "Lights",   "ChromaticAberration", "Bloom",
+    "Composition",
   };
 
   current_cubemap =
@@ -187,6 +189,7 @@ Renderer::Renderer(Configuration config, const Window* window)
     Core::make_scope<ChromaticAberrationRenderPass>(*this);
   render_passes["Composition"] = Core::make_scope<CompositionRenderPass>(*this);
   render_passes["Bloom"] = Core::make_scope<BloomRenderPass>(*this);
+  render_passes["Transparent"] = Core::make_scope<TransparentRenderPass>(*this);
 
   for (const auto& k :
        technique_construction_order.at(RendererTechnique::Deferred)) {
@@ -377,10 +380,6 @@ Renderer::submit_static_mesh(Core::Ref<StaticMesh>& static_mesh,
   const auto& source = static_mesh->get_mesh_asset();
   const auto& submesh_data = source->get_submeshes();
   for (const auto submesh_index : static_mesh->get_submeshes()) {
-    if (submesh_data.at(submesh_index).is_transparent) {
-      continue;
-    }
-
     glm::mat4 submesh_transform =
       transform * submesh_data[submesh_index].transform;
 
@@ -395,7 +394,9 @@ Renderer::submit_static_mesh(Core::Ref<StaticMesh>& static_mesh,
     RendererExtensions::emplace_transform(mesh_transform_map[key],
                                           submesh_transform);
 
-    auto& command = draw_commands[key];
+    auto& command = submesh_data.at(submesh_index).is_transparent
+                      ? transparent_draw_commands[key]
+                      : draw_commands[key];
     command.static_mesh = static_mesh;
     command.submesh_index = submesh_index;
     command.instance_count++;
@@ -477,7 +478,10 @@ Renderer::flush_draw_lists() -> void
     // Deferred
     render_passes.at("Deferred")->execute(*command_buffer);
 
+    render_passes.at("Transparent")->execute(*command_buffer);
+
     render_passes.at("Lights")->execute(*command_buffer);
+
   } else if (technique == RendererTechnique::ForwardPlus) {
     render_passes.at("ForwardPlusGeometry")->execute(*command_buffer);
     render_passes.at("Composite")->execute(*command_buffer);
@@ -495,6 +499,7 @@ Renderer::flush_draw_lists() -> void
   command_buffer->submit();
 
   draw_commands.clear();
+  transparent_draw_commands.clear();
   shadow_draw_commands.clear();
   lights_draw_commands.clear();
   mesh_transform_map.clear();

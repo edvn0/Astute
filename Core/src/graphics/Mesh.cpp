@@ -206,8 +206,9 @@ MeshAsset::MeshAsset(const std::string& file_name)
     }),
   }, dispatcher(*command_buffer)
 {
-  deferred_pbr_shader = Shader::compile_graphics_scoped(
-    "Assets/shaders/main_geometry.vert", "Assets/shaders/main_geometry.frag");
+  deferred_pbr_shader =
+    Shader::compile_graphics_scoped(Core::shaders_file("main_geometry.vert"),
+                                    Core::shaders_file("main_geometry.frag"));
 
   AssimpLogStream::initialize();
 
@@ -394,21 +395,17 @@ MeshAsset::MeshAsset(const std::string& file_name)
       ai_material->GetTexture(aiTextureType_DIFFUSE, 0, &ai_tex_path) ==
       AI_SUCCESS;
     if (has_albedo_map) {
-      Core::f32 transparency{ -1 };
-      auto has_transparency =
-        ai_material->Get(AI_MATKEY_TRANSPARENCYFACTOR, transparency);
-      has_transparency = has_transparency == AI_FAILURE
-                           ? ai_material->Get(AI_MATKEY_OPACITY, transparency)
-                           : AI_FAILURE;
+      Core::f32 opacity{ -1 };
+      auto has_transparency = ai_material->Get(AI_MATKEY_OPACITY, opacity);
 
-      if (has_transparency == AI_SUCCESS && transparency > 0.0F) {
+      if (has_transparency == AI_SUCCESS) {
         auto* found = linear_search(submeshes, [i](const Submesh& submesh) {
           return submesh.material_index == i;
         });
 
         if (found != nullptr) {
-          found->is_transparent = true;
-          materials.at(i)->set("mat_pc.transparency", 0.0F);
+          found->is_transparent = opacity < 1.0F;
+          materials.at(i)->set("mat_pc.transparency", 1.0F - opacity);
         }
       }
 

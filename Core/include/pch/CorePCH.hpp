@@ -1,5 +1,7 @@
 #pragma once
 
+#include "core/StandardPaths.hpp"
+
 #include <algorithm>
 #include <array>
 #include <atomic>

@@ -1,3 +1,4 @@
+#include "core/Verify.hpp"
 #include "pch/CorePCH.hpp"
 
 #include "graphics/render_passes/LightCulling.hpp"
@@ -17,7 +18,7 @@ LightCullingRenderPass::construct_impl() -> void
           light_culling_pipeline,
           light_culling_material] = get_data();
   light_culling_shader =
-    Shader::compile_compute_scoped("Assets/shaders/light_culling.comp");
+    Shader::compile_compute_scoped(Core::shaders_file("light_culling.comp"));
 
   light_culling_pipeline =
     Core::make_scope<ComputePipeline>(ComputePipeline::Configuration{
@@ -26,6 +27,12 @@ LightCullingRenderPass::construct_impl() -> void
   light_culling_material = Core::make_scope<Material>(Material::Configuration{
     .shader = light_culling_shader.get(),
   });
+
+  Core::ensure(
+    light_culling_material->set(
+      "predepth_map",
+      get_renderer().get_render_pass("Predepth").get_depth_attachment()),
+    "Could not set predepth_map.");
 }
 
 auto
@@ -37,10 +44,6 @@ LightCullingRenderPass::execute_impl(CommandBuffer& command_buffer) -> void
          light_culling_shader,
          light_culling_pipeline,
          light_culling_material] = get_data();
-
-  light_culling_material->set(
-    "predepth_map",
-    get_renderer().get_render_pass("Predepth").get_depth_attachment());
 
   auto* descriptor_set =
     generate_and_update_descriptor_write_sets(*light_culling_material);

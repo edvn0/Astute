@@ -29,8 +29,9 @@ CompositionRenderPass::construct_impl() -> void
       .debug_name = "Composition",
     });
 
-  composition_shader = Shader::compile_graphics_scoped(
-    "Assets/shaders/composition.vert", "Assets/shaders/composition.frag");
+  composition_shader =
+    Shader::compile_graphics_scoped(Core::shaders_file("composition.vert"),
+                                    Core::shaders_file("composition.frag"));
   composition_pipeline =
     Core::make_scope<GraphicsPipeline>(GraphicsPipeline::Configuration{
       .framebuffer = composition_framebuffer.get(),

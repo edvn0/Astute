@@ -3,6 +3,8 @@
 #include "graphics/Renderer.hpp"
 #include "graphics/Renderer2D.hpp"
 
+#include "core/StandardPaths.hpp"
+
 #include <ranges>
 #include <span>
 
@@ -19,8 +21,8 @@ Renderer2D::Renderer2D(Renderer& ren, Core::u32 object_count)
 
   line_vertices = Core::make_scope<VertexBuffer>(std::span(vertices));
   line_indices = Core::make_scope<IndexBuffer>(std::span(indices));
-  line_shader = Shader::compile_graphics_scoped("Assets/shaders/line.vert",
-                                                "Assets/shaders/line.frag");
+  line_shader = Shader::compile_graphics_scoped(
+    Core::shaders_file("line.vert"), Core::shaders_file("line.frag"));
   line_material = Core::make_scope<Material>(Material::Configuration{
     .shader = line_shader.get(),
   });
@@ -28,7 +30,6 @@ Renderer2D::Renderer2D(Renderer& ren, Core::u32 object_count)
     .framebuffer =
       renderer->get_render_pass("MainGeometry").get_framebuffer().get(),
     .shader = line_shader.get(),
-    .face_mode = VK_FRONT_FACE_COUNTER_CLOCKWISE,
     .topology = Topology::LineList,
     .override_vertex_attributes = { {
       {

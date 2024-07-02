@@ -12,6 +12,7 @@
 struct aiNode;
 struct aiAnimation;
 struct aiNodeAnim;
+struct aiMaterial;
 struct aiScene;
 
 namespace Assimp {
@@ -71,6 +72,10 @@ class MeshAsset
 {
 public:
   explicit MeshAsset(const std::string&);
+  explicit MeshAsset(const std::filesystem::path& path)
+    : MeshAsset(path.string())
+  {
+  }
   ~MeshAsset();
 
   [[nodiscard]] auto get_submeshes() -> auto& { return submeshes; }

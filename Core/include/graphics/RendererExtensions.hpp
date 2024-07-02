@@ -5,6 +5,8 @@
 #include "graphics/IFramebuffer.hpp"
 #include "graphics/Pipeline.hpp"
 
+#include <span>
+
 using BufferBinding = Engine::Core::u32;
 using BufferOffset = Engine::Core::u32;
 
@@ -35,6 +37,11 @@ auto
 explicitly_clear_framebuffer(const CommandBuffer&,
                              const IFramebuffer&,
                              bool clear_depth = true) -> void;
+
+auto
+bind_descriptor_sets(const CommandBuffer&,
+                     const IPipeline&,
+                     std::span<const VkDescriptorSet>) -> void;
 
 static constexpr auto emplace_transform = [](auto& transform_dict,
                                              const auto& matrix) {

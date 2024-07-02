@@ -452,7 +452,9 @@ Framebuffer::construct_blend_states() const
       break;
     }
 
-    blend_attachment_states[i].colorWriteMask = 0xf;
+    auto& blend_state = blend_attachment_states[i];
+
+    blend_state.colorWriteMask = 0xf;
     if (!config.blend) {
       break;
     }
@@ -463,33 +465,28 @@ Framebuffer::construct_blend_states() const
         ? attachment_specification.blend_mode
         : config.blend_mode;
 
-    blend_attachment_states[i].blendEnable =
+    blend_state.blendEnable =
       attachment_specification.blend ? VK_TRUE : VK_FALSE;
 
-    blend_attachment_states[i].colorBlendOp = VK_BLEND_OP_ADD;
-    blend_attachment_states[i].alphaBlendOp = VK_BLEND_OP_ADD;
-    blend_attachment_states[i].srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-    blend_attachment_states[i].dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+    blend_state.colorBlendOp = VK_BLEND_OP_ADD;
+    blend_state.alphaBlendOp = VK_BLEND_OP_ADD;
+    blend_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+    blend_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
 
     switch (blend_mode) {
       case FramebufferBlendMode::SrcAlphaOneMinusSrcAlpha:
-        blend_attachment_states[i].srcColorBlendFactor =
-          VK_BLEND_FACTOR_SRC_ALPHA;
-        blend_attachment_states[i].dstColorBlendFactor =
-          VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-        blend_attachment_states[i].srcAlphaBlendFactor =
-          VK_BLEND_FACTOR_SRC_ALPHA;
-        blend_attachment_states[i].dstAlphaBlendFactor =
-          VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        blend_state.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        blend_state.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        blend_state.srcAlphaBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        blend_state.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
         break;
       case FramebufferBlendMode::OneZero:
-        blend_attachment_states[i].srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-        blend_attachment_states[i].dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+        blend_state.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+        blend_state.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
         break;
       case FramebufferBlendMode::ZeroSrcColor:
-        blend_attachment_states[i].srcColorBlendFactor = VK_BLEND_FACTOR_ZERO;
-        blend_attachment_states[i].dstColorBlendFactor =
-          VK_BLEND_FACTOR_SRC_COLOR;
+        blend_state.srcColorBlendFactor = VK_BLEND_FACTOR_ZERO;
+        blend_state.dstColorBlendFactor = VK_BLEND_FACTOR_SRC_COLOR;
         break;
       default:
         Core::ensure(false, "Never here");
